@@ -1,20 +1,50 @@
-# OpenCut Native Core
+# OpenCut Native Core (C++20)
 
-This module is the first C++ performance-core candidate for timeline hot paths.
+Thư viện lõi xử lý hiệu năng cao của Catchim, được viết hoàn toàn bằng **C++20** và biên dịch sang **WebAssembly** thông qua Emscripten.
 
-Current scope:
+---
 
-- Integer tick based timeline ranges.
-- Track-local sorted clip index.
-- Overlap checks for drag, trim, and insertion.
-- Visible range queries for future timeline virtualization.
-- Move and trim commands with structured errors.
-- Insert, delete, split, move, and trim commands.
-- A small C ABI in `include/opencut/c_api.h` for future WASM/native bindings.
+## 📌 Các Phân Hệ Cốt Lõi
 
-This code is intentionally not wired into the web app yet. The current web app already uses Rust/WASM for media time and has TypeScript timeline behavior that must be preserved. The next integration step should add a thin WASM/native bridge and compare benchmark data before replacing the TypeScript path.
+1. **`opencut::time`** (`include/opencut/time.hpp`, `src/time.cpp`):
+   - Đơn vị thời gian media ticks chuẩn: `TICKS_PER_SECOND = 120_000`.
+   - Chuẩn khung hình Rational framerate (`FrameRate`) hỗ trợ mọi chuẩn fps phổ biến.
+   - Định dạng và phân tích Timecode SMPTE (`MM:SS`, `HH:MM:SS`, `HH:MM:SS:CS`, `HH:MM:SS:FF`).
+   - Căn chỉnh khung hình: `round_to_frame`, `floor_to_frame`, `snapped_seek_time`.
 
-Build when CMake and a C++20 compiler are available:
+2. **`opencut::timeline`** (`include/opencut/timeline.hpp`, `src/timeline.cpp`):
+   - Cấu trúc timeline đa track, quản lý chỉ mục khoảng thời gian (`TimeRange`, `Clip`, `Track`).
+   - Kiểm tra va chạm (`can_place_clip`, `find_first_overlapping_clip`).
+   - Các lệnh thao tác clip: thêm mới, xóa, di chuyển, cắt ngắn, chia đôi clip.
+   - Thuật toán hít nam châm thông minh (`snap_time`).
+   - Di chuyển nhiều clip đồng thời theo nhóm (`check_group_move`).
+
+3. **`opencut::compositor`** (`include/opencut/compositor.hpp`, `src/compositor.cpp`):
+   - Biến đổi ma trận 3x3 (`QuadTransform`, `Matrix3x3`, tịnh tiến, xoay, phóng to/thu nhỏ, lật ảnh).
+   - 17 chế độ hòa trộn màu sắc (Blend Modes: `Normal`, `Darken`, `Multiply`, `ColorBurn`, `Lighten`, `Screen`, `Overlay`,...).
+   - Tính toán hòa trộn alpha compositing `blend_colors`.
+
+4. **`opencut::masks`** (`include/opencut/masks.hpp`, `src/masks.cpp`):
+   - Giải tích Signed Distance Fields (SDF) cho hình chữ nhật, hình tròn, elip, mặt phẳng tuyến tính, đa giác.
+   - Làm mờ biên độ mềm (analytical feathering) và tính toán giá trị alpha.
+
+5. **`opencut::effects`** (`include/opencut/effects.hpp`, `src/effects.cpp`):
+   - Tinh chỉnh thông số màu sắc (nhiệt độ màu, phơi sáng, tương phản, độ bão hòa, vignette, gamma).
+   - Tạo nhân ma trận làm mờ 1D Gaussian kernel.
+
+6. **`opencut::audio`** (`include/opencut/audio.hpp`, `src/audio.cpp`):
+   - Đường bao âm lượng keyframe envelope.
+   - Làm mượt âm lượng vào/ra (fade-in / fade-out).
+   - Thuật toán trích xuất đỉnh sóng âm thanh (waveform decimation).
+
+7. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
+   - C ABI tương thích WebAssembly chuẩn.
+
+---
+
+## 🛠️ Hướng Dẫn Biên Dịch & Kiểm Thử
+
+### Biên dịch và chạy Unit Test (Native C++)
 
 ```bash
 cmake -S native/opencut_core -B native/opencut_core/build -DCMAKE_BUILD_TYPE=Release
@@ -22,25 +52,13 @@ cmake --build native/opencut_core/build --config Release
 ctest --test-dir native/opencut_core/build --output-on-failure
 ```
 
-On this Windows checkout, CMake and Ninja are bundled with Visual Studio. If they are not in PATH, run:
-
-```bat
-call "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\VsDevCmd.bat" -arch=x64
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S native/opencut_core -B native/opencut_core/build -G Ninja -DCMAKE_BUILD_TYPE=Debug
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build native/opencut_core/build --config Debug
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\ctest.exe" --test-dir native/opencut_core/build --output-on-failure
-```
-
-Build the web runtime module with Emscripten:
+### Biên dịch sang WebAssembly
 
 ```bash
-bun run build:cpp:wasm
-```
+# Linux/macOS
+npm run build:cpp:wasm
 
-On the local Windows setup with repo-local `.tools/emsdk` and Visual Studio bundled CMake/Ninja:
-
-```bash
+# Windows
 npm run build:cpp:wasm:win
 ```
-
-That emits `opencut_core.js` into `apps/web/public/wasm/`. The module is built with Emscripten `SINGLE_FILE=1`, so the WASM payload is embedded in the JS loader. The web app preloads that module from `EditorProvider` and uses it for timeline placement overlap checks when available. Set `NEXT_PUBLIC_OPENCUT_NATIVE_TIMELINE=0` to force the TypeScript fallback.
+Tệp đầu ra `opencut_core.js` sẽ được đưa vào `apps/web/public/wasm/`.

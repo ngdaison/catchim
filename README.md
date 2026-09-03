@@ -1,162 +1,137 @@
-# OpenCut (Legacy)
+# Catchim - Trình Chỉnh Sửa Video Trực Tuyến
 
-This is the original OpenCut codebase. It's archived and no longer maintained.
-
-The rewrite is happening at [opencut-app/opencut](https://github.com/opencut-app/opencut).
-
-## Sponsors
-
-Thanks to [Vercel](https://vercel.com?utm_source=github-opencut&utm_campaign=oss) and [fal.ai](https://fal.ai?utm_source=github-opencut&utm_campaign=oss) for their support of open-source software.
-
-<a href="https://vercel.com/oss">
-  <img alt="Vercel OSS Program" src="https://vercel.com/oss/program-badge.svg" />
-</a>
-
-<a href="https://fal.ai">
-  <img alt="Powered by fal.ai" src="https://img.shields.io/badge/Powered%20by-fal.ai-000000?style=flat&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCAxMEwxMy4wOSAxNS43NEwxMiAyMkwxMC45MSAxNS43NEw0IDEwTDEwLjkxIDguMjZMMTIgMloiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=" />
-</a>
-
-## Why?
-
-- **Privacy**: Your videos stay on your device
-- **Free features**: Most basic CapCut features are now paywalled 
-- **Simple**: People want editors that are easy to use - CapCut proved that
-
-## Project Structure
-
-- `apps/web/`: Next.js web application
-- `apps/desktop/`: Native desktop app built with GPUI (in progress)
-- `rust/`: Platform-agnostic core: GPU compositor, effects, masks, and WASM bindings. We're actively migrating business logic here from TypeScript.
-- `docs/`: Architecture and subsystem documentation
-
-## Getting Started
-
-### Prerequisites
-
-- [Bun](https://bun.sh/docs/installation)
-- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
-
-> **Note:** Docker is optional but recommended for running the local database and Redis. If you only want to work on frontend features, you can skip it.
-
-### Setup
-
-1. Fork and clone the repository
-
-2. Copy the environment file:
-
-   ```bash
-   # Unix/Linux/Mac
-   cp apps/web/.env.example apps/web/.env.local
-
-   # Windows PowerShell
-   Copy-Item apps/web/.env.example apps/web/.env.local
-   ```
-
-3. Start the database and Redis:
-
-   ```bash
-   docker compose up -d db redis serverless-redis-http
-   ```
-
-4. Install dependencies and start the dev server:
-
-   ```bash
-   bun install
-   bun dev:web
-   ```
-
-The application will be available at [http://localhost:3000](http://localhost:3000).
-
-The `.env.example` has sensible defaults that match the Docker Compose config — it should work out of the box.
-
-### Desktop setup
-
-Desktop is opt-in. If you're only working on the web app, skip this entirely.
-
-If you want to get ready for `apps/desktop`, see [`apps/desktop/README.md`](apps/desktop/README.md). It's a two-step setup: Rust toolchain first, then desktop native dependencies.
-
-### Local WASM development
-
-Only needed if you're editing `rust/wasm` and want the web app to use your local build instead of the published package.
-
-**Prerequisites** — install these once before anything else:
-
-```bash
-# Rust toolchain
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# build the WASM package
-cargo install wasm-pack
-
-# reruns the build on file changes, used by bun dev:wasm
-cargo install cargo-watch
-```
-
-1. Build the package once from the repo root:
-
-   ```bash
-   bun run build:wasm
-   ```
-
-2. Register the generated package for linking:
-
-   ```bash
-   cd rust/wasm/pkg
-   bun link
-   ```
-
-3. Link `apps/web` to the local package:
-
-   ```bash
-   cd apps/web
-   bun link opencut-wasm
-   ```
-
-4. Rebuild on changes while you work:
-
-   ```bash
-   bun dev:wasm
-   ```
-
-To switch `apps/web` back to the published package, run:
-
-```bash
-cd apps/web
-bun add opencut-wasm
-```
-
-### Self-Hosting with Docker
-
-To run everything (including a production build of the app) in Docker:
-
-```bash
-docker compose up -d
-```
-
-The app will be available at [http://localhost:3100](http://localhost:3100).
-
-## Contributing
-
-We welcome contributions! While we're actively developing and refactoring certain areas, there are plenty of opportunities to contribute effectively.
-
-**🎯 Focus areas:** Timeline functionality, project management, performance, bug fixes, and UI improvements outside the preview panel.
-
-**⚠️ Avoid for now:** Preview panel enhancements (fonts, stickers, effects) and export functionality - we're refactoring these with a new binary rendering approach.
-
-See our [Contributing Guide](.github/CONTRIBUTING.md) for detailed setup instructions, development guidelines, and complete focus area guidance.
-
-**Quick start for contributors:**
-
-- Fork the repo and clone locally
-- Follow the setup instructions in CONTRIBUTING.md
-- Working on `apps/desktop`? See [`apps/desktop/README.md`](apps/desktop/README.md) for setup
-- Create a feature branch and submit a PR
-
-## License
-
-[MIT LICENSE](LICENSE)
+**Catchim** là trình chỉnh sửa video mã nguồn mở hoạt động hoàn toàn trên trình duyệt web. Ứng dụng tập trung vào tính riêng tư (toàn bộ video và dữ liệu được xử lý trực tiếp trên máy của bạn), tốc độ xử lý mượt mà và giao diện trực quan, dễ sử dụng.
 
 ---
 
-![Star History Chart](https://api.star-history.com/svg?repos=opencut-app/opencut&type=Date)
+## 🏗️ Kiến Trúc Hệ Thống
 
+Dự án được xây dựng dựa trên sự kết hợp giữa hiệu năng cao của C++ và tính linh hoạt của giao diện Web hiện đại:
+
+* **Core Engine (`native/opencut_core/`) — Viết bằng C++20**:
+  Toàn bộ logic tính toán nền tảng, thuật toán xử lý video/audio được chuyển sang C++20 độc lập với giao diện, sau đó biên dịch thành WebAssembly (thông qua Emscripten) để chạy trực tiếp trên trình duyệt:
+  - **`opencut::time`**: Quản lý thời gian chính xác cao với hệ quy chiếu 120.000 ticks/giây, hỗ trợ toàn bộ các chuẩn khung hình (fps) và định dạng Timecode SMPTE.
+  - **`opencut::timeline`**: Quản lý đa track, thêm, sửa, xóa, cắt ngắn, chia tách clip, tính toán va chạm và thuật toán hít nam châm (snapping).
+  - **`opencut::compositor`**: Biến đổi hình học (ma trận 3x3), 17 chế độ hòa trộn lớp màu (blend modes) và kết xuất alpha compositing.
+  - **`opencut::masks`**: Mặt nạ hình học sử dụng giải tích Signed Distance Field (SDF) và làm mờ biên độ mềm (feathering).
+  - **`opencut::effects`**: Bộ chỉnh màu sắc (nhiệt độ màu, phơi sáng, tương phản, độ bão hòa, vignette, gamma) và nhân làm mờ Gaussian.
+  - **`opencut::audio`**: Đường bao âm lượng keyframe, làm mượt âm lượng vào/ra (fade-in / fade-out) và thuật toán tạo biểu đồ sóng âm (waveform).
+
+* **Giao Diện Người Dùng (`apps/web/`) — Next.js, React & TypeScript**:
+  Đảm nhận phần hiển thị giao diện đồ họa, điều khiển tương tác chuột, phím tắt, timeline trực quan, các thanh công cụ và bảng cài đặt thuộc tính. Frontend giao tiếp trực tiếp với Core Engine C++ thông qua cầu nối WebAssembly tại `apps/web/src/native/`.
+
+---
+
+## 📁 Cấu Trúc Thư Mục
+
+```text
+catchim/
+├── native/opencut_core/     # Mã nguồn C++20 của Core Engine
+│   ├── include/opencut/     # Header files (time, timeline, compositor, masks, effects, audio, c_api)
+│   ├── src/                 # Triển khai thuật toán C++
+│   ├── tests/               # Bộ kiểm thử Unit Test cho C++ (CTest)
+│   └── CMakeLists.txt       # Cấu hình biên dịch Native & WebAssembly
+├── apps/web/                # Giao diện người dùng Web (Next.js 16, React 19, TailwindCSS)
+│   ├── src/                 # Mã nguồn React components, stores, hooks
+│   │   ├── native/          # Cầu nối gọi C++ WebAssembly
+│   │   └── ...
+│   └── public/wasm/         # Tệp nhúng WebAssembly đã biên dịch (opencut_core.js)
+├── docs/                    # Tài liệu kỹ thuật
+└── package.json             # Quản lý script và phụ thuộc dự án
+```
+
+---
+
+## 🚀 Hướng Dẫn Cài Đặt & Khởi Chạy
+
+### 1. Yêu cầu môi trường
+
+- **Node.js** (phiên bản 20+ trở lên) hoặc **Bun**
+- Trình duyệt web hiện đại có hỗ trợ WebAssembly (Chrome, Edge, Firefox, Safari)
+
+*(Tùy chọn nếu muốn tự build lại mã nguồn C++):*
+- **CMake** (3.24+)
+- **Trình biên dịch C++20** (MSVC 2022, GCC 12+ hoặc Clang 15+)
+- **Emscripten SDK** (để biên dịch C++ sang WebAssembly)
+
+---
+
+### 2. Cài đặt và chạy giao diện Web
+
+1. **Clone repository về máy**:
+   ```bash
+   git clone https://github.com/0kiyo/catchim.git
+   cd catchim
+   ```
+
+2. **Cài đặt các gói phụ thuộc**:
+   ```bash
+   npm install
+   # hoặc dùng bun:
+   bun install
+   ```
+
+3. **Tạo tệp cấu hình môi trường**:
+   ```bash
+   # Trên Linux/macOS
+   cp apps/web/.env.example apps/web/.env.local
+
+   # Trên Windows PowerShell
+   Copy-Item apps/web/.env.example apps/web/.env.local
+   ```
+
+4. **Khởi chạy máy chủ phát triển (Development Server)**:
+   ```bash
+   npm run dev:web
+   # hoặc:
+   bun dev:web
+   ```
+   Mở trình duyệt và truy cập: `http://localhost:3000`
+
+---
+
+### 3. Đóng gói bản phát hành (Production Build)
+
+Để đóng gói và tối ưu toàn bộ ứng dụng web:
+```bash
+npm run build:web
+```
+
+---
+
+### 4. Biên dịch mã nguồn C++ Core (Dành cho nhà phát triển Engine)
+
+Nếu bạn thực hiện thay đổi mã nguồn C++ trong `native/opencut_core/`:
+
+* **Chạy bộ kiểm thử C++ Native**:
+  ```bash
+  cmake -S native/opencut_core -B native/opencut_core/build -DCMAKE_BUILD_TYPE=Release
+  cmake --build native/opencut_core/build --config Release
+  ctest --test-dir native/opencut_core/build --output-on-failure
+  ```
+
+* **Biên dịch sang WebAssembly**:
+  ```bash
+  # Trên Linux/macOS (khi đã active emsdk):
+  npm run build:cpp:wasm
+
+  # Trên Windows:
+  npm run build:cpp:wasm:win
+  ```
+  File WebAssembly sau khi build sẽ tự động được đưa vào `apps/web/public/wasm/opencut_core.js`.
+
+---
+
+## ✨ Tính Năng Nổi Bật
+
+- **Riêng tư và bảo mật**: Không tải video của người dùng lên server bên ngoài, dựng hình trực tiếp trên máy cục bộ.
+- **Timeline chuyên nghiệp**: Hỗ trợ đa track video, audio, text, sticker với độ trễ cực thấp.
+- **Hệ thống hít nam châm thông minh (Magnetic Snapping)**: Căn chỉnh mép clip, đường thời gian chính xác tới từng khung hình.
+- **Bộ lọc và hiệu ứng đa dạng**: Chỉnh màu, làm mờ viền, tạo hình mặt nạ và hòa trộn 17 chế độ màu khác nhau.
+- **Tương thích cao**: Hoạt động mượt mà trên máy tính để bàn và giao diện cảm ứng di động.
+
+---
+
+## 📄 Giấy Phép
+
+Dự án được phát hành theo giấy phép mã nguồn mở [MIT License](LICENSE).
