@@ -7,8 +7,8 @@
 	],
 	"scripts": {
 		"build:tools": "turbo run build --filter=@opencut/tools",
-    "build:cpp:wasm": "emcmake cmake -S native/opencut_core -B native/opencut_core/build-wasm -DCMAKE_BUILD_TYPE=Release && cmake --build native/opencut_core/build-wasm --config Release --target opencut_core_wasm",
-    "build:cpp:wasm:win": "cmd /d /c \"set PATH=C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin;C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja;%PATH%&& call .tools\\emsdk\\emsdk_env.bat && emcmake cmake -S native/opencut_core -B native/opencut_core/build-wasm -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build native/opencut_core/build-wasm --config Release --target opencut_core_wasm\"",
+    "build:cpp:wasm": "emcmake cmake -S native/core -B native/core/build-wasm -DCMAKE_BUILD_TYPE=Release && cmake --build native/core/build-wasm --config Release --target opencut_core_wasm",
+    "build:cpp:wasm:win": "cmd /d /c \"set PATH=C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\CMake\\bin;C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\Common7\\IDE\\CommonExtensions\\Microsoft\\CMake\\Ninja;%PATH%&& call .tools\\emsdk\\emsdk_env.bat && emcmake cmake -S native/core -B native/core/build-wasm -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build native/core/build-wasm --config Release --target opencut_core_wasm\"",
 		"build:wasm": "npm run build:cpp:wasm:win",
 		"build:web": "turbo run build --filter=@opencut/web",
 		"deploy:web": "turbo run deploy --filter=@opencut/web",

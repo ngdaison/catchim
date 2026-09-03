@@ -2,9 +2,9 @@
 
 ## Architecture
 
-All business and computational logic is housed in `native/opencut_core` written in 100% C++ (C++20). The web frontend under `apps/web/` is a Next.js / React UI shell that communicates with the C++ engine compiled via WebAssembly (Emscripten).
+All business and computational logic is housed in `native/core` written in 100% C++ (C++20). The web frontend under `apps/web/` is a Next.js / React UI shell that communicates with the C++ engine compiled via WebAssembly (Emscripten).
 
-### `native/opencut_core/`
+### `native/core/`
 
 The single source of truth for all non-UI code (100% C++20). Everything platform-agnostic belongs here:
 - **`opencut::time`**: High-precision media time (120,000 ticks/sec), rational framerates, SMPTE timecode parser and formatter.

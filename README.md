@@ -6,19 +6,19 @@ Cắt Chim là ứng dụng chỉnh sửa video chạy trên web, được xây 
 
 ```text
 catchim/
-├── apps/web/           # Ứng dụng web chính
-├── native/opencut_core/ # Core engine xử lý tính toán C++ (WASM)
-├── eslint/             # Rule ESLint riêng của dự án
-├── docker-compose.yml  # Chạy database, Redis và web bằng Docker
-├── package.json        # Script cấp root
-├── bun.lock            # Lockfile dùng cho Bun
-├── biome.json          # Cấu hình formatter/linter phụ trợ
-├── eslint.config.mjs   # Cấu hình ESLint
-├── turbo.json          # Cấu hình Turbo
+├── apps/web/            # Ứng dụng web chính
+├── native/              # Core engine C++ (WebAssembly)
+├── eslint/              # Rule ESLint riêng của dự án
+├── docker-compose.yml   # Chạy database, Redis và web bằng Docker
+├── package.json         # Script cấp root
+├── bun.lock             # Lockfile dùng cho Bun
+├── biome.json           # Cấu hình formatter/linter phụ trợ
+├── eslint.config.mjs    # Cấu hình ESLint
+├── turbo.json           # Cấu hình Turbo
 └── README.md
 ```
 
-Những phần phụ như cấu hình GitHub mẫu, desktop app thử nghiệm, ghi chú phát triển cũ, source Rust/native để build WASM thủ công và artifact build đã được lược bỏ để repo gọn hơn.
+Những phần phụ như cấu hình GitHub mẫu, desktop app thử nghiệm, ghi chú phát triển cũ và artifact build đã được lược bỏ để repo gọn hơn.
 
 ## Tính Năng Chính
 
