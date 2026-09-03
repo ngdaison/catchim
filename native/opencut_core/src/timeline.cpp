@@ -513,5 +513,65 @@ GroupMoveResult TimelineIndex::check_group_move(
     return result;
 }
 
+std::optional<TimelineTick> TimelineIndex::find_first_available_gap(
+    std::string_view track_id,
+    TimelineTick duration,
+    TimelineTick min_start_time) const
+{
+    if (duration <= 0) {
+        return min_start_time;
+    }
+
+    const auto* track = find_track(track_id);
+    if (track == nullptr || track->clips.empty()) {
+        return min_start_time;
+    }
+
+    TimelineTick cursor = min_start_time;
+
+    for (const auto& clip : track->clips) {
+        if (clip.range.end() <= cursor) {
+            continue;
+        }
+
+        if (clip.range.start > cursor) {
+            const TimelineTick gap = clip.range.start - cursor;
+            if (gap >= duration) {
+                return cursor;
+            }
+        }
+
+        cursor = std::max(cursor, clip.range.end());
+    }
+
+    return cursor;
+}
+
+std::vector<std::pair<std::string, TimelineTick>> TimelineIndex::apply_ripple_shift(
+    std::string_view track_id,
+    TimelineTick after_time,
+    TimelineTick delta_ticks)
+{
+    std::vector<std::pair<std::string, TimelineTick>> modified;
+    auto* track = find_track_mut(track_id);
+    if (track == nullptr || delta_ticks == 0) {
+        return modified;
+    }
+
+    for (auto& clip : track->clips) {
+        if (clip.range.start >= after_time) {
+            const TimelineTick new_start = std::max(TimelineTick{0}, clip.range.start + delta_ticks);
+            clip.range.start = new_start;
+            modified.emplace_back(clip.id, new_start);
+        }
+    }
+
+    if (!modified.empty()) {
+        rebuild_index();
+    }
+
+    return modified;
+}
+
 } // namespace opencut
 

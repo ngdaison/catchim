@@ -9,6 +9,7 @@ set(OPENCUT_CORE_SOURCES
     src/compositor.cpp
     src/effects.cpp
     src/masks.cpp
+    src/scene.cpp
     src/speed.cpp
     src/time.cpp
     src/timeline.cpp
@@ -49,6 +50,7 @@ add_opencut_test(opencut_core_effects_tests tests/effects_tests.cpp)
 add_opencut_test(opencut_core_audio_tests tests/audio_tests.cpp)
 add_opencut_test(opencut_core_animation_tests tests/animation_tests.cpp)
 add_opencut_test(opencut_core_speed_tests tests/speed_tests.cpp)
+add_opencut_test(opencut_core_scene_tests tests/scene_tests.cpp)
 
 if(EMSCRIPTEN)
     add_executable(opencut_core_wasm
@@ -77,6 +79,6 @@ if(EMSCRIPTEN)
         "-sNO_EXIT_RUNTIME=1"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sEXPORTED_RUNTIME_METHODS=['cwrap','ccall','UTF8ToString','stringToUTF8']"
-        "-sEXPORTED_FUNCTIONS=['_malloc','_free','_oc_timeline_create','_oc_timeline_destroy','_oc_timeline_add_track','_ocw_timeline_insert_clip','_ocw_timeline_delete_clip','_ocw_timeline_move_clip','_ocw_timeline_trim_clip','_ocw_timeline_split_clip','_ocw_timeline_can_place','_ocw_timeline_count_clips_in_range','_ocw_timeline_snap','_oc_time_ticks_per_second','_ocw_time_from_seconds','_ocw_time_to_seconds','_ocw_time_round_to_frame','_ocw_time_floor_to_frame','_ocw_time_last_frame','_ocw_time_snapped_seek','_ocw_time_format_timecode','_ocw_time_parse_timecode','_ocw_audio_decimate_waveform','_ocw_audio_evaluate_fade','_ocw_compositor_blend','_ocw_mask_evaluate_alpha','_ocw_effects_apply','_ocw_animation_solve_bezier','_ocw_animation_evaluate_bezier_point','_ocw_animation_evaluate_channel','_ocw_speed_map_timeline_to_source']"
+        "-sEXPORTED_FUNCTIONS=['_malloc','_free','_oc_timeline_create','_oc_timeline_destroy','_oc_timeline_add_track','_ocw_timeline_insert_clip','_ocw_timeline_delete_clip','_ocw_timeline_move_clip','_ocw_timeline_trim_clip','_ocw_timeline_split_clip','_ocw_timeline_can_place','_ocw_timeline_count_clips_in_range','_ocw_timeline_snap','_oc_time_ticks_per_second','_ocw_time_from_seconds','_ocw_time_to_seconds','_ocw_time_round_to_frame','_ocw_time_floor_to_frame','_ocw_time_last_frame','_ocw_time_snapped_seek','_ocw_time_format_timecode','_ocw_time_parse_timecode','_ocw_audio_decimate_waveform','_ocw_audio_evaluate_fade','_ocw_compositor_blend','_ocw_mask_evaluate_alpha','_ocw_effects_apply','_ocw_animation_solve_bezier','_ocw_animation_evaluate_bezier_point','_ocw_animation_evaluate_channel','_ocw_speed_map_timeline_to_source','_ocw_timeline_find_available_gap','_ocw_timeline_apply_ripple','_oc_scene_create','_oc_scene_destroy','_ocw_scene_add_item','_ocw_scene_build_display_list']"
     )
 endif()

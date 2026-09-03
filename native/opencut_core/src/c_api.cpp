@@ -6,6 +6,7 @@
 #include "opencut/compositor.hpp"
 #include "opencut/effects.hpp"
 #include "opencut/masks.hpp"
+#include "opencut/scene.hpp"
 #include "opencut/speed.hpp"
 #include "opencut/time.hpp"
 #include "opencut/timeline.hpp"
@@ -540,6 +541,72 @@ double ocw_speed_map_timeline_to_source(double timeline_offset, double timeline_
         static_cast<int64_t>(std::round(timeline_duration)),
         constant_speed
     ));
+}
+
+double ocw_timeline_find_available_gap(OcTimeline* timeline, const char* track_id, double duration, double min_start) {
+    if (timeline == nullptr || track_id == nullptr) return min_start;
+    auto gap = timeline->index.find_first_available_gap(
+        track_id,
+        static_cast<opencut::TimelineTick>(std::round(duration)),
+        static_cast<opencut::TimelineTick>(std::round(min_start))
+    );
+    return gap ? static_cast<double>(*gap) : min_start;
+}
+
+int ocw_timeline_apply_ripple(OcTimeline* timeline, const char* track_id, double after_time, double delta_ticks) {
+    if (timeline == nullptr || track_id == nullptr) return 0;
+    auto modified = timeline->index.apply_ripple_shift(
+        track_id,
+        static_cast<opencut::TimelineTick>(std::round(after_time)),
+        static_cast<opencut::TimelineTick>(std::round(delta_ticks))
+    );
+    return static_cast<int>(modified.size());
+}
+
+struct OcScene {
+    opencut::scene::SceneGraph graph;
+    std::vector<opencut::scene::RenderItem> last_display_list;
+};
+
+OcScene* oc_scene_create(void) {
+    return new OcScene();
+}
+
+void oc_scene_destroy(OcScene* scene) {
+    delete scene;
+}
+
+void ocw_scene_add_item(OcScene* scene, const char* id, uint32_t type, int32_t z_index,
+                        float opacity, uint32_t blend_mode,
+                        double cx, double cy, double w, double h, double rot,
+                        int flip_x, int flip_y, const char* asset_id)
+{
+    if (scene == nullptr || id == nullptr) return;
+    opencut::scene::RenderItem item;
+    item.id = id;
+    item.type = static_cast<opencut::scene::NodeType>(type);
+    item.z_index = z_index;
+    item.opacity = opacity;
+    item.blend_mode = blend_mode;
+    item.local_transform = opencut::QuadTransform{
+        .center_x = static_cast<float>(cx),
+        .center_y = static_cast<float>(cy),
+        .width = static_cast<float>(w),
+        .height = static_cast<float>(h),
+        .rotation_degrees = static_cast<float>(rot),
+        .flip_x = flip_x != 0,
+        .flip_y = flip_y != 0,
+    };
+    if (asset_id != nullptr) {
+        item.asset_id = asset_id;
+    }
+    scene->graph.add_item(std::move(item));
+}
+
+uint32_t ocw_scene_build_display_list(OcScene* scene, double viewport_w, double viewport_h, int enable_culling) {
+    if (scene == nullptr) return 0;
+    scene->last_display_list = scene->graph.build_display_list(viewport_w, viewport_h, enable_culling != 0);
+    return static_cast<uint32_t>(scene->last_display_list.size());
 }
 
 } // extern "C"

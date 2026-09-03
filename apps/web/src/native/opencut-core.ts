@@ -82,6 +82,12 @@ export interface NativeTimelineBindings {
 	evaluateBezierPoint: (progress: number, p0: number, p1: number, p2: number, p3: number) => number;
 	evaluateChannel: (keyTimesPtr: number, keyValuesPtr: number, keyInterpPtr: number, numKeys: number, evalTime: number) => number;
 	mapTimelineToSourceSpeed: (timelineOffset: number, timelineDuration: number, speedRatiosPtr: number, speedMultipliersPtr: number, numPoints: number, constantSpeed: number) => number;
+	findAvailableGap: (timeline: number, trackId: string, duration: number, minStart: number) => number;
+	applyRipple: (timeline: number, trackId: string, afterTime: number, deltaTicks: number) => number;
+	sceneCreate: () => number;
+	sceneDestroy: (scene: number) => void;
+	sceneAddItem: (scene: number, id: string, type: number, zIndex: number, opacity: number, blendMode: number, cx: number, cy: number, w: number, h: number, rot: number, flipX: number, flipY: number, assetId: string) => void;
+	sceneBuildDisplayList: (scene: number, viewportW: number, viewportH: number, enableCulling: number) => number;
 	malloc: (size: number) => number;
 	free: (ptr: number) => void;
 	UTF8ToString: (ptr: number, maxBytes?: number) => string;
@@ -186,6 +192,15 @@ function wrapNativeTimelineBindings(
 	const evaluateBezierPoint = module.cwrap("ocw_animation_evaluate_bezier_point", "number", ["number", "number", "number", "number", "number"]);
 	const evaluateChannel = module.cwrap("ocw_animation_evaluate_channel", "number", ["number", "number", "number", "number", "number"]);
 	const mapTimelineToSourceSpeed = module.cwrap("ocw_speed_map_timeline_to_source", "number", ["number", "number", "number", "number", "number", "number"]);
+	const findAvailableGap = module.cwrap("ocw_timeline_find_available_gap", "number", ["number", "string", "number", "number"]);
+	const applyRipple = module.cwrap("ocw_timeline_apply_ripple", "number", ["number", "string", "number", "number"]);
+	const sceneCreate = module.cwrap("oc_scene_create", "number", []);
+	const sceneDestroyRaw = module.cwrap("oc_scene_destroy", null, ["number"]);
+	const sceneAddItem = module.cwrap("ocw_scene_add_item", null, [
+		"number", "string", "number", "number", "number", "number",
+		"number", "number", "number", "number", "number", "number", "number", "string"
+	]);
+	const sceneBuildDisplayList = module.cwrap("ocw_scene_build_display_list", "number", ["number", "number", "number", "number"]);
 
 	return {
 		create,
@@ -211,6 +226,16 @@ function wrapNativeTimelineBindings(
 		evaluateBezierPoint,
 		evaluateChannel,
 		mapTimelineToSourceSpeed,
+		findAvailableGap,
+		applyRipple,
+		sceneCreate,
+		sceneDestroy: (scene: number) => {
+			sceneDestroyRaw(scene);
+		},
+		sceneAddItem: (scene: number, id: string, type: number, zIndex: number, opacity: number, blendMode: number, cx: number, cy: number, w: number, h: number, rot: number, flipX: number, flipY: number, assetId: string) => {
+			sceneAddItem(scene, id, type, zIndex, opacity, blendMode, cx, cy, w, h, rot, flipX, flipY, assetId);
+		},
+		sceneBuildDisplayList,
 		malloc: module._malloc,
 		free: module._free,
 		UTF8ToString: module.UTF8ToString,

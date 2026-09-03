@@ -155,6 +155,16 @@ public:
     [[nodiscard]] GroupMoveResult check_group_move(
         std::span<const GroupMoveItem> items) const;
 
+    [[nodiscard]] std::optional<TimelineTick> find_first_available_gap(
+        std::string_view track_id,
+        TimelineTick duration,
+        TimelineTick min_start_time = 0) const;
+
+    [[nodiscard]] std::vector<std::pair<std::string, TimelineTick>> apply_ripple_shift(
+        std::string_view track_id,
+        TimelineTick after_time,
+        TimelineTick delta_ticks);
+
 private:
     std::vector<Track> tracks_;
     std::unordered_map<std::string_view, std::size_t> track_by_id_;

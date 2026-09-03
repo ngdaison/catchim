@@ -131,6 +131,20 @@ double ocw_speed_map_timeline_to_source(double timeline_offset, double timeline_
                                         const double* speed_ratios, const double* speed_multipliers,
                                         size_t num_points, double constant_speed);
 
+// Gap Search & Ripple Shift
+double ocw_timeline_find_available_gap(OcTimeline* timeline, const char* track_id, double duration, double min_start);
+int ocw_timeline_apply_ripple(OcTimeline* timeline, const char* track_id, double after_time, double delta_ticks);
+
+// Scene Graph & Display List
+typedef struct OcScene OcScene;
+OcScene* oc_scene_create(void);
+void oc_scene_destroy(OcScene* scene);
+void ocw_scene_add_item(OcScene* scene, const char* id, uint32_t type, int32_t z_index,
+                        float opacity, uint32_t blend_mode,
+                        double cx, double cy, double w, double h, double rot,
+                        int flip_x, int flip_y, const char* asset_id);
+uint32_t ocw_scene_build_display_list(OcScene* scene, double viewport_w, double viewport_h, int enable_culling);
+
 #ifdef __cplusplus
 }
 #endif

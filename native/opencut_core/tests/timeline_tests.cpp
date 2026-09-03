@@ -179,6 +179,36 @@ void c_api_smoke_test()
     oc_timeline_destroy(timeline);
 }
 
+void test_find_available_gap()
+{
+    TimelineIndex index({
+        Track{.id = "video-1", .clips = {clip("a", 0, 50), clip("b", 100, 50)}},
+    });
+
+    // Gap of 30 starting from 0 -> fits in [50, 100] -> starts at 50
+    const auto gap1 = index.find_first_available_gap("video-1", 30, 0);
+    assert(gap1.has_value() && *gap1 == 50);
+
+    // Gap of 60 starting from 0 -> [50, 100] is only 50 -> must go after 150
+    const auto gap2 = index.find_first_available_gap("video-1", 60, 0);
+    assert(gap2.has_value() && *gap2 == 150);
+}
+
+void test_apply_ripple_shift()
+{
+    TimelineIndex index({
+        Track{.id = "video-1", .clips = {clip("a", 0, 50), clip("b", 100, 50)}},
+    });
+
+    const auto modified = index.apply_ripple_shift("video-1", 60, 30);
+    assert(modified.size() == 1);
+    assert(modified[0].first == "b");
+    assert(modified[0].second == 130);
+
+    // Check clip b is now at 130
+    assert(index.can_place("video-1", TimeRange{.start = 100, .duration = 20}));
+}
+
 } // namespace
 
 int main()
@@ -192,6 +222,8 @@ int main()
     insert_and_delete_clip();
     split_clip();
     c_api_smoke_test();
+    test_find_available_gap();
+    test_apply_ripple_shift();
 
     std::cout << "opencut_core timeline tests passed\n";
     return 0;

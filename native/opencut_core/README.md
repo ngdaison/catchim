@@ -46,7 +46,11 @@ Thư viện lõi xử lý hiệu năng cao của Catchim, được viết hoàn 
    - Đánh giá SpeedCurve đa điểm.
    - Tích phân giải tích đoạn thẳng ánh xạ chính xác timeline offset sang source media offset.
 
-9. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
+9. **`opencut::scene`** (`include/opencut/scene.hpp`, `src/scene.cpp`):
+   - Cây phân cấp đồ họa SceneGraph & RenderItem.
+   - Tính toán ma trận thế giới, cắt cúp (view-frustum culling) và tạo Display List sắp xếp theo trục Z.
+
+10. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
    - C ABI tương thích WebAssembly chuẩn.
 
 ---
