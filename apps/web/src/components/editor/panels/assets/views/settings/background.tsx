@@ -20,6 +20,7 @@ import { syntaxUIGradients } from "@/data/colors/syntax-ui";
 import { useEditor } from "@/editor/use-editor";
 import { effectPreviewService } from "@/services/renderer/effect-preview";
 import { cn } from "@/utils/ui";
+import { useTranslation, type TranslationKey } from "@/i18n";
 
 const BLUR_PREVIEW_UNIFORM_DIMENSIONS = {
 	width: 1920,
@@ -32,12 +33,16 @@ const CUSTOM_COLOR_SWATCH_BACKGROUND =
 const BlurPreview = memo(
 	({
 		blur,
+		label,
 		isSelected,
 		onSelect,
+		selectLabel,
 	}: {
 		blur: { label: string; value: number };
+		label: string;
 		isSelected: boolean;
 		onSelect: () => void;
+		selectLabel: string;
 	}) => {
 		const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -67,7 +72,7 @@ const BlurPreview = memo(
 				)}
 				onClick={onSelect}
 				type="button"
-				aria-label={`Select ${blur.label} blur`}
+				aria-label={selectLabel}
 			>
 				<canvas
 					ref={canvasRef}
@@ -75,7 +80,7 @@ const BlurPreview = memo(
 				/>
 				<div className="absolute right-1 bottom-1 left-1 text-center">
 					<span className="rounded bg-black/50 px-1 text-xs text-white">
-						{blur.label}
+						{label}
 					</span>
 				</div>
 			</button>
@@ -91,12 +96,14 @@ const BackgroundPreviews = memo(
 		currentBackgroundColor,
 		isColorBackground,
 		onSelect,
+		getSelectLabel,
 		useBackgroundColor = false,
 	}: {
 		backgrounds: readonly string[];
 		currentBackgroundColor: string;
 		isColorBackground: boolean;
 		onSelect: (bg: string) => void;
+		getSelectLabel: (background: string) => string;
 		useBackgroundColor?: boolean;
 	}) => {
 		return useMemo(
@@ -122,13 +129,14 @@ const BackgroundPreviews = memo(
 						}
 						onClick={() => onSelect(bg)}
 						type="button"
-						aria-label={`Select background ${bg}`}
+						aria-label={getSelectLabel(bg)}
 					/>
 				)),
 			[
 				backgrounds,
 				isColorBackground,
 				currentBackgroundColor,
+				getSelectLabel,
 				onSelect,
 				useBackgroundColor,
 			],
@@ -143,11 +151,13 @@ function CustomColorPreview({
 	isSelected,
 	onPreview,
 	onCommit,
+	pickLabel,
 }: {
 	currentBackgroundColor: string;
 	isSelected: boolean;
 	onPreview: (color: string) => void;
 	onCommit: (color: string) => void;
+	pickLabel: string;
 }) {
 	return (
 		<Popover>
@@ -158,7 +168,7 @@ function CustomColorPreview({
 						isSelected && "border-primary border-2",
 					)}
 					type="button"
-					aria-label="Pick a custom background color"
+					aria-label={pickLabel}
 				>
 					<span
 						className="absolute inset-0"
@@ -179,15 +189,45 @@ function CustomColorPreview({
 	);
 }
 
-const COLOR_SECTIONS = [
-	{ id: "colors", title: "Colors", backgrounds: colors, useBackgroundColor: true, showCustomPicker: true },
-	{ id: "pattern-craft", title: "Pattern craft", backgrounds: patternCraftGradients, showCustomPicker: false },
-	{ id: "syntax-ui", title: "Syntax UI", backgrounds: syntaxUIGradients, showCustomPicker: false },
-] as const;
+const COLOR_SECTIONS: Array<{
+	id: string;
+	titleKey: TranslationKey;
+	backgrounds: readonly string[];
+	useBackgroundColor?: boolean;
+	showCustomPicker: boolean;
+}> = [
+	{
+		id: "colors",
+		titleKey: "settings.backgroundColors",
+		backgrounds: colors,
+		useBackgroundColor: true,
+		showCustomPicker: true,
+	},
+	{
+		id: "pattern-craft",
+		titleKey: "settings.backgroundPatternCraft",
+		backgrounds: patternCraftGradients,
+		showCustomPicker: false,
+	},
+	{
+		id: "syntax-ui",
+		titleKey: "settings.backgroundSyntaxUi",
+		backgrounds: syntaxUIGradients,
+		showCustomPicker: false,
+	},
+];
+
+const BLUR_LABEL_KEYS: Record<string, TranslationKey> = {
+	Heavy: "blur.heavy",
+	Light: "blur.light",
+	Medium: "blur.medium",
+};
 
 export function BackgroundContent() {
 	const editor = useEditor();
+	const { t } = useTranslation();
 	const activeProject = useEditor((e) => e.project.getActive());
+	const background = activeProject.settings.background;
 
 	const handleBlurSelect = useCallback(
 		async (blurIntensity: number) => {
@@ -218,16 +258,15 @@ export function BackgroundContent() {
 		[editor.project],
 	);
 
-	const isBlurBackground = activeProject.settings.background.type === "blur";
-	const isColorBackground = activeProject.settings.background.type === "color";
+	const isBlurBackground = background.type === "blur";
+	const isColorBackground = background.type === "color";
 
 	const currentBlurIntensity = isBlurBackground
-		? (activeProject.settings.background as { blurIntensity: number })
-				.blurIntensity
+		? background.blurIntensity
 		: DEFAULT_BACKGROUND_BLUR_INTENSITY;
 
 	const currentBackgroundColor = isColorBackground
-		? (activeProject.settings.background as { color: string }).color
+		? background.color
 		: DEFAULT_BACKGROUND_COLOR;
 
 	const hasPresetColorMatch = colors.some(
@@ -243,15 +282,21 @@ export function BackgroundContent() {
 
 	const blurPreviews = useMemo(
 		() =>
-			BACKGROUND_BLUR_INTENSITY_PRESETS.map((blur) => (
-				<BlurPreview
-					key={blur.value}
-					blur={blur}
-					isSelected={isBlurBackground && currentBlurIntensity === blur.value}
-					onSelect={() => handleBlurSelect(blur.value)}
-				/>
-			)),
-		[isBlurBackground, currentBlurIntensity, handleBlurSelect],
+			BACKGROUND_BLUR_INTENSITY_PRESETS.map((blur) => {
+				const label = t(BLUR_LABEL_KEYS[blur.label] ?? "blur.medium");
+
+				return (
+					<BlurPreview
+						key={blur.value}
+						blur={blur}
+						label={label}
+						isSelected={isBlurBackground && currentBlurIntensity === blur.value}
+						onSelect={() => handleBlurSelect(blur.value)}
+						selectLabel={t("settings.selectBlur", { blur: label })}
+					/>
+				);
+			}),
+		[isBlurBackground, currentBlurIntensity, handleBlurSelect, t],
 	);
 
 	return (
@@ -263,7 +308,7 @@ export function BackgroundContent() {
 				showTopBorder={false}
 			>
 				<SectionHeader>
-					<SectionTitle>Blur</SectionTitle>
+					<SectionTitle>{t("settings.backgroundBlur")}</SectionTitle>
 				</SectionHeader>
 				<SectionContent>
 					<div className="flex flex-wrap gap-2">{blurPreviews}</div>
@@ -277,7 +322,7 @@ export function BackgroundContent() {
 					sectionKey={`settings:background-${section.id}`}
 				>
 					<SectionHeader>
-						<SectionTitle>{section.title}</SectionTitle>
+						<SectionTitle>{t(section.titleKey)}</SectionTitle>
 					</SectionHeader>
 					<SectionContent>
 						<div className="flex flex-wrap gap-2">
@@ -287,6 +332,7 @@ export function BackgroundContent() {
 									isSelected={isColorBackground && !hasPresetColorMatch}
 									onPreview={previewBackgroundColor}
 									onCommit={commitBackgroundColor}
+									pickLabel={t("settings.pickCustomBackgroundColor")}
 								/>
 							) : null}
 							<BackgroundPreviews
@@ -294,6 +340,9 @@ export function BackgroundContent() {
 								currentBackgroundColor={currentBackgroundColor}
 								isColorBackground={isColorBackground}
 								onSelect={handlePresetColorSelect}
+								getSelectLabel={(background) =>
+									t("settings.selectBackground", { background })
+								}
 								useBackgroundColor={
 									"useBackgroundColor" in section
 										? section.useBackgroundColor

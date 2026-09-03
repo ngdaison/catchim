@@ -27,6 +27,7 @@ import {
 	parseColorInput,
 	parseHexAlpha,
 } from "@/utils/color";
+import { useTranslation } from "@/i18n";
 
 const CHECKERBOARD_STYLE = {
 	backgroundImage: `
@@ -55,6 +56,7 @@ function ColorPickerContent({
 	side = "left",
 	align = "center",
 }: ColorPickerContentProps) {
+	const { t } = useTranslation();
 	const [isDragging, setIsDragging] = useState<
 		"saturation" | "hue" | "opacity" | null
 	>(null);
@@ -291,11 +293,11 @@ function ColorPickerContent({
 			<header className="border-b flex justify-between items-center pb-2 px-2">
 				<Select defaultValue="custom">
 					<SelectTrigger variant="outline">
-						<SelectValue placeholder="Select a mode" />
+						<SelectValue placeholder={t("preview.selectColorMode")} />
 					</SelectTrigger>
 					<SelectContent position="popper">
-						<SelectItem value="custom">Custom</SelectItem>
-						<SelectItem value="saved">Saved</SelectItem>
+						<SelectItem value="custom">{t("preview.customColor")}</SelectItem>
+						<SelectItem value="saved">{t("preview.savedColors")}</SelectItem>
 					</SelectContent>
 				</Select>
 				<div>

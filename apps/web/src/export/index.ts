@@ -1,4 +1,5 @@
 import type { FrameRate } from "opencut-wasm";
+import type { TCanvasSize } from "@/project/types";
 import { EXPORT_MIME_TYPES } from "./mime-types";
 
 export const EXPORT_QUALITY_VALUES = [
@@ -9,13 +10,36 @@ export const EXPORT_QUALITY_VALUES = [
 ] as const;
 
 export const EXPORT_FORMAT_VALUES = ["mp4", "webm"] as const;
+export const EXPORT_RESOLUTION_VALUES = [
+	"source",
+	"480p",
+	"720p",
+	"1080p",
+	"1440p",
+	"2160p",
+	"4320p",
+] as const;
+
+const EXPORT_RESOLUTION_HEIGHTS: Record<
+	Exclude<ExportResolution, "source">,
+	number
+> = {
+	"480p": 480,
+	"720p": 720,
+	"1080p": 1080,
+	"1440p": 1440,
+	"2160p": 2160,
+	"4320p": 4320,
+};
 
 export type ExportFormat = (typeof EXPORT_FORMAT_VALUES)[number];
 export type ExportQuality = (typeof EXPORT_QUALITY_VALUES)[number];
+export type ExportResolution = (typeof EXPORT_RESOLUTION_VALUES)[number];
 
 export interface ExportOptions {
 	format: ExportFormat;
 	quality: ExportQuality;
+	resolution?: ExportResolution;
 	fps?: FrameRate;
 	includeAudio?: boolean;
 }
@@ -47,6 +71,28 @@ export function getExportFileExtension({
 	format: ExportFormat;
 }): string {
 	return `.${format}`;
+}
+
+function roundToEven(value: number) {
+	return Math.max(2, Math.round(value / 2) * 2);
+}
+
+export function resolveExportCanvasSize({
+	sourceSize,
+	resolution,
+}: {
+	sourceSize: TCanvasSize;
+	resolution: ExportResolution | undefined;
+}): TCanvasSize {
+	if (!resolution || resolution === "source") return sourceSize;
+
+	const targetHeight = EXPORT_RESOLUTION_HEIGHTS[resolution];
+	const aspectRatio = sourceSize.width / sourceSize.height;
+
+	return {
+		width: roundToEven(targetHeight * aspectRatio),
+		height: targetHeight,
+	};
 }
 
 export function downloadBuffer({

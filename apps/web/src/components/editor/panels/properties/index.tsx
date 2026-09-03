@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useEditor } from "@/editor/use-editor";
@@ -14,8 +13,21 @@ import { usePropertiesStore } from "./stores/properties-store";
 import { getPropertiesConfig } from "./registry";
 import { cn } from "@/utils/ui";
 import { EmptyView } from "./empty-view";
+import { useTranslation, type TranslationKey } from "@/i18n";
+
+const PROPERTY_TAB_LABEL_KEYS: Record<string, TranslationKey> = {
+	audio: "properties.audio",
+	blending: "properties.blending",
+	effects: "properties.effects",
+	graphic: "properties.graphic",
+	masks: "properties.masks",
+	speed: "properties.speed",
+	text: "properties.text",
+	transform: "properties.transform",
+};
 
 export function PropertiesPanel() {
+	const { t } = useTranslation();
 	const editor = useEditor();
 	useEditor((e) => e.scenes.getActiveSceneOrNull());
 	useEditor((e) => e.media.getAssets());
@@ -34,7 +46,9 @@ export function PropertiesPanel() {
 		return (
 			<div className="panel bg-background flex h-full flex-col items-center justify-center overflow-hidden rounded-sm border">
 				<p className="text-muted-foreground text-sm">
-					{selectedElements.length} elements selected.0
+					{t("properties.elementsSelected", {
+						count: selectedElements.length,
+					})}
 				</p>
 			</div>
 		);
@@ -63,10 +77,13 @@ export function PropertiesPanel() {
 
 	return (
 		<div className="panel bg-background flex h-full overflow-hidden rounded-sm border">
-			<TooltipProvider delayDuration={0}>
-				<div className="flex shrink-0 flex-col gap-0.5 border-r p-1 scrollbar-hidden overflow-y-auto">
-					{visibleTabs.map((tab) => (
-						<Tooltip key={tab.id}>
+			<div className="flex shrink-0 flex-col gap-0.5 border-r p-1 scrollbar-hidden overflow-y-auto">
+				{visibleTabs.map((tab) => {
+					const labelKey = PROPERTY_TAB_LABEL_KEYS[tab.id];
+					const label = labelKey ? t(labelKey) : tab.label;
+
+					return (
+						<Tooltip key={tab.id} delayDuration={10}>
 							<TooltipTrigger asChild>
 								<Button
 									variant={tab.id === activeTab.id ? "secondary" : "ghost"}
@@ -77,7 +94,7 @@ export function PropertiesPanel() {
 											tabId: tab.id,
 										})
 									}
-									aria-label={tab.label}
+									aria-label={label}
 									className={cn(
 										"shrink-0",
 										"h-8 w-8",
@@ -87,11 +104,20 @@ export function PropertiesPanel() {
 									{tab.icon}
 								</Button>
 							</TooltipTrigger>
-							<TooltipContent side="right">{tab.label}</TooltipContent>
+							<TooltipContent
+								side="right"
+								align="center"
+								variant="sidebar"
+								sideOffset={8}
+							>
+								<div className="text-foreground text-sm leading-none font-medium">
+									{label}
+								</div>
+							</TooltipContent>
 						</Tooltip>
-					))}
-				</div>
-			</TooltipProvider>
+					);
+				})}
+			</div>
 			<ScrollArea className="flex-1 scrollbar-hidden">
 				{activeTab.content({ trackId: track.id })}
 			</ScrollArea>

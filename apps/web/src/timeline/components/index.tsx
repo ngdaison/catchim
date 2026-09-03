@@ -53,10 +53,11 @@ import {
 	getTimelineZoomMin,
 	getTimelinePaddingPx,
 } from "@/timeline";
+import { TIMELINE_ZOOM_MAX } from "@/timeline/scale";
 import { timelineTimeToPixels } from "@/timeline/pixel-utils";
 import {
 	getTrackHeight,
-	getCumulativeHeightBefore,
+	getTrackLayoutOffsets,
 	getTotalTracksHeight,
 } from "./track-layout";
 import { SELECTED_TRACK_ROW_CLASS } from "./theme";
@@ -87,6 +88,7 @@ import { DragLine } from "./drag-line";
 import { invokeAction } from "@/actions";
 import { resolveTimelineElementIntersections } from "./selection-hit-testing";
 import { cn } from "@/utils/ui";
+import { useTranslation } from "@/i18n";
 
 const TRACKS_CONTAINER_MAX_HEIGHT = 800;
 const FALLBACK_CONTAINER_WIDTH = 1000;
@@ -115,6 +117,7 @@ const TRACK_ICONS: Record<TimelineTrack["type"], ReactNode> = {
 };
 
 export function Timeline() {
+	const { t } = useTranslation();
 	const snappingEnabled = useTimelineStore((s) => s.snappingEnabled);
 	const {
 		selectedElements,
@@ -205,6 +208,11 @@ export function Timeline() {
 		setZoomLevelRef.current = setZoomLevel;
 	}, [setZoomLevel]);
 
+	const zoomLevelRef = useRef(zoomLevel);
+	useEffect(() => {
+		zoomLevelRef.current = zoomLevel;
+	}, [zoomLevel]);
+
 	const saveScrollPositionRef = useRef(saveScrollPosition);
 	useEffect(() => {
 		saveScrollPositionRef.current = saveScrollPosition;
@@ -283,12 +291,61 @@ export function Timeline() {
 			saveScrollPositionRef.current();
 		};
 
+		// Mobile pinch-to-zoom support
+		let initialPinchDistance: number | null = null;
+		let initialPinchZoom = 1;
+
+		const onTouchStart = (e: TouchEvent) => {
+			if (e.touches.length === 2) {
+				const t1 = e.touches[0];
+				const t2 = e.touches[1];
+				initialPinchDistance = Math.hypot(
+					t2.clientX - t1.clientX,
+					t2.clientY - t1.clientY,
+				);
+				initialPinchZoom = zoomLevelRef.current;
+			}
+		};
+
+		const onTouchMove = (e: TouchEvent) => {
+			if (e.touches.length === 2 && initialPinchDistance !== null) {
+				e.preventDefault();
+				const t1 = e.touches[0];
+				const t2 = e.touches[1];
+				const currentDist = Math.hypot(
+					t2.clientX - t1.clientX,
+					t2.clientY - t1.clientY,
+				);
+				if (initialPinchDistance > 0) {
+					const factor = currentDist / initialPinchDistance;
+					const newZoom = Math.max(
+						minZoomLevelRef.current,
+						Math.min(TIMELINE_ZOOM_MAX, initialPinchZoom * factor),
+					);
+					setZoomLevelRef.current(newZoom);
+				}
+			}
+		};
+
+		const onTouchEnd = (e: TouchEvent) => {
+			if (e.touches.length < 2) {
+				initialPinchDistance = null;
+			}
+		};
+
 		container.addEventListener("wheel", onWheel, {
 			passive: false,
 			capture: true,
 		});
+		container.addEventListener("touchstart", onTouchStart, { passive: true });
+		container.addEventListener("touchmove", onTouchMove, { passive: false });
+		container.addEventListener("touchend", onTouchEnd, { passive: true });
+
 		return () => {
 			container.removeEventListener("wheel", onWheel, { capture: true });
+			container.removeEventListener("touchstart", onTouchStart);
+			container.removeEventListener("touchmove", onTouchMove);
+			container.removeEventListener("touchend", onTouchEnd);
 			if (zoomRafId !== null) cancelAnimationFrame(zoomRafId);
 		};
 	}, [syncFollowers]);
@@ -302,12 +359,12 @@ export function Timeline() {
 
 	const { dragView, handleElementMouseDown, handleElementClick } =
 		useElementInteraction({
-		zoomLevel,
-		tracksContainerRef,
-		tracksScrollRef,
-		snappingEnabled,
-		onSnapPointChange: handleSnapPointChange,
-	});
+			zoomLevel,
+			tracksContainerRef,
+			tracksScrollRef,
+			snappingEnabled,
+			onSnapPointChange: handleSnapPointChange,
+		});
 	const isElementDragging = dragView.kind === "dragging";
 
 	const {
@@ -434,7 +491,7 @@ export function Timeline() {
 				"panel bg-background relative flex h-full flex-col overflow-hidden rounded-sm border"
 			}
 			{...dragProps}
-			aria-label="Timeline"
+			aria-label={t("timeline.timeline")}
 		>
 			<TimelineToolbar
 				zoomLevel={zoomLevel}
@@ -455,9 +512,7 @@ export function Timeline() {
 					className="relative isolate flex flex-1 flex-col overflow-hidden"
 					ref={tracksContainerRef}
 				>
-					<SelectionBox
-						bounds={selectionBox?.bounds ?? null}
-					/>
+					<SelectionBox bounds={selectionBox?.bounds ?? null} />
 					<DragLine
 						dropTarget={dropTarget}
 						tracks={tracks}
@@ -751,6 +806,7 @@ function TimelineTrackRows({
 	isDragOver: boolean;
 	dropTarget: DropTarget | null;
 }) {
+	const { t } = useTranslation();
 	const timeline = useEditor((e) => e.timeline);
 	const scene = useEditor((e) => e.scenes.getActiveSceneOrNull());
 	const tracks = useMemo<TimelineTrack[]>(
@@ -780,8 +836,8 @@ function TimelineTrackRows({
 	const draggingElementIds = useMemo(
 		() =>
 			dragView.kind === "dragging"
-			? dragView.memberTimeOffsets
-			: (null as ReadonlyMap<string, MediaTime> | null),
+				? dragView.memberTimeOffsets
+				: (null as ReadonlyMap<string, MediaTime> | null),
 		[dragView],
 	);
 	const sortedTracks = useMemo(() => {
@@ -801,6 +857,14 @@ function TimelineTrackRows({
 				return 0;
 			});
 	}, [tracks, draggingElementIds]);
+	const trackTopOffsets = useMemo(
+		() =>
+			getTrackLayoutOffsets({
+				tracks,
+				getExtraHeight: getTrackExpansionHeight,
+			}),
+		[tracks, getTrackExpansionHeight],
+	);
 
 	return (
 		<>
@@ -813,7 +877,7 @@ function TimelineTrackRows({
 								tracksWithSelection.has(track.id) && SELECTED_TRACK_ROW_CLASS,
 							)}
 							style={{
-								top: `${TIMELINE_CONTENT_TOP_PADDING_PX + getCumulativeHeightBefore({ tracks, trackIndex: index, getExtraHeight: getTrackExpansionHeight })}px`,
+								top: `${TIMELINE_CONTENT_TOP_PADDING_PX + (trackTopOffsets[index] ?? 0)}px`,
 								height: `${getTrackHeight({ type: track.type }) + getTrackExpansionHeight(index)}px`,
 							}}
 						>
@@ -843,7 +907,7 @@ function TimelineTrackRows({
 								invokeAction("paste-copied");
 							}}
 						>
-							Paste elements
+							{t("timeline.pasteElements")}
 						</ContextMenuItem>
 						<ContextMenuItem
 							icon={<HugeiconsIcon icon={VolumeHighIcon} />}
@@ -853,8 +917,8 @@ function TimelineTrackRows({
 							}}
 						>
 							{canTrackHaveAudio(track) && track.muted
-								? "Unmute track"
-								: "Mute track"}
+								? t("timeline.unmuteTrack")
+								: t("timeline.muteTrack")}
 						</ContextMenuItem>
 						<ContextMenuItem
 							icon={<HugeiconsIcon icon={ViewIcon} />}
@@ -864,8 +928,8 @@ function TimelineTrackRows({
 							}}
 						>
 							{canTrackBeHidden(track) && track.hidden
-								? "Show track"
-								: "Hide track"}
+								? t("timeline.showTrack")
+								: t("timeline.hideTrack")}
 						</ContextMenuItem>
 						{track.id !== mainTrackId && (
 							<ContextMenuItem
@@ -876,7 +940,7 @@ function TimelineTrackRows({
 								}}
 								variant="destructive"
 							>
-								Delete track
+								{t("timeline.deleteTrack")}
 							</ContextMenuItem>
 						)}
 					</ContextMenuContent>

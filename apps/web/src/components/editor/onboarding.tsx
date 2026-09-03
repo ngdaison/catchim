@@ -7,8 +7,10 @@ import { SOCIAL_LINKS } from "@/site/social";
 import { useLocalStorage } from "@/services/storage/use-local-storage";
 import { Button } from "../ui/button";
 import { Dialog, DialogBody, DialogContent, DialogTitle } from "../ui/dialog";
+import { useTranslation } from "@/i18n";
 
 export function Onboarding() {
+	const { t } = useTranslation();
 	const [step, setStep] = useState(0);
 	const [hasSeenOnboarding, setHasSeenOnboarding] = useLocalStorage({
 		key: "hasSeenOnboarding",
@@ -28,13 +30,13 @@ export function Onboarding() {
 	const getStepTitle = () => {
 		switch (step) {
 			case 0:
-				return "Welcome to OpenCut Beta! 🎉";
+				return t("onboarding.titleWelcome");
 			case 1:
-				return "⚠️ This is a super early beta!";
+				return t("onboarding.titleBeta");
 			case 2:
-				return "🦋 Have fun testing!";
+				return t("onboarding.titleTesting");
 			default:
-				return "OpenCut Onboarding";
+				return t("onboarding.titleFallback");
 		}
 	};
 
@@ -44,10 +46,10 @@ export function Onboarding() {
 				return (
 					<div className="space-y-5">
 						<div className="space-y-3">
-							<Title title="Welcome to OpenCut Beta! 🎉" />
-							<Description description="You're among the first to try OpenCut - the fully open source CapCut alternative." />
+							<Title title={t("onboarding.titleWelcome")} />
+							<Description description={t("onboarding.descriptionWelcome")} />
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<NextButton onClick={handleNext}>{t("onboarding.next")}</NextButton>
 					</div>
 				);
 			case 1:
@@ -55,11 +57,11 @@ export function Onboarding() {
 					<div className="space-y-5">
 						<div className="space-y-3">
 							<Title title={getStepTitle()} />
-							<Description description="There's still a ton of things to do to make this editor amazing." />
-							<Description description="A lot of features are still missing. We're working hard to build them out!" />
-							<Description description="If you're curious, check out our roadmap [here](https://opencut.app/roadmap)" />
+							<Description description={t("onboarding.descriptionBetaOne")} />
+							<Description description={t("onboarding.descriptionBetaTwo")} />
+							<Description description={t("onboarding.descriptionBetaRoadmap")} />
 						</div>
-						<NextButton onClick={handleNext}>Next</NextButton>
+						<NextButton onClick={handleNext}>{t("onboarding.next")}</NextButton>
 					</div>
 				);
 			case 2:
@@ -68,10 +70,14 @@ export function Onboarding() {
 						<div className="space-y-3">
 							<Title title={getStepTitle()} />
 							<Description
-								description={`Join our [Discord](${SOCIAL_LINKS.discord}), chat with cool people and share feedback to help make OpenCut the best editor ever.`}
+								description={t("onboarding.descriptionTesting", {
+									discordUrl: SOCIAL_LINKS.discord,
+								})}
 							/>
 						</div>
-						<NextButton onClick={handleClose}>Finish</NextButton>
+						<NextButton onClick={handleClose}>
+							{t("onboarding.finish")}
+						</NextButton>
 					</div>
 				);
 			default:

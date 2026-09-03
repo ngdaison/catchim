@@ -27,6 +27,7 @@ import {
 	getFractionDigitsForStep,
 	snapToStep,
 } from "@/utils/math";
+import { useTranslation } from "@/i18n";
 
 const SPEED_STEP = 0.01;
 const SPEED_FRACTION_DIGITS = getFractionDigitsForStep({ step: SPEED_STEP });
@@ -64,6 +65,7 @@ export function SpeedTab({
 	element: AudioElement | VideoElement;
 	trackId: string;
 }) {
+	const { t } = useTranslation();
 	const editor = useEditor();
 	const rate = clampRetimeRate({
 		rate: element.retime?.rate ?? DEFAULT_RETIME_RATE,
@@ -111,11 +113,11 @@ export function SpeedTab({
 	return (
 		<Section collapsible sectionKey={`${element.id}:speed`}>
 			<SectionHeader>
-				<SectionTitle>Speed</SectionTitle>
+				<SectionTitle>{t("properties.speed")}</SectionTitle>
 			</SectionHeader>
 			<SectionContent>
 				<SectionFields>
-					<SectionField label="Speed">
+					<SectionField label={t("properties.speed")}>
 						<NumberField
 							icon={<HugeiconsIcon icon={DashboardSpeed02Icon} />}
 							value={speedDraft.displayValue}
@@ -140,7 +142,7 @@ export function SpeedTab({
 						/>
 					</SectionField>
 					<div className="flex items-center justify-between">
-						<span className="text-sm">Change pitch</span>
+						<span className="text-sm">{t("properties.changePitch")}</span>
 						<Switch
 							checked={!maintainPitch}
 							disabled={!isPitchPreserveAvailable}

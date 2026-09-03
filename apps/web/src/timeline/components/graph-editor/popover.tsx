@@ -19,8 +19,13 @@ import {
 	PRESET_MATCH_TOLERANCE,
 	type EasingPreset,
 } from "./easing-presets";
-import { removePreset, savePreset, useCustomPresets } from "./custom-presets-store";
+import {
+	removePreset,
+	savePreset,
+	useCustomPresets,
+} from "./custom-presets-store";
 import { BezierGraph, BEZIER_GRAPH_MIN_HEIGHT } from "./bezier-graph";
+import { useTranslation } from "@/i18n";
 
 const COLLAPSED_MAX = 6;
 const THUMB_SEGMENTS = 24;
@@ -58,6 +63,7 @@ export function GraphEditorPopover({
 	onCommitValue?: (value: NormalizedCubicBezier) => void;
 	onCancelPreview?: () => void;
 }) {
+	const { t } = useTranslation();
 	const [isExpanded, setIsExpanded] = useState(false);
 	const custom = useCustomPresets();
 	const allPresets = [...BUILTIN_PRESETS, ...custom];
@@ -123,13 +129,17 @@ export function GraphEditorPopover({
 					)}
 				</div>
 
-				<Tabs variant="underline" defaultValue="presets" className="flex flex-col gap-2">
+				<Tabs
+					variant="underline"
+					defaultValue="presets"
+					className="flex flex-col gap-2"
+				>
 					<TabsList className="px-3">
 						<TabsTrigger value="presets" className="text-xs">
-							Presets
+							{t("common.presets")}
 						</TabsTrigger>
 						<TabsTrigger value="saved" className="text-xs">
-							Saved
+							{t("assets.saved")}
 						</TabsTrigger>
 					</TabsList>
 					<TabsContent value="presets" className="px-3 pb-0">
@@ -178,7 +188,9 @@ export function GraphEditorPopover({
 										className="size-3.5 opacity-40"
 									/>
 								</div>
-								<span className="text-[10px] leading-tight">Save</span>
+								<span className="text-[10px] leading-tight">
+									{t("common.save")}
+								</span>
 							</button>
 						</div>
 					</TabsContent>
@@ -311,8 +323,24 @@ function CurveThumb({ value }: { value: NormalizedCubicBezier }) {
 	const points: string[] = [];
 	for (let i = 0; i <= THUMB_SEGMENTS; i++) {
 		const progress = i / THUMB_SEGMENTS;
-		const x = toThumbX({ value: getBezierPoint({ progress, p0: 0, p1: value[0], p2: value[2], p3: 1 }) });
-		const y = toThumbY({ value: getBezierPoint({ progress, p0: 0, p1: value[1], p2: value[3], p3: 1 }) });
+		const x = toThumbX({
+			value: getBezierPoint({
+				progress,
+				p0: 0,
+				p1: value[0],
+				p2: value[2],
+				p3: 1,
+			}),
+		});
+		const y = toThumbY({
+			value: getBezierPoint({
+				progress,
+				p0: 0,
+				p1: value[1],
+				p2: value[3],
+				p3: 1,
+			}),
+		});
 		points.push(`${x},${y}`);
 	}
 	return (

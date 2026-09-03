@@ -22,9 +22,8 @@ import {
 } from "@/components/ui/select";
 import { PREVIEW_ZOOM_PRESETS } from "@/preview/zoom";
 import { usePreviewViewport } from "./preview-viewport";
-import { GridPopover } from "./guide-popover";
-import { usePreviewStore } from "@/preview/preview-store";
 import type { MediaTime } from "@/wasm";
+import { useTranslation } from "@/i18n";
 
 export function PreviewToolbar({
 	onToggleFullscreen,
@@ -32,27 +31,18 @@ export function PreviewToolbar({
 	onToggleFullscreen: () => void;
 }) {
 	return (
-		<div className="grid grid-cols-[1fr_auto_1fr] items-center pb-3 pt-5 px-5">
+		<div className="flex items-center justify-between px-3 py-1 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:pb-3 sm:pt-5 sm:px-5">
 			<TimecodeDisplay />
-			<PlayPauseButton />
-			<div className="justify-self-end flex items-center gap-2.5">
-				<ZoomSelect />
-				<Separator orientation="vertical" className="h-4" />
-				{/* v0.4.0 */}
-				{/* <GridPopover>
-					<Button
-						variant={activeGuideDefinition ? "secondary" : "text"}
-						size="icon"
-					>
-						{activeGuideDefinition ? (
-							activeGuideDefinition.renderTriggerIcon()
-						) : (
-							<HugeiconsIcon icon={GridTableIcon} />
-						)}
-					</Button>
-				</GridPopover> */}
-				<Button variant="text" onClick={onToggleFullscreen}>
-					<HugeiconsIcon icon={FullScreenIcon} />
+			<div className="flex items-center">
+				<PlayPauseButton />
+			</div>
+			<div className="justify-self-end flex items-center gap-1.5 sm:gap-2.5">
+				<div className="hidden sm:flex items-center gap-2.5">
+					<ZoomSelect />
+					<Separator orientation="vertical" className="h-4" />
+				</div>
+				<Button variant="text" size="icon" className="size-8" onClick={onToggleFullscreen}>
+					<HugeiconsIcon icon={FullScreenIcon} className="size-4" />
 				</Button>
 			</div>
 		</div>
@@ -99,10 +89,11 @@ function TimecodeDisplay() {
 }
 
 function ZoomSelect() {
+	const { t } = useTranslation();
 	const { isAtFit, zoomPercent, fitToScreen, setViewportPercent } =
 		usePreviewViewport();
 
-	const displayLabel = isAtFit ? "Fit" : `${zoomPercent}%`;
+	const displayLabel = isAtFit ? t("preview.fit") : `${zoomPercent}%`;
 
 	const onValueChange = (value: string) => {
 		if (value === "fit") {
@@ -119,7 +110,7 @@ function ZoomSelect() {
 		>
 			<SelectTrigger className="tabular-nums">{displayLabel}</SelectTrigger>
 			<SelectContent>
-				<SelectItem value="fit">Fit</SelectItem>
+				<SelectItem value="fit">{t("preview.fit")}</SelectItem>
 				<SelectSeparator />
 				{PREVIEW_ZOOM_PRESETS.map((preset) => (
 					<SelectItem key={preset} value={String(preset)}>

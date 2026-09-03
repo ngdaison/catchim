@@ -417,8 +417,9 @@ function canApplyMovesToExistingTracks({
 	moves: PlannedElementMove[];
 }): boolean {
 	const movingElementIds = new Set(moves.map((move) => move.elementId));
+	const displayTracks = getDisplayTracks({ tracks });
 	const sourceElements = new Map(
-		getDisplayTracks({ tracks }).flatMap((track) =>
+		displayTracks.flatMap((track) =>
 			track.elements.map((element) => [element.id, element] as const),
 		),
 	);
@@ -438,9 +439,7 @@ function canApplyMovesToExistingTracks({
 			return false;
 		}
 
-		const targetTrack = getDisplayTracks({ tracks })[
-			targetPlacement.displayIndex
-		];
+		const targetTrack = displayTracks[targetPlacement.displayIndex];
 		if (!targetTrack) {
 			return false;
 		}

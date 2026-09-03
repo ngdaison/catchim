@@ -15,3 +15,13 @@ export function buildTimelineSnapPoints({
 
 	return snapPoints;
 }
+
+export function buildSortedTimelineSnapPoints({
+	sources,
+}: {
+	sources: TimelineSnapPointSource[];
+}): SnapPoint[] {
+	return buildTimelineSnapPoints({ sources }).sort(
+		(leftPoint, rightPoint) => leftPoint.time - rightPoint.time,
+	);
+}

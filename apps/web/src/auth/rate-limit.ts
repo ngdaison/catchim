@@ -15,7 +15,11 @@ export const baseRateLimit = new Ratelimit({
 });
 
 export async function checkRateLimit({ request }: { request: Request }) {
-	const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
-	const { success } = await baseRateLimit.limit(ip);
-	return { success, limited: !success };
+	try {
+		const ip = request.headers.get("x-forwarded-for") ?? "anonymous";
+		const { success } = await baseRateLimit.limit(ip);
+		return { success, limited: !success };
+	} catch {
+		return { success: true, limited: false };
+	}
 }

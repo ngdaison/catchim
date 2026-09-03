@@ -26,12 +26,24 @@ import type {
 } from "@/stickers";
 import { useStickersStore } from "@/stickers/stickers-store";
 import { cn } from "@/utils/ui";
-import {
-	HappyIcon,
-} from "@hugeicons/core-free-icons";
+import { HappyIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { useTranslation, type TranslationKey } from "@/i18n";
+
+const STICKER_CATEGORY_LABEL_KEYS = {
+	all: "assets.all",
+	flags: "assets.flags",
+	shapes: "assets.shapes",
+} as const satisfies Record<StickerCategory, TranslationKey>;
+
+const STICKER_CATEGORY_KEYS: StickerCategory[] = ["all", "flags", "shapes"];
+
+function isStickerCategory(value: string): value is StickerCategory {
+	return value in STICKER_CATEGORIES;
+}
 
 export function StickersView() {
+	const { t } = useTranslation();
 	const {
 		browseContent,
 		browseStickers,
@@ -55,7 +67,7 @@ export function StickersView() {
 				<Input
 					size="sm"
 					variant="default"
-					placeholder="Search..."
+					placeholder={t("assets.search")}
 					value={searchQuery}
 					onChange={(e) => {
 						setSearchQuery({ query: e.target.value });
@@ -74,15 +86,17 @@ export function StickersView() {
 			<Tabs
 				value={selectedCategory}
 				onValueChange={(value) => {
-					setSelectedCategory({ category: value as StickerCategory });
+					if (isStickerCategory(value)) {
+						setSelectedCategory({ category: value });
+					}
 				}}
 				variant="underline"
 				className="mt-2 flex min-h-0 flex-1 flex-col"
 			>
-				<TabsList aria-label="Sticker categories">
-					{Object.entries(STICKER_CATEGORIES).map(([key, label]) => (
+				<TabsList aria-label={t("assets.stickerCategories")}>
+					{STICKER_CATEGORY_KEYS.map((key) => (
 						<TabsTrigger key={key} value={key}>
-							{label}
+							{t(STICKER_CATEGORY_LABEL_KEYS[key])}
 						</TabsTrigger>
 					))}
 				</TabsList>
@@ -134,6 +148,8 @@ function StickerRow({ items }: { items: StickerData[] }) {
 }
 
 function EmptyView({ message }: { message: string }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className="bg-background flex h-full flex-col items-center justify-center gap-3 p-4">
 			<HugeiconsIcon
@@ -141,7 +157,7 @@ function EmptyView({ message }: { message: string }) {
 				className="text-muted-foreground size-10"
 			/>
 			<div className="flex flex-col gap-2 text-center">
-				<p className="text-lg font-medium">No stickers found</p>
+				<p className="text-lg font-medium">{t("assets.noStickersFound")}</p>
 				<p className="text-muted-foreground text-sm text-balance">{message}</p>
 			</div>
 		</div>
@@ -172,6 +188,7 @@ function RegionBanner({ region }: { region: string }) {
 }
 
 function StickersContentView() {
+	const { t } = useTranslation();
 	const {
 		browseContent,
 		clearRecentStickers,
@@ -205,7 +222,7 @@ function StickersContentView() {
 					{isRegionSearch && <RegionBanner region={regionLabel} />}
 					<div className="flex items-center justify-between">
 						<span className="text-muted-foreground text-sm">
-							{searchResults.total} results
+							{t("assets.results", { count: searchResults.total })}
 						</span>
 					</div>
 					<StickerGrid items={searchResults.items} />
@@ -215,7 +232,13 @@ function StickersContentView() {
 
 		// "all" tab search — sections are in browseContent, fall through to section rendering below
 		if (selectedCategory !== "all" && searchQuery) {
-			return <EmptyView message={`No stickers found for "${searchQuery}"`} />;
+			return (
+				<EmptyView
+					message={t("assets.noStickersFoundForQuery", {
+						query: searchQuery,
+					})}
+				/>
+			);
 		}
 	}
 
@@ -228,15 +251,17 @@ function StickersContentView() {
 	}
 
 	if (!browseContent?.sections.length) {
-		const categoryLabel = STICKER_CATEGORIES[selectedCategory];
+		const categoryLabel = t(STICKER_CATEGORY_LABEL_KEYS[selectedCategory]);
 		return (
 			<EmptyView
 				message={
 					viewMode === "search"
-						? `No stickers found for "${searchQuery}"`
+						? t("assets.noStickersFoundForQuery", { query: searchQuery })
 						: selectedCategory === "all"
-							? "No stickers available yet."
-							: `No stickers available in ${categoryLabel.toLowerCase()} yet.`
+							? t("assets.noStickersAvailable")
+							: t("assets.noStickersAvailableInCategory", {
+									category: categoryLabel.toLowerCase(),
+								})
 				}
 			/>
 		);
@@ -267,6 +292,7 @@ function StickerSection({
 	onClearRecent: () => void;
 	onSeeAll: (category: StickerCategory) => void;
 }) {
+	const { t } = useTranslation();
 	const hasHeader =
 		Boolean(section.title) || section.id === "recent" || section.action;
 
@@ -288,7 +314,7 @@ function StickerSection({
 								size="sm"
 								className="h-auto gap-1 p-0 text-xs text-muted-foreground"
 							>
-								Clear
+								{t("assets.clear")}
 							</Button>
 						)}
 
@@ -298,10 +324,12 @@ function StickerSection({
 								size="sm"
 								className="h-auto gap-1 p-0 text-xs text-primary"
 								onClick={() => {
-									onSeeAll(section.action?.category as StickerCategory);
+									if (section.action?.category) {
+										onSeeAll(section.action.category);
+									}
 								}}
 							>
-								See all
+								{t("assets.all")}
 							</Button>
 						)}
 					</div>
@@ -328,22 +356,21 @@ function StickerItem({
 	shouldCapSize = false,
 	containerClassName,
 }: StickerItemProps) {
+	const { t } = useTranslation();
 	const editor = useEditor();
 	const { addToRecentStickers } = useStickersStore();
 	const [isAdding, setIsAdding] = useState(false);
-	const [hasImageError, setHasImageError] = useState(false);
-
-	useEffect(() => {
-		if (!item.id) {
-			return;
-		}
-
-		setHasImageError(false);
-	}, [item.id]);
+	const [imageError, setImageError] = useState<{
+		hasError: boolean;
+		itemId: string;
+	}>({ hasError: false, itemId: item.id });
 
 	const displayName = item.name;
+	const hasImageError = imageError.itemId === item.id && imageError.hasError;
 	const shapePreset =
-		item.provider === "shapes" ? parseShapeStickerId({ stickerId: item.id }) : null;
+		item.provider === "shapes"
+			? parseShapeStickerId({ stickerId: item.id })
+			: null;
 
 	const handleAdd = async () => {
 		setIsAdding(true);
@@ -380,7 +407,7 @@ function StickerItem({
 			addToRecentStickers({ stickerId: item.id });
 		} catch (error) {
 			console.error("Failed to add sticker:", error);
-			toast.error("Failed to add sticker to timeline");
+			toast.error(t("assets.failedToAddSticker"));
 		} finally {
 			setIsAdding(false);
 		}
@@ -407,7 +434,7 @@ function StickerItem({
 								}
 							: undefined
 					}
-					onError={() => setHasImageError(true)}
+					onError={() => setImageError({ hasError: true, itemId: item.id })}
 					loading="lazy"
 					unoptimized
 				/>

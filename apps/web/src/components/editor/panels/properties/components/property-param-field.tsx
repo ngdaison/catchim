@@ -24,6 +24,66 @@ import {
 import { usePropertyDraft } from "../hooks/use-property-draft";
 import { KeyframeToggle } from "./keyframe-toggle";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslation, type TranslationKey } from "@/i18n";
+
+const PARAM_LABEL_KEYS: Record<string, TranslationKey> = {
+	"background.color": "properties.backgroundColor",
+	"background.cornerRadius": "properties.backgroundRadius",
+	"background.enabled": "properties.backgroundEnabled",
+	"background.offsetX": "properties.backgroundOffsetX",
+	"background.offsetY": "properties.backgroundOffsetY",
+	"background.paddingX": "properties.backgroundPaddingX",
+	"background.paddingY": "properties.backgroundPaddingY",
+	"transform.positionX": "properties.positionX",
+	"transform.positionY": "properties.positionY",
+	"transform.rotate": "properties.rotate",
+	"transform.scaleX": "properties.scaleX",
+	"transform.scaleY": "properties.scaleY",
+	blendMode: "properties.blendMode",
+	color: "properties.color",
+	content: "properties.content",
+	fontFamily: "properties.fontFamily",
+	fontSize: "properties.fontSize",
+	fontStyle: "properties.fontStyle",
+	fontWeight: "properties.fontWeight",
+	letterSpacing: "properties.letterSpacing",
+	lineHeight: "properties.lineHeight",
+	muted: "properties.muted",
+	opacity: "properties.opacity",
+	textAlign: "properties.textAlign",
+	textDecoration: "properties.textDecoration",
+	volume: "properties.volume",
+};
+
+const SELECT_OPTION_LABEL_KEYS: Record<string, TranslationKey> = {
+	"blendMode:color": "properties.blendModeColor",
+	"blendMode:color-burn": "properties.blendModeColorBurn",
+	"blendMode:color-dodge": "properties.blendModeColorDodge",
+	"blendMode:darken": "properties.blendModeDarken",
+	"blendMode:difference": "properties.blendModeDifference",
+	"blendMode:exclusion": "properties.blendModeExclusion",
+	"blendMode:hard-light": "properties.blendModeHardLight",
+	"blendMode:hue": "properties.blendModeHue",
+	"blendMode:lighten": "properties.blendModeLighten",
+	"blendMode:luminosity": "properties.blendModeLuminosity",
+	"blendMode:multiply": "properties.blendModeMultiply",
+	"blendMode:normal": "properties.blendModeNormal",
+	"blendMode:overlay": "properties.blendModeOverlay",
+	"blendMode:plus-lighter": "properties.blendModePlusLighter",
+	"blendMode:saturation": "properties.blendModeSaturation",
+	"blendMode:screen": "properties.blendModeScreen",
+	"blendMode:soft-light": "properties.blendModeSoftLight",
+	"fontStyle:italic": "properties.fontStyleItalic",
+	"fontStyle:normal": "properties.blendModeNormal",
+	"fontWeight:bold": "properties.fontWeightBold",
+	"fontWeight:normal": "properties.blendModeNormal",
+	"textAlign:center": "properties.textAlignCenter",
+	"textAlign:left": "properties.textAlignLeft",
+	"textAlign:right": "properties.textAlignRight",
+	"textDecoration:line-through": "properties.textDecorationLineThrough",
+	"textDecoration:none": "properties.textDecorationNone",
+	"textDecoration:underline": "properties.textDecorationUnderline",
+};
 
 export function PropertyParamField({
 	param,
@@ -42,15 +102,22 @@ export function PropertyParamField({
 		onToggle: () => void;
 	};
 }) {
+	const { t } = useTranslation();
+	const label = PARAM_LABEL_KEYS[param.key]
+		? t(PARAM_LABEL_KEYS[param.key])
+		: param.label;
+
 	return (
 		<SectionField
-			label={param.label}
+			label={label}
 			beforeLabel={
 				keyframe && param.keyframable !== false ? (
 					<KeyframeToggle
 						isActive={keyframe.isActive}
 						isDisabled={keyframe.isDisabled}
-						title={`Toggle ${param.label.toLowerCase()} keyframe`}
+						title={t("properties.keyframeToggle", {
+							label: label.toLowerCase(),
+						})}
 						onToggle={keyframe.onToggle}
 					/>
 				) : undefined
@@ -61,6 +128,10 @@ export function PropertyParamField({
 				value={value}
 				onPreview={onPreview}
 				onCommit={onCommit}
+				translateOption={(option) => {
+					const key = SELECT_OPTION_LABEL_KEYS[`${param.key}:${option.value}`];
+					return key ? t(key) : option.label;
+				}}
 			/>
 		</SectionField>
 	);
@@ -71,11 +142,13 @@ function ParamInput({
 	value,
 	onPreview,
 	onCommit,
+	translateOption,
 }: {
 	param: ParamDefinition;
 	value: ParamValue;
 	onPreview: (value: ParamValue) => void;
 	onCommit: () => void;
+	translateOption: (option: { value: string; label: string }) => string;
 }) {
 	if (param.type === "number") {
 		return (
@@ -115,7 +188,7 @@ function ParamInput({
 				<SelectContent>
 					{param.options.map((option) => (
 						<SelectItem key={option.value} value={option.value}>
-							{option.label}
+							{translateOption(option)}
 						</SelectItem>
 					))}
 				</SelectContent>
@@ -180,9 +253,7 @@ function NumberParamField({
 		);
 
 	const previewFromDisplay = (displayVal: number) => {
-		const clamped = clampDisplayValue(
-			snapToStep({ value: displayVal, step }),
-		);
+		const clamped = clampDisplayValue(snapToStep({ value: displayVal, step }));
 		onPreview(clamped / displayMultiplier);
 	};
 

@@ -70,14 +70,43 @@ export function getTrackPlacementByDisplayIndex({
 	tracks: SceneTracks;
 	displayIndex: number;
 }): TrackPlacement | null {
-	const displayTracks = getDisplayTracks({ tracks });
-	const track = displayTracks[displayIndex];
-	if (!track) {
+	if (displayIndex < 0) {
 		return null;
 	}
 
-	return getTrackPlacementById({
-		tracks,
-		trackId: track.id,
-	});
+	if (displayIndex < tracks.overlay.length) {
+		const track = tracks.overlay[displayIndex];
+		return {
+			trackId: track.id,
+			trackType: track.type,
+			section: "overlay",
+			sectionIndex: displayIndex,
+			displayIndex,
+		};
+	}
+
+	const mainDisplayIndex = tracks.overlay.length;
+	if (displayIndex === mainDisplayIndex) {
+		return {
+			trackId: tracks.main.id,
+			trackType: tracks.main.type,
+			section: "main",
+			sectionIndex: -1,
+			displayIndex,
+		};
+	}
+
+	const audioTrackIndex = displayIndex - mainDisplayIndex - 1;
+	const audioTrack = tracks.audio[audioTrackIndex];
+	if (!audioTrack) {
+		return null;
+	}
+
+	return {
+		trackId: audioTrack.id,
+		trackType: audioTrack.type,
+		section: "audio",
+		sectionIndex: audioTrackIndex,
+		displayIndex,
+	};
 }

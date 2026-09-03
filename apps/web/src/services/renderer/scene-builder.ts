@@ -16,7 +16,9 @@ import {
 	buildTransformFromParams,
 	readBlendModeFromParams,
 	readOpacityFromParams,
+	type Transform,
 } from "@/rendering";
+import type { ParamValues } from "@/params";
 
 const PREVIEW_MAX_IMAGE_SIZE = 2048;
 
@@ -30,15 +32,36 @@ function getVisibleSortedElements({ track }: { track: TimelineTrack }) {
 		});
 }
 
+function buildScaledTransformFromParams({
+	params,
+	coordinateScale,
+}: {
+	params: ParamValues;
+	coordinateScale: number;
+}): Transform {
+	const transform = buildTransformFromParams({ params });
+	if (coordinateScale === 1) return transform;
+
+	return {
+		...transform,
+		position: {
+			x: transform.position.x * coordinateScale,
+			y: transform.position.y * coordinateScale,
+		},
+	};
+}
+
 function buildTrackNodes({
 	tracks,
 	mediaMap,
 	canvasSize,
+	coordinateScale,
 	isPreview,
 }: {
 	tracks: TimelineTrack[];
 	mediaMap: Map<string, MediaAsset>;
 	canvasSize: TCanvasSize;
+	coordinateScale: number;
 	isPreview?: boolean;
 }): AnyBaseNode[] {
 	const nodes: AnyBaseNode[] = [];
@@ -76,7 +99,10 @@ function buildTrackNodes({
 							trimStart: element.trimStart,
 							trimEnd: element.trimEnd,
 							retime: element.retime,
-							transform: buildTransformFromParams({ params: element.params }),
+							transform: buildScaledTransformFromParams({
+								params: element.params,
+								coordinateScale,
+							}),
 							animations: element.animations,
 							opacity: readOpacityFromParams({ params: element.params }),
 							blendMode: readBlendModeFromParams({ params: element.params }),
@@ -93,7 +119,10 @@ function buildTrackNodes({
 							timeOffset: element.startTime,
 							trimStart: element.trimStart,
 							trimEnd: element.trimEnd,
-							transform: buildTransformFromParams({ params: element.params }),
+							transform: buildScaledTransformFromParams({
+								params: element.params,
+								coordinateScale,
+							}),
 							animations: element.animations,
 							opacity: readOpacityFromParams({ params: element.params }),
 							blendMode: readBlendModeFromParams({ params: element.params }),
@@ -111,7 +140,10 @@ function buildTrackNodes({
 				nodes.push(
 					new TextNode({
 						...element,
-						transform: buildTransformFromParams({ params: element.params }),
+						transform: buildScaledTransformFromParams({
+							params: element.params,
+							coordinateScale,
+						}),
 						opacity: readOpacityFromParams({ params: element.params }),
 						blendMode: readBlendModeFromParams({ params: element.params }),
 						canvasCenter: { x: canvasSize.width / 2, y: canvasSize.height / 2 },
@@ -132,7 +164,10 @@ function buildTrackNodes({
 						timeOffset: element.startTime,
 						trimStart: element.trimStart,
 						trimEnd: element.trimEnd,
-						transform: buildTransformFromParams({ params: element.params }),
+						transform: buildScaledTransformFromParams({
+							params: element.params,
+							coordinateScale,
+						}),
 						animations: element.animations,
 						opacity: readOpacityFromParams({ params: element.params }),
 						blendMode: readBlendModeFromParams({ params: element.params }),
@@ -150,7 +185,10 @@ function buildTrackNodes({
 						timeOffset: element.startTime,
 						trimStart: element.trimStart,
 						trimEnd: element.trimEnd,
-						transform: buildTransformFromParams({ params: element.params }),
+						transform: buildScaledTransformFromParams({
+							params: element.params,
+							coordinateScale,
+						}),
 						animations: element.animations,
 						opacity: readOpacityFromParams({ params: element.params }),
 						blendMode: readBlendModeFromParams({ params: element.params }),
@@ -216,6 +254,7 @@ function buildBlurBackgroundNodes({
 
 export type BuildSceneParams = {
 	canvasSize: TCanvasSize;
+	coordinateScale?: number;
 	tracks: SceneTracks;
 	mediaAssets: MediaAsset[];
 	duration: number;
@@ -225,6 +264,7 @@ export type BuildSceneParams = {
 
 export function buildScene({
 	canvasSize,
+	coordinateScale = 1,
 	tracks,
 	mediaAssets,
 	duration,
@@ -245,6 +285,7 @@ export function buildScene({
 		tracks: orderedTracksBottomToTop,
 		mediaMap,
 		canvasSize,
+		coordinateScale,
 		isPreview,
 	});
 

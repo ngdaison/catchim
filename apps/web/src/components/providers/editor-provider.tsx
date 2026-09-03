@@ -14,6 +14,8 @@ import {
 	initializeGpuRenderer,
 	isGpuAvailable,
 } from "@/services/renderer/gpu-renderer";
+import { useTranslation } from "@/i18n";
+import { warmNativeTimelineCore } from "@/native/opencut-core";
 
 interface EditorProviderProps {
 	projectId: string;
@@ -21,6 +23,7 @@ interface EditorProviderProps {
 }
 
 export function EditorProvider({ projectId, children }: EditorProviderProps) {
+	const { t } = useTranslation();
 	const activeProject = useEditor((e) => e.project.getActiveOrNull());
 	const router = useRouter();
 	const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +41,7 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 		const loadProject = async () => {
 			try {
 				setIsLoading(true);
+				warmNativeTimelineCore();
 				await initializeGpuRenderer();
 				editor.renderer.setDegraded(!isGpuAvailable());
 				await editor.project.loadProject({ id: projectId });
@@ -57,11 +61,11 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 				if (isNotFound) {
 					try {
 						const newProjectId = await editor.project.createNewProject({
-							name: "Untitled Project",
+							name: t("project.untitledProject"),
 						});
 						router.replace(`/editor/${newProjectId}`);
 					} catch (_createErr) {
-						setError("Failed to create project");
+						setError(t("project.failedToCreateProject"));
 						setIsLoading(false);
 					}
 				} else {
@@ -72,7 +76,9 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 						setError(wasmPanic);
 					} else {
 						setError(
-							err instanceof Error ? err.message : "Failed to load project",
+							err instanceof Error
+								? err.message
+								: t("project.failedToLoadProject"),
 						);
 					}
 					setIsLoading(false);
@@ -85,7 +91,7 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 		return () => {
 			cancelled = true;
 		};
-	}, [projectId, router]);
+	}, [projectId, router, t]);
 
 	if (error) {
 		return (
@@ -102,7 +108,9 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 			<div className="bg-background flex h-screen w-screen items-center justify-center">
 				<div className="flex flex-col items-center gap-4">
 					<Loader2 className="text-muted-foreground size-8 animate-spin" />
-					<p className="text-muted-foreground text-sm">Loading project...</p>
+					<p className="text-muted-foreground text-sm">
+						{t("project.loadingProject")}
+					</p>
 				</div>
 			</div>
 		);
@@ -113,7 +121,9 @@ export function EditorProvider({ projectId, children }: EditorProviderProps) {
 			<div className="bg-background flex h-screen w-screen items-center justify-center">
 				<div className="flex flex-col items-center gap-4">
 					<Loader2 className="text-muted-foreground size-8 animate-spin" />
-					<p className="text-muted-foreground text-sm">Exiting project...</p>
+					<p className="text-muted-foreground text-sm">
+						{t("project.exitingProject")}
+					</p>
 				</div>
 			</div>
 		);

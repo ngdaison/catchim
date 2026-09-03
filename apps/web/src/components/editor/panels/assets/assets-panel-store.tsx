@@ -11,9 +11,9 @@ import {
 	TextIcon,
 	Settings01Icon,
 	SlidersHorizontalIcon,
-	ColorsIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import type { TranslationKey } from "@/i18n";
 
 export const TAB_KEYS = [
 	"media",
@@ -29,52 +29,54 @@ export const TAB_KEYS = [
 
 export type Tab = (typeof TAB_KEYS)[number];
 
-const createHugeiconsIcon =
-	({ icon }: { icon: IconSvgElement }) =>
-	({ className }: { className?: string }) => (
-		<HugeiconsIcon icon={icon} className={className} />
-	);
+const createHugeiconsIcon = ({ icon }: { icon: IconSvgElement }) => {
+	function PanelTabIcon({ className }: { className?: string }) {
+		return <HugeiconsIcon icon={icon} className={className} />;
+	}
+
+	return PanelTabIcon;
+};
 
 export const tabs = {
 	media: {
 		icon: createHugeiconsIcon({ icon: Folder03Icon }),
-		label: "Media",
+		labelKey: "assets.media",
 	},
 	sounds: {
 		icon: createHugeiconsIcon({ icon: HeadphonesIcon }),
-		label: "Sounds",
+		labelKey: "assets.sounds",
 	},
 	text: {
 		icon: createHugeiconsIcon({ icon: TextIcon }),
-		label: "Text",
+		labelKey: "assets.text",
 	},
 	stickers: {
 		icon: createHugeiconsIcon({ icon: Happy01Icon }),
-		label: "Stickers",
+		labelKey: "assets.stickers",
 	},
 	effects: {
 		icon: createHugeiconsIcon({ icon: MagicWand05Icon }),
-		label: "Effects",
+		labelKey: "assets.effects",
 	},
 	transitions: {
 		icon: createHugeiconsIcon({ icon: ArrowRightDoubleIcon }),
-		label: "Transitions",
+		labelKey: "assets.transitions",
 	},
 	captions: {
 		icon: createHugeiconsIcon({ icon: ClosedCaptionIcon }),
-		label: "Captions",
+		labelKey: "assets.captions",
 	},
 	adjustment: {
 		icon: createHugeiconsIcon({ icon: SlidersHorizontalIcon }),
-		label: "Adjustment",
+		labelKey: "assets.adjustment",
 	},
 	settings: {
 		icon: createHugeiconsIcon({ icon: Settings01Icon }),
-		label: "Settings",
+		labelKey: "assets.settings",
 	},
 } satisfies Record<
 	Tab,
-	{ icon: ElementType<{ className?: string }>; label: string }
+	{ icon: ElementType<{ className?: string }>; labelKey: TranslationKey }
 >;
 
 export type MediaViewMode = "grid" | "list";

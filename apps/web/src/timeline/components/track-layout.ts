@@ -43,6 +43,27 @@ export function getCumulativeHeightBefore({
 		);
 }
 
+export function getTrackLayoutOffsets({
+	tracks,
+	getExtraHeight,
+}: {
+	tracks: Array<{ type: TrackType }>;
+	getExtraHeight?: (trackIndex: number) => number;
+}): number[] {
+	const offsets: number[] = [];
+	let currentOffset = 0;
+
+	for (let index = 0; index < tracks.length; index += 1) {
+		offsets.push(currentOffset);
+		currentOffset +=
+			getTrackHeight({ type: tracks[index].type }) +
+			(getExtraHeight?.(index) ?? 0) +
+			TIMELINE_TRACK_GAP_PX;
+	}
+
+	return offsets;
+}
+
 export function getTotalTracksHeight({
 	tracks,
 	getExtraHeight,

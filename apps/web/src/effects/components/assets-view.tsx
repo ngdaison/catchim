@@ -8,12 +8,14 @@ import { effectPreviewService } from "@/services/renderer/effect-preview";
 import { useEditor } from "@/editor/use-editor";
 import { buildEffectElement } from "@/timeline/element-utils";
 import type { EffectDefinition } from "@/effects/types";
+import { useTranslation } from "@/i18n";
 
 export function EffectsView() {
+	const { t } = useTranslation();
 	const effects = effectsRegistry.getAll();
 
 	return (
-		<PanelView title="Effects">
+		<PanelView title={t("assets.effects")}>
 			<EffectsGrid effects={effects} />
 		</PanelView>
 	);

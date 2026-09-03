@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useEditor } from "@/editor/use-editor";
 import { storageService } from "@/services/storage/service";
+import { useTranslation } from "@/i18n";
 
 interface StorageContextType {
 	isInitialized: boolean;
@@ -27,6 +28,7 @@ interface StorageProviderProps {
 }
 
 export function StorageProvider({ children }: StorageProviderProps) {
+	const { t } = useTranslation();
 	const [status, setStatus] = useState<StorageContextType>({
 		isInitialized: false,
 		isLoading: true,
@@ -48,9 +50,7 @@ export function StorageProvider({ children }: StorageProviderProps) {
 				const hasSupport = storageService.isFullySupported();
 
 				if (!hasSupport) {
-					toast.warning(
-						"Storage not fully supported. Some features may not work.",
-					);
+					toast.warning(t("common.storageNotFullySupported"));
 				}
 
 				await editor.project.loadAllProjects();
@@ -67,13 +67,14 @@ export function StorageProvider({ children }: StorageProviderProps) {
 					isInitialized: false,
 					isLoading: false,
 					hasSupport: storageService.isFullySupported(),
-					error: error instanceof Error ? error.message : "Unknown error",
+					error:
+						error instanceof Error ? error.message : t("common.unknownError"),
 				});
 			}
 		};
 
 		initializeStorage();
-	}, [editor.project.loadAllProjects]);
+	}, [editor.project.loadAllProjects, t]);
 
 	return (
 		<StorageContext.Provider value={status}>{children}</StorageContext.Provider>

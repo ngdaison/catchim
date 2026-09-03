@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { ClockIcon } from "lucide-react";
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from "@/components/ui/popover";
+	Dialog,
+	DialogContent,
+	DialogTitle,
+	DialogTrigger,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
@@ -20,6 +21,7 @@ import {
 	clearFormDraft,
 } from "@/components/ui/form";
 import type { FeedbackEntry } from "../types";
+import { useTranslation } from "@/i18n";
 
 const PERSIST_KEY = "feedback-draft";
 const HISTORY_KEY = "feedback-history";
@@ -29,10 +31,26 @@ interface FeedbackFormValues {
 	message: string;
 }
 
+function isFeedbackEntry(value: unknown): value is FeedbackEntry {
+	return (
+		typeof value === "object" &&
+		value !== null &&
+		"id" in value &&
+		"message" in value &&
+		"createdAt" in value &&
+		typeof value.id === "string" &&
+		typeof value.message === "string" &&
+		typeof value.createdAt === "string"
+	);
+}
+
 function readHistory(): FeedbackEntry[] {
 	try {
 		const stored = localStorage.getItem(HISTORY_KEY);
-		return stored ? (JSON.parse(stored) as FeedbackEntry[]) : [];
+		if (!stored) return [];
+
+		const parsed: unknown = JSON.parse(stored);
+		return Array.isArray(parsed) ? parsed.filter(isFeedbackEntry) : [];
 	} catch {
 		return [];
 	}
@@ -47,6 +65,7 @@ function writeHistory({ entries }: { entries: FeedbackEntry[] }): void {
 }
 
 function useFeedback() {
+	const { t } = useTranslation();
 	const [entries, setEntries] = useState<FeedbackEntry[]>(readHistory);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -69,7 +88,7 @@ function useFeedback() {
 
 			if (!res.ok) {
 				const data = await res.json().catch(() => null);
-				throw new Error(data?.error ?? "Failed to submit");
+				throw new Error(data?.error ?? t("feedback.submitError"));
 			}
 
 			const { entry } = await res.json();
@@ -77,10 +96,10 @@ function useFeedback() {
 			setEntries(next);
 			writeHistory({ entries: next });
 			onSuccess();
-			toast.success("Feedback sent");
+			toast.success(t("feedback.sent"));
 		} catch (error) {
 			toast.error(
-				error instanceof Error ? error.message : "Failed to send feedback",
+				error instanceof Error ? error.message : t("feedback.submitError"),
 			);
 		} finally {
 			setIsSubmitting(false);
@@ -91,31 +110,43 @@ function useFeedback() {
 }
 
 export function FeedbackPopover() {
+	const { t } = useTranslation();
 	const [open, setOpen] = useState(false);
 
 	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger asChild>
 				<Button variant="outline" className="h-8">
-					Send feedback
+					{t("feedback.button")}
 				</Button>
-			</PopoverTrigger>
-			<PopoverContent align="end" className="w-80 p-0">
+			</DialogTrigger>
+			<DialogContent className="w-[calc(100%-2rem)] max-w-sm overflow-hidden p-0">
+				<div className="border-b p-3 pr-14">
+					<DialogTitle className="text-sm font-medium">
+						{t("feedback.button")}
+					</DialogTitle>
+				</div>
 				<FeedbackPopoverContent onClose={() => setOpen(false)} />
-			</PopoverContent>
-		</Popover>
+			</DialogContent>
+		</Dialog>
 	);
 }
 
 type View = "compose" | "history";
 
 function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
+	const { t } = useTranslation();
 	const { entries, isSubmitting, submit } = useFeedback();
 	const [view, setView] = useState<View>("compose");
 
 	const form = useForm<FeedbackFormValues>({
 		defaultValues: { message: "" },
 	});
+	const message =
+		useWatch({
+			control: form.control,
+			name: "message",
+		}) ?? "";
 
 	async function handleSubmit(values: FeedbackFormValues) {
 		await submit({
@@ -148,7 +179,7 @@ function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
 						onClick={() => setView("compose")}
 						className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
 					>
-						← Back
+						← {t("feedback.back")}
 					</button>
 				</div>
 			</div>
@@ -158,7 +189,10 @@ function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
 	return (
 		<div className="flex flex-col">
 			<Form persistKey={PERSIST_KEY} {...form}>
-				<form onSubmit={form.handleSubmit(handleSubmit)} className="flex flex-col">
+				<form
+					onSubmit={form.handleSubmit(handleSubmit)}
+					className="flex flex-col"
+				>
 					<FormField
 						control={form.control}
 						name="message"
@@ -166,7 +200,7 @@ function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
 							<FormItem>
 								<FormControl>
 									<Textarea
-										placeholder="Thoughts, bugs, ideas..."
+										placeholder={t("feedback.placeholder")}
 										className="min-h-[7rem] text-sm p-3 bg-background shadow-none border-none! resize-none"
 										{...field}
 									/>
@@ -188,22 +222,22 @@ function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
 							<span />
 						)}
 						<div className="flex gap-2">
-							{!form.watch("message").trim() && (
+							{!message.trim() && (
 								<Button
 									type="button"
 									variant="outline"
 									size="sm"
 									onClick={onClose}
 								>
-									Cancel
+									{t("common.cancel")}
 								</Button>
 							)}
 							<Button
 								type="submit"
 								size="sm"
-								disabled={isSubmitting || !form.watch("message").trim()}
+								disabled={isSubmitting || !message.trim()}
 							>
-								{isSubmitting ? <Spinner /> : "Send"}
+								{isSubmitting ? <Spinner /> : t("common.send")}
 							</Button>
 						</div>
 					</div>
@@ -213,15 +247,21 @@ function FeedbackPopoverContent({ onClose }: { onClose: () => void }) {
 	);
 }
 
-function relativeDate(iso: string): string {
+function relativeDate({
+	iso,
+	t,
+}: {
+	iso: string;
+	t: ReturnType<typeof useTranslation>["t"];
+}): string {
 	const diff = Date.now() - new Date(iso).getTime();
 	const mins = Math.floor(diff / 60_000);
-	if (mins < 1) return "just now";
-	if (mins < 60) return `${mins}m ago`;
+	if (mins < 1) return t("feedback.justNow");
+	if (mins < 60) return t("feedback.minutesAgo", { count: mins });
 	const hrs = Math.floor(mins / 60);
-	if (hrs < 24) return `${hrs}h ago`;
+	if (hrs < 24) return t("feedback.hoursAgo", { count: hrs });
 	const days = Math.floor(hrs / 24);
-	if (days < 7) return `${days}d ago`;
+	if (days < 7) return t("feedback.daysAgo", { count: days });
 	return new Date(iso).toLocaleDateString(undefined, {
 		month: "short",
 		day: "numeric",
@@ -229,13 +269,15 @@ function relativeDate(iso: string): string {
 }
 
 function FeedbackEntryItem({ entry }: { entry: FeedbackEntry }) {
+	const { t } = useTranslation();
+
 	return (
 		<div className="px-3 py-2.5">
 			<p className="text-sm text-muted-foreground leading-snug whitespace-pre-wrap break-words">
 				{entry.message}
 			</p>
 			<span className="mt-1 block text-[11px] text-muted-foreground/50">
-				{relativeDate(entry.createdAt)}
+				{relativeDate({ iso: entry.createdAt, t })}
 			</span>
 		</div>
 	);

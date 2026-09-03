@@ -86,7 +86,50 @@ const apiResponseSchema = z.object({
 	pageSize: z.number(),
 	sort: z.string(),
 	minRating: z.number().optional(),
+	unavailable: z.string().optional(),
 });
+
+const placeholderFreesoundApiKeys = new Set([
+	"",
+	"example_api_key",
+	"your_api_key_here",
+]);
+
+function isFreesoundApiKeyConfigured() {
+	return !placeholderFreesoundApiKeys.has(webEnv.FREESOUND_API_KEY.trim());
+}
+
+function createEmptySoundSearchResponse({
+	query,
+	type,
+	page,
+	pageSize,
+	sort,
+	minRating,
+	unavailable,
+}: {
+	query?: string;
+	type?: string;
+	page: number;
+	pageSize: number;
+	sort: string;
+	minRating?: number;
+	unavailable?: string;
+}) {
+	return {
+		count: 0,
+		next: null,
+		previous: null,
+		results: [],
+		query: query || "",
+		type: type || "effects",
+		page,
+		pageSize,
+		sort,
+		minRating,
+		unavailable,
+	};
+}
 
 function buildSortParameter({ query, sort }: { query?: string; sort: string }) {
 	if (!query) return `${sort}_desc`;
@@ -163,6 +206,7 @@ export async function GET(request: NextRequest) {
 			page_size: searchParams.get("page_size") || undefined,
 			sort: searchParams.get("sort") || undefined,
 			min_rating: searchParams.get("min_rating") || undefined,
+			commercial_only: searchParams.get("commercial_only") || undefined,
 		});
 
 		if (!validationResult.success) {
@@ -196,6 +240,20 @@ export async function GET(request: NextRequest) {
 			);
 		}
 
+		if (!isFreesoundApiKeyConfigured()) {
+			return NextResponse.json(
+				createEmptySoundSearchResponse({
+					query,
+					type,
+					page,
+					pageSize,
+					sort,
+					minRating: min_rating,
+					unavailable: "FREESOUND_API_KEY is not configured",
+				}),
+			);
+		}
+
 		const baseUrl = "https://freesound.org/apiv2/search/text/";
 
 		const sortParam = buildSortParameter({ query, sort });
@@ -220,9 +278,24 @@ export async function GET(request: NextRequest) {
 		if (!response.ok) {
 			const errorText = await response.text();
 			console.error("Freesound API error:", response.status, errorText);
+
+			if (response.status === 401 || response.status === 403) {
+				return NextResponse.json(
+					createEmptySoundSearchResponse({
+						query,
+						type,
+						page,
+						pageSize,
+						sort,
+						minRating: min_rating,
+						unavailable: "FREESOUND_API_KEY was rejected",
+					}),
+				);
+			}
+
 			return NextResponse.json(
 				{ error: "Failed to search sounds" },
-				{ status: response.status },
+				{ status: 502 },
 			);
 		}
 

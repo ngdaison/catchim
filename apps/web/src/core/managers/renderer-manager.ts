@@ -1,12 +1,15 @@
 import type { EditorCore } from "@/core";
 import type { RootNode } from "@/services/renderer/nodes/root-node";
-import type { ExportOptions, ExportResult } from "@/export";
+import {
+	resolveExportCanvasSize,
+	type ExportOptions,
+	type ExportResult,
+} from "@/export";
 import { CanvasRenderer } from "@/services/renderer/canvas-renderer";
 import { SceneExporter } from "@/services/renderer/scene-exporter";
 import { buildScene } from "@/services/renderer/scene-builder";
 import { createTimelineAudioBuffer } from "@/media/audio";
 import { formatTimecode } from "opencut-wasm";
-import { frameRateToFloat } from "@/fps/utils";
 import { downloadBlob } from "@/utils/browser";
 
 type SnapshotResult =
@@ -122,7 +125,10 @@ export class RendererManager {
 				return { success: false, error: "Failed to create image" };
 			}
 
-			const timecode = formatTimecode({ time: renderTime, rate: fps })!.replace(/:/g, "-");
+			const timecode = formatTimecode({ time: renderTime, rate: fps })!.replace(
+				/:/g,
+				"-",
+			);
 			const safeName =
 				activeProject.metadata.name.replace(/[<>:"/\\|?*]/g, "-").trim() ||
 				"snapshot";
@@ -147,7 +153,7 @@ export class RendererManager {
 		onProgress?: ({ progress }: { progress: number }) => void;
 		onCancel?: () => boolean;
 	}): Promise<ExportResult> {
-		const { format, quality, fps, includeAudio } = options;
+		const { format, quality, fps, includeAudio, resolution } = options;
 
 		try {
 			const tracks = this.editor.scenes.getActiveScene().tracks;
@@ -164,7 +170,12 @@ export class RendererManager {
 			}
 
 			const exportFps = fps ?? activeProject.settings.fps;
-			const canvasSize = activeProject.settings.canvasSize;
+			const sourceCanvasSize = activeProject.settings.canvasSize;
+			const canvasSize = resolveExportCanvasSize({
+				sourceSize: sourceCanvasSize,
+				resolution,
+			});
+			const coordinateScale = canvasSize.height / sourceCanvasSize.height;
 
 			let audioBuffer: AudioBuffer | null = null;
 			if (includeAudio) {
@@ -181,6 +192,7 @@ export class RendererManager {
 				mediaAssets,
 				duration,
 				canvasSize,
+				coordinateScale,
 				background: activeProject.settings.background,
 			});
 

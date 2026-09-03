@@ -24,5 +24,6 @@ bun.lockb
 target/
 
 .cargo-tools/
+.tools/
 
 rust-migration-notes.md

@@ -20,6 +20,7 @@
 		],
 		"paths": {
 			"@/*": ["./src/*"],
+			"opencut-wasm": ["./src/native/opencut-wasm-compat.ts"],
 			"content-collections": ["./.content-collections/generated"]
 		},
 		"forceConsistentCasingInFileNames": true

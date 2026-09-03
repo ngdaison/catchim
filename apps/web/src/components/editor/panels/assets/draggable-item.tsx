@@ -14,6 +14,7 @@ import { useEditor } from "@/editor/use-editor";
 import type { TimelineDragData } from "@/timeline/drag";
 import { cn } from "@/utils/ui";
 import type { MediaTime } from "@/wasm";
+import { useTranslation } from "@/i18n";
 
 export interface DraggableItemProps {
 	name: string;
@@ -46,6 +47,7 @@ export function DraggableItem({
 	variant = "card",
 	isDraggable = true,
 }: DraggableItemProps) {
+	const { t } = useTranslation();
 	const [isDragging, setIsDragging] = useState(false);
 	const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
 	const dragRef = useRef<HTMLDivElement>(null);
@@ -187,7 +189,7 @@ export function DraggableItem({
 								{shouldShowPlusOnDrag && (
 									<PlusButton
 										onClick={handleAddToTimeline}
-										tooltipText="Add to timeline or drag to position"
+										tooltipText={t("assets.addToTimelineOrDrag")}
 									/>
 								)}
 							</AspectRatio>

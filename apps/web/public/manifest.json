@@ -1,8 +1,13 @@
 {
 	"name": "OpenCut",
+	"short_name": "OpenCut",
 	"description": "A simple but powerful video editor that gets the job done. In your browser.",
+	"id": "/",
 	"display": "standalone",
+	"scope": "/",
 	"start_url": "/",
+	"background_color": "#09090b",
+	"theme_color": "#09090b",
 	"icons": [
 		{
 			"src": "/icons/android-icon-36x36.png",

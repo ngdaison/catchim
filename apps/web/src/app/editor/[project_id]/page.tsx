@@ -16,8 +16,7 @@ import { Onboarding } from "@/components/editor/onboarding";
 import { MigrationDialog } from "@/project/components/migration-dialog";
 import { usePanelStore } from "@/editor/panel-store";
 import { usePasteMedia } from "@/media/use-paste-media";
-import { MobileGate } from "@/components/editor/mobile-gate";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useEditor } from "@/editor/use-editor";
 import { Cancel01Icon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -34,43 +33,45 @@ import {
 	bookmarkNotesPreviewOverlay,
 	getBookmarkPreviewOverlaySource,
 } from "@/timeline/bookmarks/index";
+import { MobileEditorLayout } from "@/components/editor/mobile/mobile-editor-layout";
+import { useTranslation } from "@/i18n";
 
 export default function Editor() {
-	const params = useParams();
-	const projectId = params.project_id as string;
+	const params = useParams<{ project_id: string }>();
+	const projectId = params.project_id;
+	const isMobile = useIsMobileEditor();
 
 	return (
-		<MobileGate>
-			<EditorProvider projectId={projectId}>
-				<div className="bg-background flex h-screen w-screen flex-col overflow-hidden">
-					<DegradedRendererBanner />
-					<EditorHeader />
-					<div className="min-h-0 min-w-0 flex-1">
-						<EditorLayout />
-					</div>
-					<Onboarding />
-					<MigrationDialog />
-					<ChangelogNotification />
+		<EditorProvider projectId={projectId}>
+			<div className="bg-background flex h-dvh w-screen flex-col overflow-hidden">
+				<DegradedRendererBanner />
+				{!isMobile && <EditorHeader />}
+				<div className="min-h-0 min-w-0 flex-1">
+					<EditorLayout />
 				</div>
-			</EditorProvider>
-		</MobileGate>
+				<Onboarding />
+				<MigrationDialog />
+				<ChangelogNotification />
+			</div>
+		</EditorProvider>
 	);
 }
 
 function DegradedRendererBanner() {
+	const { t } = useTranslation();
 	const isDegraded = useEditor((e) => e.renderer.isDegraded);
 	const [dismissed, setDismissed] = useState(false);
 	if (!isDegraded || dismissed) return null;
 
 	return (
 		<div className="bg-accent border-b h-9 flex items-center justify-center gap-2 text-xs text-muted-foreground">
-			<span>For the best experience, open OpenCut in Chrome.</span>
+			<span>{t("timeline.forBestExperienceUseChrome")}</span>
 			<Button
 				variant="text"
 				size="icon"
 				className="p-0 w-auto [&_svg]:size-3.5"
 				onClick={() => setDismissed(true)}
-				aria-label="Dismiss"
+				aria-label={t("common.dismiss")}
 			>
 				<HugeiconsIcon icon={Cancel01Icon} />
 			</Button>
@@ -81,6 +82,7 @@ function DegradedRendererBanner() {
 function EditorLayout() {
 	usePasteMedia();
 	const { panels, setPanel } = usePanelStore();
+	const isMobile = useIsMobileEditor();
 	const activeScene = useEditor((editor) =>
 		editor.scenes.getActiveSceneOrNull(),
 	);
@@ -124,6 +126,16 @@ function EditorLayout() {
 			),
 		[overlaySource.definitions, overlays],
 	);
+
+	if (isMobile) {
+		return (
+			<MobileEditorLayout
+				overlayControls={overlayControls}
+				overlayInstances={overlaySource.instances}
+				onOverlayVisibilityChange={setOverlayVisibility}
+			/>
+		);
+	}
 
 	return (
 		<ResizablePanelGroup
@@ -206,4 +218,19 @@ function EditorLayout() {
 			</ResizablePanel>
 		</ResizablePanelGroup>
 	);
+}
+
+function useIsMobileEditor() {
+	const [isMobile, setIsMobile] = useState(false);
+
+	useEffect(() => {
+		const mediaQuery = window.matchMedia("(max-width: 767px)");
+		const update = () => setIsMobile(mediaQuery.matches);
+
+		update();
+		mediaQuery.addEventListener("change", update);
+		return () => mediaQuery.removeEventListener("change", update);
+	}, []);
+
+	return isMobile;
 }

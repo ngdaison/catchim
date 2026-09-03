@@ -1,7 +1,10 @@
 "use client";
 
 import { Separator } from "@/components/ui/separator";
-import { type Tab, useAssetsPanelStore } from "@/components/editor/panels/assets/assets-panel-store";
+import {
+	type Tab,
+	useAssetsPanelStore,
+} from "@/components/editor/panels/assets/assets-panel-store";
 import { TabBar } from "./tabbar";
 import { Captions } from "@/subtitles/components/assets-view";
 import { MediaView } from "./views/assets";
@@ -10,9 +13,18 @@ import { SoundsView } from "@/sounds/components/assets-view";
 import { StickersView } from "@/stickers/components/assets-view";
 import { TextView } from "@/text/components/assets-view";
 import { EffectsView } from "@/effects/components/assets-view";
+import { useTranslation } from "@/i18n";
+import { cn } from "@/utils/ui";
 
-export function AssetsPanel() {
+export function AssetsPanel({
+	showTabBar = true,
+	className,
+}: {
+	showTabBar?: boolean;
+	className?: string;
+}) {
 	const { activeTab } = useAssetsPanelStore();
+	const { t } = useTranslation();
 
 	const viewMap: Record<Tab, React.ReactNode> = {
 		media: <MediaView />,
@@ -22,22 +34,31 @@ export function AssetsPanel() {
 		effects: <EffectsView />,
 		transitions: (
 			<div className="text-muted-foreground p-4">
-				Transitions view coming soon...
+				{t("assets.transitionsComingSoon")}
 			</div>
 		),
 		captions: <Captions />,
 		adjustment: (
 			<div className="text-muted-foreground p-4">
-				Adjustment view coming soon...
+				{t("assets.adjustmentComingSoon")}
 			</div>
 		),
 		settings: <SettingsView />,
 	};
 
 	return (
-		<div className="panel bg-background flex h-full rounded-sm border overflow-hidden">
-			<TabBar />
-			<Separator orientation="vertical" />
+		<div
+			className={cn(
+				"panel bg-background flex h-full overflow-hidden rounded-sm border",
+				className,
+			)}
+		>
+			{showTabBar && (
+				<>
+					<TabBar />
+					<Separator orientation="vertical" />
+				</>
+			)}
 			<div className="flex-1 overflow-hidden">{viewMap[activeTab]}</div>
 		</div>
 	);

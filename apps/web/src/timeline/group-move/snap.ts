@@ -1,8 +1,8 @@
 import type { SceneTracks } from "@/timeline";
 import {
-	buildTimelineSnapPoints,
+	buildSortedTimelineSnapPoints,
 	getTimelineSnapThresholdInTicks,
-	resolveTimelineSnap,
+	resolveSortedTimelineSnap,
 	type SnapPoint,
 } from "@/timeline/snapping";
 import { getElementEdgeSnapPoints } from "@/timeline/element-snap-source";
@@ -17,30 +17,21 @@ export function snapGroupEdges({
 	tracks,
 	playheadTime,
 	zoomLevel,
+	snapPoints: cachedSnapPoints,
 }: {
 	group: MoveGroup;
 	anchorStartTime: MediaTime;
 	tracks: SceneTracks;
 	playheadTime: MediaTime;
 	zoomLevel: number;
+	snapPoints?: SnapPoint[];
 }): {
 	snappedAnchorStartTime: MediaTime;
 	snapPoint: SnapPoint | null;
 } {
-	const excludeElementIds = new Set(
-		group.members.map((member) => member.elementId),
-	);
-	const snapPoints = buildTimelineSnapPoints({
-		sources: [
-			() => getElementEdgeSnapPoints({ tracks, excludeElementIds }),
-			() => getPlayheadSnapPoints({ playheadTime }),
-			() =>
-				getAnimationKeyframeSnapPointsForTimeline({
-					tracks,
-					excludeElementIds,
-				}),
-		],
-	});
+	const snapPoints =
+		cachedSnapPoints ??
+		buildMoveGroupSnapPoints({ group, tracks, playheadTime });
 	const maxSnapDistance = getTimelineSnapThresholdInTicks({ zoomLevel });
 
 	let closestSnapDistance = Infinity;
@@ -52,7 +43,7 @@ export function snapGroupEdges({
 			a: anchorStartTime,
 			b: member.timeOffset,
 		});
-		const memberStartSnap = resolveTimelineSnap({
+		const memberStartSnap = resolveSortedTimelineSnap({
 			targetTime: memberStartTime,
 			snapPoints,
 			maxSnapDistance,
@@ -69,7 +60,7 @@ export function snapGroupEdges({
 			snapPoint = memberStartSnap.snapPoint;
 		}
 
-		const memberEndSnap = resolveTimelineSnap({
+		const memberEndSnap = resolveSortedTimelineSnap({
 			targetTime: addMediaTime({
 				a: memberStartTime,
 				b: member.duration,
@@ -97,4 +88,30 @@ export function snapGroupEdges({
 		snappedAnchorStartTime,
 		snapPoint,
 	};
+}
+
+export function buildMoveGroupSnapPoints({
+	group,
+	tracks,
+	playheadTime,
+}: {
+	group: MoveGroup;
+	tracks: SceneTracks;
+	playheadTime: MediaTime;
+}): SnapPoint[] {
+	const excludeElementIds = new Set(
+		group.members.map((member) => member.elementId),
+	);
+
+	return buildSortedTimelineSnapPoints({
+		sources: [
+			() => getElementEdgeSnapPoints({ tracks, excludeElementIds }),
+			() => getPlayheadSnapPoints({ playheadTime }),
+			() =>
+				getAnimationKeyframeSnapPointsForTimeline({
+					tracks,
+					excludeElementIds,
+				}),
+		],
+	});
 }

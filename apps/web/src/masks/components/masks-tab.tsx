@@ -67,6 +67,7 @@ import {
 	OcTextWidthIcon,
 } from "@/components/icons";
 import { cn } from "@/utils/ui";
+import { useTranslation } from "@/i18n";
 
 type MasksTabProps = {
 	element: MaskableElement;
@@ -127,6 +128,7 @@ function withPreviewedMaskParam({
 }
 
 export function MasksTab({ element, trackId }: MasksTabProps) {
+	const { t } = useTranslation();
 	const editor = useEditor();
 	const { renderElement, previewUpdates, commit } =
 		useElementPreview<MaskableElement>({
@@ -254,7 +256,7 @@ export function MasksTab({ element, trackId }: MasksTabProps) {
 	return (
 		<div className="flex flex-col h-full">
 			<div className="border-b px-3.5 h-11 shrink-0 flex items-center justify-between gap-2">
-				<SectionTitle>Masks</SectionTitle>
+				<SectionTitle>{t("properties.masks")}</SectionTitle>
 				<DropdownMenu
 					open={hasMask ? false : isDropdownOpen}
 					onOpenChange={handleDropdownOpenChange}
@@ -267,20 +269,23 @@ export function MasksTab({ element, trackId }: MasksTabProps) {
 										variant="ghost"
 										size="icon"
 										disabled
-										aria-label="Add mask"
+										aria-label={t("properties.addMask")}
 									>
 										<HugeiconsIcon icon={PlusSignIcon} className="size-3.5!" />
 									</Button>
 								</span>
 							</TooltipTrigger>
 							<TooltipContent className="max-w-56 text-balance">
-								Only one mask is supported right now. If you need more,
-								duplicate the clip and apply a different mask to each copy.
+								{t("properties.maskLimitDescription")}
 							</TooltipContent>
 						</Tooltip>
 					) : (
 						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon" aria-label="Add mask">
+							<Button
+								variant="ghost"
+								size="icon"
+								aria-label={t("properties.addMask")}
+							>
 								<HugeiconsIcon icon={PlusSignIcon} className="size-3.5!" />
 							</Button>
 						</DropdownMenuTrigger>
@@ -329,6 +334,7 @@ function MaskItem({
 	previewParam,
 	onCommit,
 }: MaskItemProps) {
+	const { t } = useTranslation();
 	const editor = useEditor();
 	const definition = getMaskDefinition(mask.type);
 
@@ -340,7 +346,7 @@ function MaskItem({
 						<Button
 							variant="ghost"
 							size="icon"
-							aria-label={`Toggle ${definition.name} mask inversion`}
+							aria-label={t("properties.invertMask")}
 							onClick={() =>
 								editor.timeline.toggleMaskInverted({
 									trackId,
@@ -356,7 +362,7 @@ function MaskItem({
 						<Button
 							variant="ghost"
 							size="icon"
-							aria-label={`Remove ${definition.name} mask`}
+							aria-label={t("properties.removeMask")}
 							onClick={() =>
 								editor.timeline.removeMask({
 									trackId,
@@ -835,17 +841,21 @@ function MaskNumberField({
 }
 
 function EmptyView({ onAddMask }: EmptyViewProps) {
+	const { t } = useTranslation();
+
 	return (
 		<div className="flex flex-col h-full items-center justify-center gap-4 text-center">
 			<OcShapesIcon className="size-10 text-muted-foreground" strokeWidth={1} />
 			<div className="flex flex-col gap-2">
-				<h3 className="font-medium text-foreground">No masks</h3>
+				<h3 className="font-medium text-foreground">
+					{t("properties.noMasks")}
+				</h3>
 				<p className="text-muted-foreground text-sm text-balance max-w-40">
-					Add a mask to hide or reveal parts of this layer.
+					{t("properties.addMaskDescription")}
 				</p>
 			</div>
 			<Button variant="default" size="sm" onClick={onAddMask}>
-				Add mask
+				{t("properties.addMask")}
 			</Button>
 		</div>
 	);

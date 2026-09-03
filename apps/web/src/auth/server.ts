@@ -26,14 +26,14 @@ export const auth = betterAuth({
 	rateLimit: {
 		storage: "secondary-storage",
 		customStorage: {
-			get: async (key) => {
+			get: async (key: string) => {
 				const value = await redis.get(key);
 				return value as RateLimit | undefined;
 			},
-			set: async (key, value) => {
+			set: async (key: string, value: unknown) => {
 				await redis.set(key, value);
 			},
-		},
+		} as any,
 	},
 	baseURL: webEnv.NEXT_PUBLIC_SITE_URL,
 	appName: "OpenCut",

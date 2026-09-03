@@ -23,7 +23,6 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { NumberField } from "@/components/ui/number-field";
 import { useEditorStore } from "@/editor/editor-store";
-import { usePropertyDraft } from "@/components/editor/panels/properties/hooks/use-property-draft";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { Tick02Icon } from "@hugeicons/core-free-icons";
 import { cn } from "@/utils/ui";
@@ -31,6 +30,15 @@ import { dimensionToAspectRatio } from "@/utils/geometry";
 import { formatNumberForDisplay } from "@/utils/math";
 import { OcSquarePlusIcon } from "@/components/icons";
 import type { TCanvasSize } from "@/project/types";
+import { isLanguage, LANGUAGE_OPTIONS, useTranslation } from "@/i18n";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogBody,
+	DialogFooter,
+} from "@/components/ui/dialog";
 
 type SettingsView = "project-info" | "background";
 
@@ -70,35 +78,16 @@ function parseCanvasDimension({ input }: { input: string }): number | null {
 	return rounded > 0 ? rounded : null;
 }
 
-function useCanvasDimensionDraft({
-	value,
-	onCommit,
-}: {
-	value: number;
-	onCommit: (value: number) => void;
-}) {
-	const [pendingValue, setPendingValue] = useState(value);
-
-	return usePropertyDraft({
-		displayValue: formatCanvasDimension({ value }),
-		parse: (input) => parseCanvasDimension({ input }),
-		onStartEditing: () => {
-			setPendingValue(value);
-		},
-		onPreview: (nextValue) => {
-			setPendingValue(nextValue);
-		},
-		onCommit: () => {
-			if (pendingValue !== value) {
-				onCommit(pendingValue);
-			}
-		},
-	});
-}
-
 export function SettingsView() {
 	const [view, setView] = useState<SettingsView>("project-info");
+	const [isCustomCanvasDialogOpen, setIsCustomCanvasDialogOpen] =
+		useState(false);
+	const [customCanvasDraft, setCustomCanvasDraft] = useState({
+		width: "",
+		height: "",
+	});
 	const editor = useEditor();
+	const { language, setLanguage, t } = useTranslation();
 	const activeProject = useEditor((e) => e.project.getActive());
 	const { canvasPresets } = useEditorStore();
 	const currentCanvasSize = activeProject.settings.canvasSize;
@@ -116,14 +105,15 @@ export function SettingsView() {
 		};
 	});
 
-	const selectedPresetId = canvasSizeMode === "preset"
-		? (presetItems.find((preset) =>
-				areCanvasSizesEqual({
-					left: preset.canvasSize,
-					right: currentCanvasSize,
-				}),
-			)?.id ?? null)
-		: null;
+	const selectedPresetId =
+		canvasSizeMode === "preset"
+			? (presetItems.find((preset) =>
+					areCanvasSizesEqual({
+						left: preset.canvasSize,
+						right: currentCanvasSize,
+					}),
+				)?.id ?? null)
+			: null;
 
 	const updateCustomCanvasSize = ({
 		canvasSize,
@@ -184,29 +174,37 @@ export function SettingsView() {
 		});
 	};
 
-	const selectCustomCanvasSize = () => {
-		updateCustomCanvasSize({
-			canvasSize: lastCustomCanvasSize ?? currentCanvasSize,
+	const openCustomCanvasDialog = () => {
+		const canvasSize =
+			canvasSizeMode === "custom"
+				? currentCanvasSize
+				: (lastCustomCanvasSize ?? currentCanvasSize);
+		setCustomCanvasDraft({
+			width: formatCanvasDimension({ value: canvasSize.width }),
+			height: formatCanvasDimension({ value: canvasSize.height }),
 		});
+		setIsCustomCanvasDialogOpen(true);
 	};
 
-	const widthDraft = useCanvasDimensionDraft({
-		value: currentCanvasSize.width,
-		onCommit: (width) =>
-			updateCustomCanvasSize({
-				canvasSize: { width, height: currentCanvasSize.height },
-			}),
-	});
+	const applyCustomCanvasSize = () => {
+		const width = parseCanvasDimension({ input: customCanvasDraft.width });
+		const height = parseCanvasDimension({ input: customCanvasDraft.height });
+		if (width === null || height === null) return;
 
-	const heightDraft = useCanvasDimensionDraft({
-		value: currentCanvasSize.height,
-		onCommit: (height) =>
-			updateCustomCanvasSize({
-				canvasSize: { width: currentCanvasSize.width, height },
-			}),
-	});
+		updateCustomCanvasSize({
+			canvasSize: { width, height },
+		});
+		setIsCustomCanvasDialogOpen(false);
+	};
 
 	const isCustomSelected = canvasSizeMode === "custom";
+	const canApplyCustomCanvasSize =
+		parseCanvasDimension({ input: customCanvasDraft.width }) !== null &&
+		parseCanvasDimension({ input: customCanvasDraft.height }) !== null;
+	const projectName =
+		language === "vi" && activeProject.metadata.name === "New project"
+			? t("assets.projectNameDefault")
+			: activeProject.metadata.name;
 
 	return (
 		<PanelView
@@ -222,8 +220,12 @@ export function SettingsView() {
 					}}
 				>
 					<TabsList>
-						<TabsTrigger value="project-info">Project info</TabsTrigger>
-						<TabsTrigger value="background">Background</TabsTrigger>
+						<TabsTrigger value="project-info">
+							{t("settings.projectInfo")}
+						</TabsTrigger>
+						<TabsTrigger value="background">
+							{t("settings.background")}
+						</TabsTrigger>
 					</TabsList>
 				</Tabs>
 			}
@@ -232,24 +234,54 @@ export function SettingsView() {
 				<div className="flex flex-col">
 					<Section showTopBorder={false}>
 						<SectionHeader>
-							<SectionTitle className="flex-1">Name</SectionTitle>
-							<span className="text-sm truncate">
-								{activeProject.metadata.name}
-							</span>
+							<SectionTitle className="flex-1">
+								{t("settings.name")}
+							</SectionTitle>
+							<span className="text-sm truncate">{projectName}</span>
 						</SectionHeader>
 					</Section>
 					<Section showTopBorder={false}>
 						<SectionHeader className="justify-between">
-							<SectionTitle className="flex-1">Frame rate</SectionTitle>
-					<Select
-							value={String(Math.round(frameRateToFloat(activeProject.settings.fps)))}
-							onValueChange={(value) => {
-								const fps = floatToFrameRate(parseFloat(value));
-								editor.project.updateSettings({ settings: { fps } });
-							}}
+							<SectionTitle className="flex-1">
+								{t("settings.language")}
+							</SectionTitle>
+							<Select
+								value={language}
+								onValueChange={(value) => {
+									if (isLanguage(value)) {
+										setLanguage(value);
+									}
+								}}
 							>
 								<SelectTrigger className="bg-transparent border-none p-1 h-auto">
-									<SelectValue placeholder="Select a frame rate" />
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									{LANGUAGE_OPTIONS.map((option) => (
+										<SelectItem key={option.value} value={option.value}>
+											{t(option.labelKey)}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</SectionHeader>
+					</Section>
+					<Section showTopBorder={false}>
+						<SectionHeader className="justify-between">
+							<SectionTitle className="flex-1">
+								{t("settings.frameRate")}
+							</SectionTitle>
+							<Select
+								value={String(
+									Math.round(frameRateToFloat(activeProject.settings.fps)),
+								)}
+								onValueChange={(value) => {
+									const fps = floatToFrameRate(parseFloat(value));
+									editor.project.updateSettings({ settings: { fps } });
+								}}
+							>
+								<SelectTrigger className="bg-transparent border-none p-1 h-auto">
+									<SelectValue placeholder={t("settings.selectFrameRate")} />
 								</SelectTrigger>
 								<SelectContent>
 									{FPS_PRESETS.map((preset) => (
@@ -267,7 +299,9 @@ export function SettingsView() {
 						sectionKey="settings:aspect-ratio"
 					>
 						<SectionHeader>
-							<SectionTitle className="flex-1">Aspect ratio</SectionTitle>
+							<SectionTitle className="flex-1">
+								{t("settings.aspectRatio")}
+							</SectionTitle>
 						</SectionHeader>
 						<SectionContent className="px-2 flex flex-col gap-1 pb-2">
 							{presetItems.map((preset) => (
@@ -286,34 +320,80 @@ export function SettingsView() {
 							<div className="pb-2">
 								<AspectRatioItem
 									key="custom"
-									label="Custom"
+									label={t("settings.custom")}
 									previewIcon={<OcSquarePlusIcon />}
 									isSelected={isCustomSelected}
-									onClick={selectCustomCanvasSize}
-									uiOptions={
-										<div className=" flex items-center gap-2 text-foreground">
-											<NumberField
-												value={widthDraft.displayValue}
-												className="w-full"
-												aria-label="Canvas width"
-												onFocus={widthDraft.onFocus}
-												onChange={widthDraft.onChange}
-												onBlur={widthDraft.onBlur}
-											/>
-											<NumberField
-												value={heightDraft.displayValue}
-												className="w-full"
-												aria-label="Canvas height"
-												onFocus={heightDraft.onFocus}
-												onChange={heightDraft.onChange}
-												onBlur={heightDraft.onBlur}
-											/>
-										</div>
-									}
+									onClick={openCustomCanvasDialog}
 								/>
 							</div>
 						</SectionContent>
 					</Section>
+					<Dialog
+						open={isCustomCanvasDialogOpen}
+						onOpenChange={setIsCustomCanvasDialogOpen}
+					>
+						<DialogContent className="max-w-sm overflow-hidden p-0">
+							<DialogHeader>
+								<DialogTitle>{t("settings.customCanvasSize")}</DialogTitle>
+							</DialogHeader>
+							<DialogBody>
+								<div className="grid grid-cols-2 gap-3">
+									<div className="flex flex-col gap-1.5">
+										<label
+											className="text-xs font-medium text-muted-foreground"
+											htmlFor="custom-canvas-width"
+										>
+											{t("settings.canvasWidth")}
+										</label>
+										<NumberField
+											id="custom-canvas-width"
+											value={customCanvasDraft.width}
+											aria-label={t("settings.canvasWidth")}
+											onChange={(event) =>
+												setCustomCanvasDraft((draft) => ({
+													...draft,
+													width: event.target.value,
+												}))
+											}
+										/>
+									</div>
+									<div className="flex flex-col gap-1.5">
+										<label
+											className="text-xs font-medium text-muted-foreground"
+											htmlFor="custom-canvas-height"
+										>
+											{t("settings.canvasHeight")}
+										</label>
+										<NumberField
+											id="custom-canvas-height"
+											value={customCanvasDraft.height}
+											aria-label={t("settings.canvasHeight")}
+											onChange={(event) =>
+												setCustomCanvasDraft((draft) => ({
+													...draft,
+													height: event.target.value,
+												}))
+											}
+										/>
+									</div>
+								</div>
+							</DialogBody>
+							<DialogFooter>
+								<Button
+									variant="outline"
+									onClick={() => setIsCustomCanvasDialogOpen(false)}
+								>
+									{t("common.cancel")}
+								</Button>
+								<Button
+									onClick={applyCustomCanvasSize}
+									disabled={!canApplyCustomCanvasSize}
+								>
+									{t("common.apply")}
+								</Button>
+							</DialogFooter>
+						</DialogContent>
+					</Dialog>
 				</div>
 			)}
 			{view === "background" && <BackgroundContent />}
