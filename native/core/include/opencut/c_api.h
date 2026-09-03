@@ -145,6 +145,18 @@ void ocw_scene_add_item(OcScene* scene, const char* id, uint32_t type, int32_t z
                         int flip_x, int flip_y, const char* asset_id);
 uint32_t ocw_scene_build_display_list(OcScene* scene, double viewport_w, double viewport_h, int enable_culling);
 
+// Subtitles Engine
+double ocw_subtitles_parse_timestamp(const char* ts);
+int ocw_subtitles_format_timestamp(double ticks, char* out_buf, size_t out_len);
+
+// Text Layout & Line Breaking
+double ocw_text_measure_line_height(double font_size, double line_height_ratio);
+int ocw_text_break_lines_count(const char* text, double max_width, double avg_char_width);
+
+// Geometry & Hit-Testing
+int ocw_geometry_point_in_rotated_rect(double px, double py, double cx, double cy, double w, double h, double rot);
+int ocw_geometry_test_snap(double source_val, double target_val, double threshold, double* out_snapped, double* out_delta);
+
 #ifdef __cplusplus
 }
 #endif

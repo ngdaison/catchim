@@ -50,7 +50,20 @@ Thư viện lõi xử lý hiệu năng cao của Catchim, được viết hoàn 
    - Cây phân cấp đồ họa SceneGraph & RenderItem.
    - Tính toán ma trận thế giới, cắt cúp (view-frustum culling) và tạo Display List sắp xếp theo trục Z.
 
-10. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
+10. **`opencut::subtitles`** (`include/opencut/subtitles.hpp`, `src/subtitles.cpp`):
+   - Phân tích cú pháp (Parser) và định dạng xuất (Formatter) phụ đề SRT.
+   - Chuyển đổi timestamp phụ đề sang chuẩn MediaTime ticks.
+
+11. **`opencut::text`** (`include/opencut/text_layout.hpp`, `src/text_layout.cpp`):
+   - Thuật toán bẻ dòng tự động (Greedy Line Breaking) theo độ rộng tối đa.
+   - Tính toán bố cục văn bản đa dòng, kích thước bounding box và căn lề.
+
+12. **`opencut::geometry`** (`include/opencut/geometry.hpp`, `src/geometry.cpp`):
+   - Hit-testing kiểm tra điểm nằm trong hình chữ nhật xoay.
+   - Thuật toán trục phân tách (SAT) kiểm tra va chạm đa giác quad và bounding box.
+   - Tính toán khoảng cách căn gióng nam châm (Smart Snapping Guides).
+
+13. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
    - C ABI tương thích WebAssembly chuẩn.
 
 ---

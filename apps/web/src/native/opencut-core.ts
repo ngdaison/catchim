@@ -88,6 +88,12 @@ export interface NativeTimelineBindings {
 	sceneDestroy: (scene: number) => void;
 	sceneAddItem: (scene: number, id: string, type: number, zIndex: number, opacity: number, blendMode: number, cx: number, cy: number, w: number, h: number, rot: number, flipX: number, flipY: number, assetId: string) => void;
 	sceneBuildDisplayList: (scene: number, viewportW: number, viewportH: number, enableCulling: number) => number;
+	parseSubtitleTimestamp: (ts: string) => number;
+	formatSubtitleTimestamp: (ticks: number, outBuf: number, outLen: number) => number;
+	measureLineHeight: (fontSize: number, lineHeightRatio: number) => number;
+	breakLinesCount: (text: string, maxWidth: number, avgCharWidth: number) => number;
+	pointInRotatedRect: (px: number, py: number, cx: number, cy: number, w: number, h: number, rot: number) => number;
+	testSnapAxis: (sourceVal: number, targetVal: number, threshold: number, outSnapped: number, outDelta: number) => number;
 	malloc: (size: number) => number;
 	free: (ptr: number) => void;
 	UTF8ToString: (ptr: number, maxBytes?: number) => string;
@@ -201,6 +207,12 @@ function wrapNativeTimelineBindings(
 		"number", "number", "number", "number", "number", "number", "number", "string"
 	]);
 	const sceneBuildDisplayList = module.cwrap("ocw_scene_build_display_list", "number", ["number", "number", "number", "number"]);
+	const parseSubtitleTimestamp = module.cwrap("ocw_subtitles_parse_timestamp", "number", ["string"]);
+	const formatSubtitleTimestamp = module.cwrap("ocw_subtitles_format_timestamp", "number", ["number", "number", "number"]);
+	const measureLineHeight = module.cwrap("ocw_text_measure_line_height", "number", ["number", "number"]);
+	const breakLinesCount = module.cwrap("ocw_text_break_lines_count", "number", ["string", "number", "number"]);
+	const pointInRotatedRect = module.cwrap("ocw_geometry_point_in_rotated_rect", "number", ["number", "number", "number", "number", "number", "number", "number"]);
+	const testSnapAxis = module.cwrap("ocw_geometry_test_snap", "number", ["number", "number", "number", "number", "number"]);
 
 	return {
 		create,
@@ -236,6 +248,12 @@ function wrapNativeTimelineBindings(
 			sceneAddItem(scene, id, type, zIndex, opacity, blendMode, cx, cy, w, h, rot, flipX, flipY, assetId);
 		},
 		sceneBuildDisplayList,
+		parseSubtitleTimestamp,
+		formatSubtitleTimestamp,
+		measureLineHeight,
+		breakLinesCount,
+		pointInRotatedRect,
+		testSnapAxis,
 		malloc: module._malloc,
 		free: module._free,
 		UTF8ToString: module.UTF8ToString,

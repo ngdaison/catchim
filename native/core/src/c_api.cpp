@@ -5,9 +5,12 @@
 #include "opencut/audio.hpp"
 #include "opencut/compositor.hpp"
 #include "opencut/effects.hpp"
+#include "opencut/geometry.hpp"
 #include "opencut/masks.hpp"
 #include "opencut/scene.hpp"
 #include "opencut/speed.hpp"
+#include "opencut/subtitles.hpp"
+#include "opencut/text_layout.hpp"
 #include "opencut/time.hpp"
 #include "opencut/timeline.hpp"
 
@@ -607,6 +610,39 @@ uint32_t ocw_scene_build_display_list(OcScene* scene, double viewport_w, double 
     if (scene == nullptr) return 0;
     scene->last_display_list = scene->graph.build_display_list(viewport_w, viewport_h, enable_culling != 0);
     return static_cast<uint32_t>(scene->last_display_list.size());
+}
+
+double ocw_subtitles_parse_timestamp(const char* ts) {
+    if (ts == nullptr) return 0.0;
+    return static_cast<double>(opencut::subtitles::SrtParser::parse_timestamp(ts));
+}
+
+int ocw_subtitles_format_timestamp(double ticks, char* out_buf, size_t out_len) {
+    if (out_buf == nullptr || out_len == 0) return 0;
+    std::string formatted = opencut::subtitles::SrtParser::format_timestamp(static_cast<opencut::TimelineTick>(std::round(ticks)));
+    if (formatted.size() >= out_len) return 0;
+    std::memcpy(out_buf, formatted.c_str(), formatted.size() + 1);
+    return 1;
+}
+
+double ocw_text_measure_line_height(double font_size, double line_height_ratio) {
+    if (font_size <= 0.0) font_size = 16.0;
+    if (line_height_ratio <= 0.0) line_height_ratio = 1.2;
+    return font_size * line_height_ratio;
+}
+
+int ocw_text_break_lines_count(const char* text, double max_width, double avg_char_width) {
+    if (text == nullptr) return 0;
+    auto lines = opencut::text::TextLayoutEngine::break_lines(text, max_width, avg_char_width);
+    return static_cast<int>(lines.size());
+}
+
+int ocw_geometry_point_in_rotated_rect(double px, double py, double cx, double cy, double w, double h, double rot) {
+    return opencut::geometry::GeometryEngine::point_in_rotated_rect(px, py, cx, cy, w, h, rot) ? 1 : 0;
+}
+
+int ocw_geometry_test_snap(double source_val, double target_val, double threshold, double* out_snapped, double* out_delta) {
+    return opencut::geometry::GeometryEngine::test_snap_axis(source_val, target_val, threshold, out_snapped, out_delta) ? 1 : 0;
 }
 
 } // extern "C"
