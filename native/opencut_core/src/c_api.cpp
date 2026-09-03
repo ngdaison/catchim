@@ -1,10 +1,12 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "opencut/c_api.h"
 
+#include "opencut/animation.hpp"
 #include "opencut/audio.hpp"
 #include "opencut/compositor.hpp"
 #include "opencut/effects.hpp"
 #include "opencut/masks.hpp"
+#include "opencut/speed.hpp"
 #include "opencut/time.hpp"
 #include "opencut/timeline.hpp"
 
@@ -496,6 +498,48 @@ void ocw_effects_apply(float r, float g, float b, float a,
     out_rgba[1] = result.g;
     out_rgba[2] = result.b;
     out_rgba[3] = result.a;
+}
+
+double ocw_animation_solve_bezier(double time, double t0, double t1, double t2, double t3) {
+    return opencut::animation::CubicBezier::solve_progress_for_time(time, t0, t1, t2, t3);
+}
+
+double ocw_animation_evaluate_bezier_point(double progress, double p0, double p1, double p2, double p3) {
+    return opencut::animation::CubicBezier::evaluate_point(progress, p0, p1, p2, p3);
+}
+
+double ocw_animation_evaluate_channel(const double* key_times, const double* key_values, const int* key_interp, size_t num_keys, double eval_time) {
+    if (key_times == nullptr || key_values == nullptr || num_keys == 0) {
+        return 0.0;
+    }
+    opencut::animation::KeyframeChannel channel;
+    for (size_t i = 0; i < num_keys; ++i) {
+        opencut::animation::Keyframe kf{
+            .time = static_cast<int64_t>(std::round(key_times[i])),
+            .value = key_values[i],
+            .interpolation = key_interp != nullptr
+                ? static_cast<opencut::animation::InterpolationType>(key_interp[i])
+                : opencut::animation::InterpolationType::Linear
+        };
+        channel.insert_or_update_keyframe(kf);
+    }
+    return channel.evaluate(static_cast<int64_t>(std::round(eval_time)));
+}
+
+double ocw_speed_map_timeline_to_source(double timeline_offset, double timeline_duration,
+                                        const double* speed_ratios, const double* speed_multipliers,
+                                        size_t num_points, double constant_speed) {
+    opencut::speed::SpeedCurve curve;
+    if (speed_ratios != nullptr && speed_multipliers != nullptr && num_points > 0) {
+        for (size_t i = 0; i < num_points; ++i) {
+            curve.add_point(speed_ratios[i], speed_multipliers[i]);
+        }
+    }
+    return static_cast<double>(curve.map_timeline_to_source_offset(
+        static_cast<int64_t>(std::round(timeline_offset)),
+        static_cast<int64_t>(std::round(timeline_duration)),
+        constant_speed
+    ));
 }
 
 } // extern "C"

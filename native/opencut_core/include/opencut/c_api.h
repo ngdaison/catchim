@@ -121,6 +121,16 @@ void ocw_effects_apply(float r, float g, float b, float a,
                        float brightness, float contrast, float saturation, float exposure,
                        float temp, float tint, float hue, float gamma, float* out_rgba);
 
+// Animation & Keyframes
+double ocw_animation_solve_bezier(double time, double t0, double t1, double t2, double t3);
+double ocw_animation_evaluate_bezier_point(double progress, double p0, double p1, double p2, double p3);
+double ocw_animation_evaluate_channel(const double* key_times, const double* key_values, const int* key_interp, size_t num_keys, double eval_time);
+
+// Speed Ramping
+double ocw_speed_map_timeline_to_source(double timeline_offset, double timeline_duration,
+                                        const double* speed_ratios, const double* speed_multipliers,
+                                        size_t num_points, double constant_speed);
+
 #ifdef __cplusplus
 }
 #endif

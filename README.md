@@ -16,6 +16,8 @@ Dự án được xây dựng dựa trên sự kết hợp giữa hiệu năng c
   - **`opencut::masks`**: Mặt nạ hình học sử dụng giải tích Signed Distance Field (SDF) và làm mờ biên độ mềm (feathering).
   - **`opencut::effects`**: Bộ chỉnh màu sắc (nhiệt độ màu, phơi sáng, tương phản, độ bão hòa, vignette, gamma) và nhân làm mờ Gaussian.
   - **`opencut::audio`**: Đường bao âm lượng keyframe, làm mượt âm lượng vào/ra (fade-in / fade-out) và thuật toán tạo biểu đồ sóng âm (waveform).
+  - **`opencut::animation`**: Giải phương trình đường cong Bezier bậc 3, tìm kiếm nhị phân và nội suy keyframe mượt mà 60-120fps (Hold, Linear, Bezier) cho 8 kênh thuộc tính Transform 2D.
+  - **`opencut::speed`**: Tích phân giải tích đường cong tốc độ (Speed Ramping) và ánh xạ thời gian timeline sang thời gian video gốc.
 
 * **Giao Diện Người Dùng (`apps/web/`) — Next.js, React & TypeScript**:
   Đảm nhận phần hiển thị giao diện đồ họa, điều khiển tương tác chuột, phím tắt, timeline trực quan, các thanh công cụ và bảng cài đặt thuộc tính. Frontend giao tiếp trực tiếp với Core Engine C++ thông qua cầu nối WebAssembly tại `apps/web/src/native/`.

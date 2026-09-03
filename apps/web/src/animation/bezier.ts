@@ -1,4 +1,5 @@
 import type { ScalarAnimationKey } from "@/animation/types";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 const BEZIER_SOLVE_ITERATIONS = 20;
 
@@ -15,6 +16,11 @@ export function getBezierPoint({
 	p2: number;
 	p3: number;
 }) {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		return bindings.evaluateBezierPoint(progress, p0, p1, p2, p3);
+	}
+
 	const mt = 1 - progress;
 	return (
 		mt * mt * mt * p0 +
@@ -63,12 +69,24 @@ export function solveBezierProgressForTime({
 	leftKey: ScalarAnimationKey;
 	rightKey: ScalarAnimationKey;
 }) {
-	let lower = 0;
-	let upper = 1;
 	const rightHandle =
 		leftKey.rightHandle ?? getDefaultRightHandle({ leftKey, rightKey });
 	const leftHandle =
 		rightKey.leftHandle ?? getDefaultLeftHandle({ leftKey, rightKey });
+
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		return bindings.solveBezier(
+			time,
+			leftKey.time,
+			leftKey.time + rightHandle.dt,
+			rightKey.time + leftHandle.dt,
+			rightKey.time,
+		);
+	}
+
+	let lower = 0;
+	let upper = 1;
 
 	for (let iteration = 0; iteration < BEZIER_SOLVE_ITERATIONS; iteration++) {
 		const mid = (lower + upper) / 2;

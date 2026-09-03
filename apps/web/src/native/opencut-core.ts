@@ -78,6 +78,10 @@ export interface NativeTimelineBindings {
 	parseTimecode: (str: string, format: number, fpsNum: number, fpsDen: number) => number;
 	evaluateFade: (offset: number, duration: number, fadeIn: number, fadeOut: number) => number;
 	evaluateMaskAlpha: (px: number, py: number, maskType: number, cx: number, cy: number, sx: number, sy: number, rot: number, feather: number, inverted: number) => number;
+	solveBezier: (time: number, t0: number, t1: number, t2: number, t3: number) => number;
+	evaluateBezierPoint: (progress: number, p0: number, p1: number, p2: number, p3: number) => number;
+	evaluateChannel: (keyTimesPtr: number, keyValuesPtr: number, keyInterpPtr: number, numKeys: number, evalTime: number) => number;
+	mapTimelineToSourceSpeed: (timelineOffset: number, timelineDuration: number, speedRatiosPtr: number, speedMultipliersPtr: number, numPoints: number, constantSpeed: number) => number;
 	malloc: (size: number) => number;
 	free: (ptr: number) => void;
 	UTF8ToString: (ptr: number, maxBytes?: number) => string;
@@ -178,6 +182,10 @@ function wrapNativeTimelineBindings(
 	const evaluateMaskAlpha = module.cwrap("ocw_mask_evaluate_alpha", "number", [
 		"number", "number", "number", "number", "number", "number", "number", "number", "number", "number"
 	]);
+	const solveBezier = module.cwrap("ocw_animation_solve_bezier", "number", ["number", "number", "number", "number", "number"]);
+	const evaluateBezierPoint = module.cwrap("ocw_animation_evaluate_bezier_point", "number", ["number", "number", "number", "number", "number"]);
+	const evaluateChannel = module.cwrap("ocw_animation_evaluate_channel", "number", ["number", "number", "number", "number", "number"]);
+	const mapTimelineToSourceSpeed = module.cwrap("ocw_speed_map_timeline_to_source", "number", ["number", "number", "number", "number", "number", "number"]);
 
 	return {
 		create,
@@ -199,6 +207,10 @@ function wrapNativeTimelineBindings(
 		parseTimecode,
 		evaluateFade,
 		evaluateMaskAlpha,
+		solveBezier,
+		evaluateBezierPoint,
+		evaluateChannel,
+		mapTimelineToSourceSpeed,
 		malloc: module._malloc,
 		free: module._free,
 		UTF8ToString: module.UTF8ToString,

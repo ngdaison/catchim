@@ -37,7 +37,16 @@ Thư viện lõi xử lý hiệu năng cao của Catchim, được viết hoàn 
    - Làm mượt âm lượng vào/ra (fade-in / fade-out).
    - Thuật toán trích xuất đỉnh sóng âm thanh (waveform decimation).
 
-7. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
+7. **`opencut::animation`** (`include/opencut/animation.hpp`, `src/animation.cpp`):
+   - Giải phương trình tham số bậc 3 Cubic Bezier.
+   - Quản lý kênh KeyframeChannel (Hold, Linear, Bezier).
+   - Đánh giá nhóm kênh TransformChannelGroup (Position, Scale, Rotation, Opacity, Anchor).
+
+8. **`opencut::speed`** (`include/opencut/speed.hpp`, `src/speed.cpp`):
+   - Đánh giá SpeedCurve đa điểm.
+   - Tích phân giải tích đoạn thẳng ánh xạ chính xác timeline offset sang source media offset.
+
+9. **C ABI & WebAssembly Exports** (`include/opencut/c_api.h`, `src/c_api.cpp`):
    - C ABI tương thích WebAssembly chuẩn.
 
 ---
