@@ -104,7 +104,8 @@ export function TextToSpeechTab({
 			() => setPreviewVoiceId(null),
 			(err) => {
 				setPreviewVoiceId(null);
-				toast.error("Không thể phát giọng đọc mẫu.");
+				const message = err instanceof Error ? err.message : "Không thể phát giọng đọc mẫu.";
+				toast.error(message);
 				console.error("[TTS Preview Error]:", err);
 			},
 		);

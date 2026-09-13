@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+import fs from "node:fs";
+import path from "node:path";
 
 export const dynamic = "force-dynamic";
 
@@ -151,6 +153,171 @@ async function synthesizeWithEdge(
 	});
 }
 
+/**
+ * Helper to locate models/voice folder across development and production layouts
+ */
+function getVoiceModelDir(): string {
+	const candidates = [
+		path.join(process.cwd(), "models", "voice"),
+		path.join(process.cwd(), "apps", "web", "models", "voice"),
+		"d:\\DATA\\source\\catchim\\apps\\web\\models\\voice",
+	];
+	for (const candidate of candidates) {
+		if (fs.existsSync(candidate)) {
+			return candidate;
+		}
+	}
+	return candidates[0];
+}
+
+interface VoiceMetadata {
+	id?: string;
+	name?: string;
+	description?: string;
+	language?: string;
+	langCode?: string;
+	modelPth?: string;
+	modelCkpt?: string;
+	sampleAudio?: string;
+	promptText?: string;
+	promptLang?: string;
+}
+
+let cachedSovitsWeights: string | null = null;
+let cachedGptWeights: string | null = null;
+
+/**
+ * Synthesize audio via local Python GPT-SoVITS api_v2 server
+ */
+async function synthesizeWithGptSovits(
+	text: string,
+	speed: number = 1.0,
+): Promise<{ buffer: Buffer; contentType: string }> {
+	const voiceDir = getVoiceModelDir();
+	const infoPath = path.join(voiceDir, "info.json");
+
+	let meta: VoiceMetadata = {
+		modelPth: "model.pth",
+		modelCkpt: "model.ckpt",
+		sampleAudio: "sample.wav",
+		promptText: "Xin chào các bạn, đây là giọng đọc nhân bản AI từ GPT-SoVITS.",
+		promptLang: "auto",
+		langCode: "auto",
+	};
+
+	if (fs.existsSync(infoPath)) {
+		try {
+			const parsed = JSON.parse(fs.readFileSync(infoPath, "utf-8"));
+			meta = { ...meta, ...parsed };
+		} catch (e) {
+			console.warn("[GPT-SoVITS] Không thể đọc info.json, dùng cấu hình mặc định:", e);
+		}
+	}
+
+	const pthFile = path.resolve(voiceDir, meta.modelPth || "model.pth");
+	const ckptFile = path.resolve(voiceDir, meta.modelCkpt || "model.ckpt");
+	const sampleFile = path.resolve(voiceDir, meta.sampleAudio || "sample.wav");
+
+	const missingFiles: string[] = [];
+	if (!fs.existsSync(pthFile)) missingFiles.push(path.basename(pthFile));
+	if (!fs.existsSync(ckptFile)) missingFiles.push(path.basename(ckptFile));
+	if (!fs.existsSync(sampleFile)) missingFiles.push(path.basename(sampleFile));
+
+	if (missingFiles.length > 0) {
+		throw new Error(
+			`Chưa tìm thấy file mô hình: ${missingFiles.join(", ")} trong thư mục apps/web/models/voice/. Vui lòng đặt các file (.pth, .ckpt, sample.wav) vào thư mục này để kích hoạt giọng clone.`
+		);
+	}
+
+	const gptSovitsBaseUrl = process.env.GPT_SOVITS_URL || "http://127.0.0.1:9880";
+
+	// Verify or switch SoVITS weights if changed
+	if (cachedSovitsWeights !== pthFile) {
+		try {
+			const setSovitsRes = await fetch(
+				`${gptSovitsBaseUrl}/set_sovits_weights?weights_path=${encodeURIComponent(pthFile)}`,
+				{ method: "GET" }
+			);
+			if (!setSovitsRes.ok) {
+				const errData = await setSovitsRes.text();
+				throw new Error(`Lỗi nạp trọng số SoVITS: ${errData}`);
+			}
+			cachedSovitsWeights = pthFile;
+		} catch (err: unknown) {
+			if (err instanceof TypeError || (err instanceof Error && err.message.includes("fetch failed"))) {
+				throw new Error(
+					`Không thể kết nối đến máy chủ GPT-SoVITS tại ${gptSovitsBaseUrl}. Vui lòng khởi chạy server Python (chạy script: apps/web/scripts/start-gpt-sovits.bat hoặc lệnh: python api_v2.py -p 9880).`
+				);
+			}
+			throw err;
+		}
+	}
+
+	// Verify or switch GPT weights if changed
+	if (cachedGptWeights !== ckptFile) {
+		try {
+			const setGptRes = await fetch(
+				`${gptSovitsBaseUrl}/set_gpt_weights?weights_path=${encodeURIComponent(ckptFile)}`,
+				{ method: "GET" }
+			);
+			if (!setGptRes.ok) {
+				const errData = await setGptRes.text();
+				throw new Error(`Lỗi nạp trọng số GPT: ${errData}`);
+			}
+			cachedGptWeights = ckptFile;
+		} catch (err: unknown) {
+			if (err instanceof TypeError || (err instanceof Error && err.message.includes("fetch failed"))) {
+				throw new Error(
+					`Không thể kết nối đến máy chủ GPT-SoVITS tại ${gptSovitsBaseUrl}. Vui lòng khởi chạy server Python.`
+				);
+			}
+			throw err;
+		}
+	}
+
+	// Request TTS inference
+	const ttsPayload = {
+		text,
+		text_lang: meta.langCode || "auto",
+		ref_audio_path: sampleFile,
+		prompt_text: meta.promptText || "",
+		prompt_lang: meta.promptLang || "auto",
+		speed_factor: Math.max(0.5, Math.min(2.0, Number(speed) || 1.0)),
+		media_type: "wav",
+		streaming_mode: false,
+	};
+
+	let ttsRes: Response;
+	try {
+		ttsRes = await fetch(`${gptSovitsBaseUrl}/tts`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(ttsPayload),
+		});
+	} catch {
+		throw new Error(
+			`Không thể kết nối đến máy chủ GPT-SoVITS tại ${gptSovitsBaseUrl}. Vui lòng kiểm tra server Python đã chạy chưa.`
+		);
+	}
+
+	if (!ttsRes.ok) {
+		let detail = "";
+		try {
+			const errJson = await ttsRes.json();
+			detail = errJson.message || errJson.Exception || JSON.stringify(errJson);
+		} catch {
+			detail = await ttsRes.text();
+		}
+		throw new Error(`GPT-SoVITS tạo âm thanh thất bại (${ttsRes.status}): ${detail}`);
+	}
+
+	const arrayBuf = await ttsRes.arrayBuffer();
+	return {
+		buffer: Buffer.from(arrayBuf),
+		contentType: "audio/wav",
+	};
+}
+
 export async function POST(req: NextRequest) {
 	try {
 		const body = await req.json();
@@ -181,6 +348,30 @@ export async function POST(req: NextRequest) {
 		}
 
 		const cleanText = text.trim();
+
+		// Case 0: Built-in GPT-SoVITS cloned neural voice
+		if (engine === "gpt-sovits" || voiceId === "vi-custom-gpt-sovits") {
+			try {
+				const effectiveSpeed = Number(userSpeed) || 1.0;
+				const { buffer, contentType } = await synthesizeWithGptSovits(cleanText, effectiveSpeed);
+				return new NextResponse(buffer as unknown as BodyInit, {
+					status: 200,
+					headers: {
+						"Content-Type": contentType,
+						"Content-Length": buffer.length.toString(),
+						"Cache-Control": "no-store",
+					},
+				});
+			} catch (gptError) {
+				console.warn("[GPT-SoVITS Warning]:", gptError instanceof Error ? gptError.message : gptError);
+				return NextResponse.json(
+					{
+						error: gptError instanceof Error ? gptError.message : "GPT-SoVITS synthesis failed",
+					},
+					{ status: 400 },
+				);
+			}
+		}
 
 		// Case 1: Specific Google Translate voice requested
 		if (engine === "google" || voiceId === "vi-female-google") {

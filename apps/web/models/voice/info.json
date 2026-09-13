@@ -1,0 +1,12 @@
+{
+  "id": "vi-custom-gpt-sovits",
+  "name": "Giọng Clone AI (GPT-SoVITS)",
+  "description": "Giọng nhân bản từ model apps/web/models/voice/ (.pth & .ckpt)",
+  "language": "vi-VN",
+  "langCode": "auto",
+  "modelPth": "model.pth",
+  "modelCkpt": "model.ckpt",
+  "sampleAudio": "sample.wav",
+  "promptText": "Xin chào các bạn, đây là giọng đọc nhân bản AI từ GPT-SoVITS.",
+  "promptLang": "auto"
+}

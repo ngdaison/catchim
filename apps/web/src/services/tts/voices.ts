@@ -5,6 +5,21 @@ export const TTS_VOICES: TtsVoice[] = [
 	// TẤT CẢ GIỌNG ĐỌC TIẾNG VIỆT 100% TỰ NHIÊN (Không biến đổi âm sắc)
 	// =========================================================================
 	{
+		id: "vi-custom-gpt-sovits",
+		name: "Giọng Clone AI (GPT-SoVITS)",
+		language: "vi-VN",
+		gender: "special",
+		categories: ["vietnamese", "trending"],
+		description: "Giọng nhân bản từ model apps/web/models/voice/ (.pth & .ckpt)",
+		avatarGradient: "from-purple-600 via-indigo-600 to-pink-500",
+		avatarIcon: "✨",
+		previewSampleText: "Xin chào các bạn, đây là giọng đọc nhân bản AI từ mô hình GPT-SoVITS của bạn.",
+		engine: "gpt-sovits",
+		langCode: "vi",
+		pitchFactor: 1.0,
+		audioEffect: "none",
+	},
+	{
 		id: "vi-female-sweet",
 		name: "Hoài My (Nữ miền Bắc)",
 		language: "vi-VN",

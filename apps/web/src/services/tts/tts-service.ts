@@ -126,7 +126,12 @@ export class TtsService {
 			});
 
 			if (!response.ok) {
-				throw new Error(`TTS server error: ${response.status}`);
+				let msg = `TTS server error: ${response.status}`;
+				try {
+					const data = await response.json();
+					if (data?.error) msg = data.error;
+				} catch {}
+				throw new Error(msg);
 			}
 
 			const blob = await response.blob();
@@ -226,7 +231,12 @@ export class TtsService {
 		});
 
 		if (!response.ok) {
-			throw new Error(`Không thể kết nối máy chủ tạo giọng nói (${response.status})`);
+			let msg = `Không thể kết nối máy chủ tạo giọng nói (${response.status})`;
+			try {
+				const data = await response.json();
+				if (data?.error) msg = data.error;
+			} catch {}
+			throw new Error(msg);
 		}
 
 		const blob = await response.blob();

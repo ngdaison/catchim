@@ -20,7 +20,7 @@ export interface TtsVoice {
 	avatarGradient: string; // Tailwind gradient classes e.g. "from-pink-500 to-rose-400"
 	avatarIcon?: string;
 	previewSampleText: string;
-	engine: "edge" | "google" | "web-speech";
+	engine: "edge" | "google" | "web-speech" | "gpt-sovits";
 	edgeVoiceName?: string;
 	langCode: string; // 'vi', 'en', etc.
 	pitchOffset?: number;
