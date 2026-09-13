@@ -8,9 +8,14 @@ echo.
 set GPT_DIR=D:\DATA\source\GPT-SoVITS
 
 if not exist "%GPT_DIR%" (
-    echo [LOI] Khong tim thay thu muc GPT-SoVITS tai %GPT_DIR%
-    pause
-    exit /b 1
+    echo [INFO] Khong tim thay thu muc tai %GPT_DIR%.
+    echo [INFO] Dang tien hanh lay ma nguon GPT-SoVITS tu GitHub...
+    git clone https://github.com/RVC-Boss/GPT-SoVITS.git "%GPT_DIR%"
+    if %ERRORLEVEL% neq 0 (
+        echo [LOI] Khong the lay code tu GitHub. Vui long kiem tra ket noi mang.
+        pause
+        exit /b 1
+    )
 )
 
 cd /d "%GPT_DIR%"
