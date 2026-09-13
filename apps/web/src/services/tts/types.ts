@@ -8,26 +8,7 @@ export type VoiceCategory =
 
 export type VoiceGender = "female" | "male" | "child" | "special";
 
-export type VoiceAudioEffect =
-	| "none"
-	| "robot"
-	| "chipmunk"
-	| "radio"
-	| "deep-bass"
-	| "echo"
-	| "grandpa"
-	| "demon"
-	| "asmr"
-	| "vlogger"
-	| "child-girl"
-	| "child-boy"
-	| "cave-reverb"
-	| "astronaut"
-	| "ghost"
-	| "clown"
-	| "food-reviewer"
-	| "tvc-commercial"
-	| "mafia";
+export type VoiceAudioEffect = "none";
 
 export interface TtsVoice {
 	id: string;

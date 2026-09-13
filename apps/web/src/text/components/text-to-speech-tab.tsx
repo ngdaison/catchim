@@ -29,7 +29,6 @@ const CATEGORIES: { id: VoiceCategory; labelKey: string; icon: string }[] = [
 	{ id: "english", labelKey: "tts.catEnglish", icon: "🇺🇸" },
 	{ id: "trending", labelKey: "tts.catTrending", icon: "🔥" },
 	{ id: "story", labelKey: "tts.catStory", icon: "📖" },
-	{ id: "fun", labelKey: "tts.catFun", icon: "🎈" },
 ];
 
 export function TextToSpeechTab({
