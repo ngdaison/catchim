@@ -23,6 +23,9 @@ export interface TtsVoice {
 	langCode: string; // 'vi', 'en', etc.
 	pitchOffset?: number;
 	rateOffset?: number;
+	pitchHz?: number; // Base pitch offset in Hz e.g. +40, -25, +140
+	rateMultiplier?: number; // Base rate multiplier e.g. 1.08, 0.85
+	audioEffect?: "none" | "robot" | "chipmunk" | "radio" | "deep-bass" | "echo";
 }
 
 export interface TtsSynthesisOptions {
