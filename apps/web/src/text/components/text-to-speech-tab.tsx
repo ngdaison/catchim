@@ -25,8 +25,6 @@ import {
 
 const CATEGORIES: { id: VoiceCategory; labelKey: string; icon: string }[] = [
 	{ id: "all", labelKey: "tts.catAll", icon: "🌐" },
-	{ id: "vietnamese", labelKey: "tts.catVietnamese", icon: "🇻🇳" },
-	{ id: "english", labelKey: "tts.catEnglish", icon: "🇺🇸" },
 	{ id: "trending", labelKey: "tts.catTrending", icon: "🔥" },
 	{ id: "story", labelKey: "tts.catStory", icon: "📖" },
 ];
