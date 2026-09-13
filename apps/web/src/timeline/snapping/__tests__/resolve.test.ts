@@ -19,7 +19,7 @@ describe("resolveTimelineSnap", () => {
 			maxSnapDistance: 5,
 		});
 
-		expect(result.snappedTime).toBe(100);
+		expect(result.snappedTime).toBe(mediaTime({ ticks: 100 }));
 		expect(result.snapPoint?.elementId).toBe("element-100");
 		expect(result.snapDistance).toBe(3);
 	});
@@ -31,7 +31,7 @@ describe("resolveTimelineSnap", () => {
 			maxSnapDistance: 5,
 		});
 
-		expect(result.snappedTime).toBe(200);
+		expect(result.snappedTime).toBe(mediaTime({ ticks: 200 }));
 		expect(result.snapPoint?.elementId).toBe("element-200");
 		expect(result.snapDistance).toBe(2);
 	});
@@ -43,7 +43,7 @@ describe("resolveTimelineSnap", () => {
 			maxSnapDistance: 5,
 		});
 
-		expect(result.snappedTime).toBe(90);
+		expect(result.snappedTime).toBe(mediaTime({ ticks: 90 }));
 		expect(result.snapPoint).toBeNull();
 	});
 });

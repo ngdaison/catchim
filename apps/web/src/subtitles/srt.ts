@@ -1,4 +1,5 @@
 import type { ParseSubtitleResult, SubtitleCue } from "./types";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 const TIMESTAMP_SEPARATOR = /\s*-->\s*/;
 const TIMESTAMP_PATTERN =
@@ -77,6 +78,14 @@ export function parseSrt({ input }: { input: string }): ParseSubtitleResult {
 }
 
 function parseSrtTimestamp({ input }: { input: string }): number {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		const ticks = bindings.parseSubtitleTimestamp(input);
+		if (ticks >= 0) {
+			return bindings.toSeconds(ticks);
+		}
+	}
+
 	const normalized = input.trim().replace(",", ".");
 	const match = normalized.match(/^(\d{2}):(\d{2}):(\d{2})\.(\d{1,3})$/);
 	if (!match) {

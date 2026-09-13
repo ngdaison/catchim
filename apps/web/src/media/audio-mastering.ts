@@ -1,3 +1,5 @@
+import { getNativeTimelineBindings } from "../native/opencut-core";
+
 const MASTER_LIMITER_THRESHOLD_DB = -1;
 const MASTER_LIMITER_KNEE_DB = 0;
 const MASTER_LIMITER_RATIO = 20;
@@ -10,6 +12,29 @@ export function getAudioBufferPeak({
 }: {
 	audioBuffer: AudioBuffer;
 }): number {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		let maxPeak = 0;
+		for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+			const channelData = audioBuffer.getChannelData(channel);
+			if (channelData.length === 0) continue;
+			const byteSize = channelData.length * 4;
+			const ptr = bindings.malloc(byteSize);
+			if (ptr !== 0) {
+				try {
+					bindings.HEAPF32.set(channelData, ptr >> 2);
+					const chPeak = bindings.computeBufferPeak(ptr, channelData.length);
+					if (chPeak > maxPeak) {
+						maxPeak = chPeak;
+					}
+				} finally {
+					bindings.free(ptr);
+				}
+			}
+		}
+		return maxPeak;
+	}
+
 	let peak = 0;
 
 	for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
@@ -91,6 +116,26 @@ function clampAudioBufferPeak({
 	audioBuffer: AudioBuffer;
 	maxPeak: number;
 }): void {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+			const channelData = audioBuffer.getChannelData(channel);
+			if (channelData.length === 0) continue;
+			const byteSize = channelData.length * 4;
+			const ptr = bindings.malloc(byteSize);
+			if (ptr !== 0) {
+				try {
+					bindings.HEAPF32.set(channelData, ptr >> 2);
+					bindings.clampBufferSamples(ptr, channelData.length, maxPeak);
+					channelData.set(bindings.HEAPF32.subarray(ptr >> 2, (ptr >> 2) + channelData.length));
+				} finally {
+					bindings.free(ptr);
+				}
+			}
+		}
+		return;
+	}
+
 	for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
 		const channelData = audioBuffer.getChannelData(channel);
 		for (let index = 0; index < channelData.length; index++) {

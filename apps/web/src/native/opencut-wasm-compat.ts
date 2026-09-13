@@ -157,6 +157,8 @@ export function guessTimecodeFormat({
 	return null;
 }
 
+let timecodeBufPtr = 0;
+
 export function formatTimecode({
 	time,
 	format = "HH:MM:SS:CS",
@@ -166,6 +168,34 @@ export function formatTimecode({
 	format?: TimeCodeFormat;
 	rate?: FrameRate;
 }): string {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		if (timecodeBufPtr === 0) {
+			timecodeBufPtr = bindings.malloc(64);
+		}
+		if (timecodeBufPtr !== 0) {
+			const fmtIdx =
+				format === "MM:SS"
+					? 0
+					: format === "HH:MM:SS"
+						? 1
+						: format === "HH:MM:SS:FF"
+							? 3
+							: 2;
+			const ok = bindings.formatTimecode(
+				time,
+				fmtIdx,
+				rate?.numerator ?? 30,
+				rate?.denominator ?? 1,
+				timecodeBufPtr,
+				64,
+			);
+			if (ok === 1) {
+				return bindings.UTF8ToString(timecodeBufPtr);
+			}
+		}
+	}
+
 	const totalTicks = Math.max(0, Math.trunc(time));
 	const totalSeconds = Math.floor(totalTicks / TICKS_PER_SECOND_CONST);
 	const hourTicks = SECONDS_PER_HOUR * TICKS_PER_SECOND_CONST;
@@ -208,6 +238,14 @@ export function parseTimecode({
 }): number | null {
 	const trimmed = timeCode.trim();
 	if (!trimmed) return null;
+
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		const fmtIdx = format === "MM:SS" ? 0 : format === "HH:MM:SS" ? 1 : format === "HH:MM:SS:FF" ? 3 : 2;
+		const res = bindings.parseTimecode(trimmed, fmtIdx, rate?.numerator ?? 30, rate?.denominator ?? 1);
+		if (res >= 0) return res;
+	}
+
 	const parts = trimmed.split(":").map(Number);
 	if (parts.some(isNaN)) return null;
 
@@ -287,8 +325,14 @@ export function releaseTexture(id: string): void {
 	textures.delete(id);
 }
 
+let lastFrameProfile = {
+	renderTimeMs: 0,
+	layerCount: 0,
+};
+
 export function renderFrame(frame: any): void {
 	if (!compositorCanvas) return;
+	const startTime = typeof performance !== "undefined" ? performance.now() : 0;
 	const ctx = compositorCanvas.getContext("2d");
 	if (!ctx) return;
 
@@ -300,43 +344,49 @@ export function renderFrame(frame: any): void {
 		ctx.clearRect(0, 0, compositorCanvas.width, compositorCanvas.height);
 	}
 
-	if (!frame.items) return;
+	let layerCount = 0;
+	if (frame.items) {
+		for (const item of frame.items) {
+			if (item.type === "layer" && item.textureId) {
+				const tex = textures.get(item.textureId);
+				if (!tex) continue;
 
-	for (const item of frame.items) {
-		if (item.type === "layer" && item.textureId) {
-			const tex = textures.get(item.textureId);
-			if (!tex) continue;
+				ctx.save();
+				ctx.globalAlpha = item.opacity ?? 1.0;
 
-			ctx.save();
-			ctx.globalAlpha = item.opacity ?? 1.0;
-
-			// Blend mode mapping
-			if (item.blendMode && item.blendMode !== "normal") {
-				ctx.globalCompositeOperation = item.blendMode;
-			}
-
-			const t = item.transform;
-			if (t) {
-				ctx.translate(t.centerX, t.centerY);
-				if (t.rotationDegrees) {
-					ctx.rotate((t.rotationDegrees * Math.PI) / 180);
+				// Blend mode mapping
+				if (item.blendMode && item.blendMode !== "normal") {
+					ctx.globalCompositeOperation = item.blendMode;
 				}
-				ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
-				ctx.drawImage(tex.source, -t.width / 2, -t.height / 2, t.width, t.height);
-			} else {
-				ctx.drawImage(tex.source, 0, 0, compositorCanvas.width, compositorCanvas.height);
-			}
 
-			ctx.restore();
+				const t = item.transform;
+				if (t) {
+					ctx.translate(t.centerX, t.centerY);
+					if (t.rotationDegrees) {
+						ctx.rotate((t.rotationDegrees * Math.PI) / 180);
+					}
+					ctx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+					ctx.drawImage(tex.source, -t.width / 2, -t.height / 2, t.width, t.height);
+				} else {
+					ctx.drawImage(tex.source, 0, 0, compositorCanvas.width, compositorCanvas.height);
+				}
+
+				ctx.restore();
+				layerCount++;
+			}
 		}
+	}
+
+	if (typeof performance !== "undefined") {
+		lastFrameProfile = {
+			renderTimeMs: performance.now() - startTime,
+			layerCount,
+		};
 	}
 }
 
 export function getLastFrameProfile(): any {
-	return {
-		renderTimeMs: 0,
-		layerCount: 0,
-	};
+	return lastFrameProfile;
 }
 
 export async function initializeGpu(): Promise<void> {
@@ -348,12 +398,101 @@ export function applyEffectPasses({
 	source,
 	width,
 	height,
+	passes,
 }: {
 	source: OffscreenCanvas;
 	width: number;
 	height: number;
 	passes: any;
 }): OffscreenCanvas {
+	if (!passes || passes.length === 0) return source;
+
+	const bindings = getNativeTimelineBindings();
+	if (!bindings) return source;
+
+	const ctx = source.getContext("2d");
+	if (!ctx) return source;
+
+	try {
+		const imgData = ctx.getImageData(0, 0, width, height);
+		const byteLen = width * height * 4;
+		const ptr = bindings.malloc(byteLen);
+		if (!ptr) return source;
+
+		bindings.HEAPU8.set(new Uint8Array(imgData.data.buffer), ptr);
+
+		for (const pass of passes) {
+			const type = pass.type || pass.shader || "";
+			const getUniform = (name: string, fallback = 0) => {
+				if (pass[name] !== undefined) return pass[name];
+				if (Array.isArray(pass.uniforms)) {
+					const u = pass.uniforms.find((item: any) => item.name === name);
+					return u ? (Array.isArray(u.value) ? u.value[0] : u.value) : fallback;
+				}
+				if (pass.uniforms && typeof pass.uniforms === "object") {
+					const val = pass.uniforms[name];
+					return val !== undefined ? (Array.isArray(val) ? val[0] : val) : fallback;
+				}
+				return fallback;
+			};
+
+			if (type === "color_grading" || type === "adjustments" || type.includes("color")) {
+				bindings.applyColorGradingRgba(
+					ptr,
+					width,
+					height,
+					getUniform("brightness", 0),
+					getUniform("contrast", 0),
+					getUniform("saturation", 0),
+					getUniform("exposure", 0),
+					getUniform("temperature", 0),
+					getUniform("tint", 0),
+					getUniform("hue", 0),
+					getUniform("gamma", 1.0),
+				);
+			} else if (type === "gaussian_blur" || type === "blur" || type.includes("blur")) {
+				const sigma = getUniform("u_sigma", getUniform("sigma", 0));
+				const radius = getUniform("radius", Math.round(sigma * 2.5) || 5);
+				bindings.applyGaussianBlurRgba(
+					ptr,
+					width,
+					height,
+					Math.max(1, Math.round(radius)),
+					sigma,
+				);
+			} else if (type === "vignette" || type.includes("vignette")) {
+				bindings.applyVignetteRgba(
+					ptr,
+					width,
+					height,
+					getUniform("amount", 0.5),
+					getUniform("softness", 0.5),
+					getUniform("roundness", 1.0),
+				);
+			} else if (type === "chroma_key" || type.includes("chroma")) {
+				bindings.applyChromaKeyRgba(
+					ptr,
+					width,
+					height,
+					getUniform("keyR", 0),
+					getUniform("keyG", 1),
+					getUniform("keyB", 0),
+					getUniform("similarity", 0.4),
+					getUniform("smoothness", 0.1),
+					getUniform("spill", 0.1),
+				);
+			}
+		}
+
+		const resultBytes = bindings.HEAPU8.subarray(ptr, ptr + byteLen);
+		imgData.data.set(resultBytes);
+		bindings.free(ptr);
+
+		ctx.putImageData(imgData, 0, 0);
+	} catch (err) {
+		console.warn("[OpenCut] Native effect pass execution failed:", err);
+	}
+
 	return source;
 }
 
@@ -368,5 +507,32 @@ export function applyMaskFeather({
 	height: number;
 	feather: number;
 }): OffscreenCanvas {
+	if (feather <= 0.01) return mask;
+
+	const bindings = getNativeTimelineBindings();
+	if (!bindings) return mask;
+
+	const canvas = mask as OffscreenCanvas;
+	const ctx = canvas.getContext("2d");
+	if (!ctx) return mask;
+
+	try {
+		const imgData = ctx.getImageData(0, 0, width, height);
+		const byteLen = width * height * 4;
+		const ptr = bindings.malloc(byteLen);
+		if (!ptr) return mask;
+
+		bindings.HEAPU8.set(new Uint8Array(imgData.data.buffer), ptr);
+		bindings.applyGaussianBlurRgba(ptr, width, height, Math.round(feather), feather * 0.5);
+
+		const resultBytes = bindings.HEAPU8.subarray(ptr, ptr + byteLen);
+		imgData.data.set(resultBytes);
+		bindings.free(ptr);
+
+		ctx.putImageData(imgData, 0, 0);
+	} catch (err) {
+		console.warn("[OpenCut] Native mask feather failed:", err);
+	}
+
 	return mask;
 }

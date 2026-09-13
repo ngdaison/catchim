@@ -107,27 +107,29 @@ export function resolveTimelineElementIntersections({
 		const elementTop = TIMELINE_CONTENT_TOP_PADDING_PX + trackTop;
 		const elementBottom = elementTop + trackHeight;
 
+		// Fast vertical culling: skip track completely if outside selection rectangle
+		if (
+			elementBottom < selectionRectangle.top ||
+			elementTop > selectionRectangle.bottom
+		) {
+			continue;
+		}
+
 		for (const element of track.elements) {
 			const elementLeft = timelineTimeToPixels({ time: element.startTime, zoomLevel });
-			const elementRight = timelineTimeToPixels({ time: element.startTime + element.duration, zoomLevel });
-			const elementRectangle = {
-				left: elementLeft,
-				top: elementTop,
-				right: elementRight,
-				bottom: elementBottom,
-			};
-
-			if (
-				isRectangleIntersecting({
-					elementRectangle,
-					selectionRectangle,
-				})
-			) {
-				selectedElements.push({
-					trackId: track.id,
-					elementId: element.id,
-				});
+			if (elementLeft > selectionRectangle.right) {
+				continue;
 			}
+
+			const elementRight = timelineTimeToPixels({ time: element.startTime + element.duration, zoomLevel });
+			if (elementRight < selectionRectangle.left) {
+				continue;
+			}
+
+			selectedElements.push({
+				trackId: track.id,
+				elementId: element.id,
+			});
 		}
 	}
 

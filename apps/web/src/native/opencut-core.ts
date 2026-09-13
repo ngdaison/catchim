@@ -33,6 +33,8 @@ interface EmscriptenModule {
 	_free: (ptr: number) => void;
 	HEAPF32: Float32Array;
 	HEAPF64: Float64Array;
+	HEAPU32: Uint32Array;
+	HEAPU8: Uint8Array;
 	UTF8ToString: (ptr: number, maxBytes?: number) => string;
 	stringToUTF8: (str: string, outPtr: number, maxBytes: number) => void;
 }
@@ -94,10 +96,31 @@ export interface NativeTimelineBindings {
 	breakLinesCount: (text: string, maxWidth: number, avgCharWidth: number) => number;
 	pointInRotatedRect: (px: number, py: number, cx: number, cy: number, w: number, h: number, rot: number) => number;
 	testSnapAxis: (sourceVal: number, targetVal: number, threshold: number, outSnapped: number, outDelta: number) => number;
+	clearBufferRgba: (bufferPtr: number, width: number, height: number, r: number, g: number, b: number, a: number) => void;
+	compositeLayerRgba: (destPtr: number, destW: number, destH: number, srcPtr: number, srcW: number, srcH: number, cx: number, cy: number, w: number, h: number, rot: number, flipX: number, flipY: number, opacity: number, blendMode: number, maskAlphaPtr: number) => void;
+	applyMaskToBuffer: (pixelsPtr: number, width: number, height: number, maskType: number, cx: number, cy: number, sx: number, sy: number, rot: number, feather: number, inverted: number) => void;
+	applyColorGradingRgba: (pixelsPtr: number, width: number, height: number, brightness: number, contrast: number, saturation: number, exposure: number, temp: number, tint: number, hue: number, gamma: number) => void;
+	applyGaussianBlurRgba: (pixelsPtr: number, width: number, height: number, radius: number, sigma: number) => void;
+	applyVignetteRgba: (pixelsPtr: number, width: number, height: number, amount: number, softness: number, roundness: number) => void;
+	applyChromaKeyRgba: (pixelsPtr: number, width: number, height: number, keyR: number, keyG: number, keyB: number, similarity: number, smoothness: number, spill: number) => void;
+	applyGainRamp: (samplesPtr: number, numSamples: number, startGain: number, endGain: number) => void;
+	mixAudioBuffers: (destPtr: number, srcPtr: number, numSamples: number, volume: number) => void;
+	resampleAudioLinear: (srcPtr: number, srcLen: number, dstPtr: number, dstLen: number) => void;
+	computePeakBuckets: (channelPtr: number, startsPtr: number, endsPtr: number, numBuckets: number, outPeaksPtr: number) => void;
+	computeRmsBuckets: (channelPtr: number, maxWindowLength: number, startsPtr: number, endsPtr: number, numBuckets: number, outRmsPtr: number) => void;
+	mixAudioChannelRetime: (outputDataPtr: number, outputStartSample: number, renderedLength: number, outputLength: number, sampleRate: number, sourceDataPtr: number, sourceLength: number, sourceSampleRate: number, trimStart: number, retimeRate: number, gain: number) => void;
+	snapPointsSorted: (targetTime: number, pointsTimesPtr: number, numPoints: number, maxDistance: number, outSnappedPtr: number, outMatchedIndexPtr: number) => number;
+	snapPointsLinear: (targetTime: number, pointsTimesPtr: number, numPoints: number, maxDistance: number, outSnappedPtr: number, outMatchedIndexPtr: number) => number;
+	computeBufferPeak: (samplesPtr: number, numSamples: number) => number;
+	clampBufferSamples: (samplesPtr: number, numSamples: number, maxPeak: number) => void;
+	downmixStereo: (leftPtr: number, rightPtr: number, outPtr: number, numSamples: number) => void;
 	malloc: (size: number) => number;
 	free: (ptr: number) => void;
 	UTF8ToString: (ptr: number, maxBytes?: number) => string;
+	HEAPF32: Float32Array;
 	HEAPF64: Float64Array;
+	HEAPU32: Uint32Array;
+	HEAPU8: Uint8Array;
 }
 
 interface NativeTrackCache {
@@ -214,6 +237,37 @@ function wrapNativeTimelineBindings(
 	const pointInRotatedRect = module.cwrap("ocw_geometry_point_in_rotated_rect", "number", ["number", "number", "number", "number", "number", "number", "number"]);
 	const testSnapAxis = module.cwrap("ocw_geometry_test_snap", "number", ["number", "number", "number", "number", "number"]);
 
+	const clearBufferRgba = module.cwrap("ocw_compositor_clear_buffer", null, ["number", "number", "number", "number", "number", "number", "number"]);
+	const compositeLayerRgba = module.cwrap("ocw_compositor_composite_layer", null, [
+		"number", "number", "number", "number", "number", "number",
+		"number", "number", "number", "number", "number", "number", "number",
+		"number", "number", "number"
+	]);
+	const applyMaskToBuffer = module.cwrap("ocw_mask_apply_to_buffer", null, [
+		"number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"
+	]);
+	const applyColorGradingRgba = module.cwrap("ocw_effects_apply_color_grading", null, [
+		"number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"
+	]);
+	const applyGaussianBlurRgba = module.cwrap("ocw_effects_apply_gaussian_blur", null, ["number", "number", "number", "number", "number"]);
+	const applyVignetteRgba = module.cwrap("ocw_effects_apply_vignette", null, ["number", "number", "number", "number", "number", "number"]);
+	const applyChromaKeyRgba = module.cwrap("ocw_effects_apply_chroma_key", null, [
+		"number", "number", "number", "number", "number", "number", "number", "number", "number"
+	]);
+	const applyGainRamp = module.cwrap("ocw_audio_apply_gain_ramp", null, ["number", "number", "number", "number"]);
+	const mixAudioBuffers = module.cwrap("ocw_audio_mix_buffers", null, ["number", "number", "number", "number"]);
+	const resampleAudioLinear = module.cwrap("ocw_audio_resample_linear", null, ["number", "number", "number", "number"]);
+	const computePeakBuckets = module.cwrap("ocw_audio_compute_peak_buckets", null, ["number", "number", "number", "number", "number"]);
+	const computeRmsBuckets = module.cwrap("ocw_audio_compute_rms_buckets", null, ["number", "number", "number", "number", "number", "number"]);
+	const mixAudioChannelRetime = module.cwrap("ocw_audio_mix_channel_retime", null, [
+		"number", "number", "number", "number", "number", "number", "number", "number", "number", "number", "number"
+	]);
+	const snapPointsSorted = module.cwrap("ocw_snap_points_sorted", "number", ["number", "number", "number", "number", "number", "number"]);
+	const snapPointsLinear = module.cwrap("ocw_snap_points_linear", "number", ["number", "number", "number", "number", "number", "number"]);
+	const computeBufferPeak = module.cwrap("ocw_audio_compute_buffer_peak", "number", ["number", "number"]);
+	const clampBufferSamples = module.cwrap("ocw_audio_clamp_buffer_samples", null, ["number", "number", "number"]);
+	const downmixStereo = module.cwrap("ocw_audio_downmix_stereo", null, ["number", "number", "number", "number"]);
+
 	return {
 		create,
 		destroy: (timeline: number) => {
@@ -254,10 +308,31 @@ function wrapNativeTimelineBindings(
 		breakLinesCount,
 		pointInRotatedRect,
 		testSnapAxis,
+		clearBufferRgba,
+		compositeLayerRgba,
+		applyMaskToBuffer,
+		applyColorGradingRgba,
+		applyGaussianBlurRgba,
+		applyVignetteRgba,
+		applyChromaKeyRgba,
+		applyGainRamp,
+		mixAudioBuffers,
+		resampleAudioLinear,
+		computePeakBuckets,
+		computeRmsBuckets,
+		mixAudioChannelRetime,
+		snapPointsSorted,
+		snapPointsLinear,
+		computeBufferPeak,
+		clampBufferSamples,
+		downmixStereo,
 		malloc: module._malloc,
 		free: module._free,
 		UTF8ToString: module.UTF8ToString,
+		HEAPF32: module.HEAPF32,
 		HEAPF64: module.HEAPF64,
+		HEAPU32: module.HEAPU32,
+		HEAPU8: module.HEAPU8,
 	};
 }
 

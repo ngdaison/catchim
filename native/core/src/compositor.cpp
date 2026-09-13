@@ -146,4 +146,106 @@ ColorRGBA blend_colors(ColorRGBA base, ColorRGBA layer, BlendMode mode, float op
     return {clamp01(final_r), clamp01(final_g), clamp01(final_b), final_a};
 }
 
+void clear_buffer_rgba(std::uint32_t* buffer, int width, int height, ColorRGBA clear_color) noexcept {
+    if (!buffer || width <= 0 || height <= 0) return;
+
+    std::uint8_t r = static_cast<std::uint8_t>(clamp01(clear_color.r) * 255.0f + 0.5f);
+    std::uint8_t g = static_cast<std::uint8_t>(clamp01(clear_color.g) * 255.0f + 0.5f);
+    std::uint8_t b = static_cast<std::uint8_t>(clamp01(clear_color.b) * 255.0f + 0.5f);
+    std::uint8_t a = static_cast<std::uint8_t>(clamp01(clear_color.a) * 255.0f + 0.5f);
+    std::uint32_t packed = static_cast<std::uint32_t>(r) |
+                           (static_cast<std::uint32_t>(g) << 8) |
+                           (static_cast<std::uint32_t>(b) << 16) |
+                           (static_cast<std::uint32_t>(a) << 24);
+
+    std::fill_n(buffer, static_cast<std::size_t>(width) * height, packed);
+}
+
+void composite_layer_rgba(
+    std::uint32_t* dest, int dest_w, int dest_h,
+    const std::uint32_t* src, int src_w, int src_h,
+    const QuadTransform& transform,
+    float opacity,
+    BlendMode mode,
+    const float* mask_alpha
+) noexcept {
+    if (!dest || !src || dest_w <= 0 || dest_h <= 0 || src_w <= 0 || src_h <= 0) return;
+    if (opacity <= 0.001f) return;
+
+    Matrix3x3 world = Matrix3x3::from_transform(transform);
+    Matrix3x3 inv = world.inverse();
+
+    // Compute destination axis-aligned bounding box of transformed quad
+    Point2D c0 = world.transform_point({-0.5f, -0.5f});
+    Point2D c1 = world.transform_point({0.5f, -0.5f});
+    Point2D c2 = world.transform_point({0.5f, 0.5f});
+    Point2D c3 = world.transform_point({-0.5f, 0.5f});
+
+    float min_x_f = std::min({c0.x, c1.x, c2.x, c3.x});
+    float max_x_f = std::max({c0.x, c1.x, c2.x, c3.x});
+    float min_y_f = std::min({c0.y, c1.y, c2.y, c3.y});
+    float max_y_f = std::max({c0.y, c1.y, c2.y, c3.y});
+
+    int min_x = std::clamp(static_cast<int>(std::floor(min_x_f)), 0, dest_w - 1);
+    int max_x = std::clamp(static_cast<int>(std::ceil(max_x_f)), 0, dest_w - 1);
+    int min_y = std::clamp(static_cast<int>(std::floor(min_y_f)), 0, dest_h - 1);
+    int max_y = std::clamp(static_cast<int>(std::ceil(max_y_f)), 0, dest_h - 1);
+
+    if (min_x > max_x || min_y > max_y) return;
+
+    for (int dy = min_y; dy <= max_y; ++dy) {
+        int row_offset = dy * dest_w;
+        for (int dx = min_x; dx <= max_x; ++dx) {
+            Point2D pt = inv.transform_point({static_cast<float>(dx), static_cast<float>(dy)});
+            if (pt.x < -0.5f || pt.x >= 0.5f || pt.y < -0.5f || pt.y >= 0.5f) {
+                continue;
+            }
+
+            float u = (pt.x + 0.5f) * src_w;
+            float v = (pt.y + 0.5f) * src_h;
+
+            int sx = std::clamp(static_cast<int>(u), 0, src_w - 1);
+            int sy = std::clamp(static_cast<int>(v), 0, src_h - 1);
+
+            std::uint32_t src_p = src[sy * src_w + sx];
+            float src_a = ((src_p >> 24) & 0xFF) / 255.0f;
+            if (src_a <= 0.001f) continue;
+
+            float eff_op = opacity;
+            if (mask_alpha != nullptr) {
+                eff_op *= mask_alpha[sy * src_w + sx];
+                if (eff_op <= 0.001f) continue;
+            }
+
+            std::uint32_t dst_p = dest[row_offset + dx];
+
+            ColorRGBA base{
+                (dst_p & 0xFF) / 255.0f,
+                ((dst_p >> 8) & 0xFF) / 255.0f,
+                ((dst_p >> 16) & 0xFF) / 255.0f,
+                ((dst_p >> 24) & 0xFF) / 255.0f
+            };
+
+            ColorRGBA layer{
+                (src_p & 0xFF) / 255.0f,
+                ((src_p >> 8) & 0xFF) / 255.0f,
+                ((src_p >> 16) & 0xFF) / 255.0f,
+                src_a
+            };
+
+            ColorRGBA result = blend_colors(base, layer, mode, eff_op);
+
+            std::uint8_t out_r = static_cast<std::uint8_t>(result.r * 255.0f + 0.5f);
+            std::uint8_t out_g = static_cast<std::uint8_t>(result.g * 255.0f + 0.5f);
+            std::uint8_t out_b = static_cast<std::uint8_t>(result.b * 255.0f + 0.5f);
+            std::uint8_t out_a = static_cast<std::uint8_t>(result.a * 255.0f + 0.5f);
+
+            dest[row_offset + dx] = static_cast<std::uint32_t>(out_r) |
+                                   (static_cast<std::uint32_t>(out_g) << 8) |
+                                   (static_cast<std::uint32_t>(out_b) << 16) |
+                                   (static_cast<std::uint32_t>(out_a) << 24);
+        }
+    }
+}
+
 } // namespace opencut

@@ -39,4 +39,6 @@ struct MaskDefinition {
 // Soft feathering curve given signed distance and feather width
 [[nodiscard]] float apply_feather(float distance, float feather_radius, bool inverted) noexcept;
 
+void apply_mask_rgba(std::uint32_t* pixels, int width, int height, const MaskDefinition& mask) noexcept;
+
 } // namespace opencut

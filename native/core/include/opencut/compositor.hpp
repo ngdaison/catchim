@@ -88,4 +88,15 @@ struct Frame {
 
 ColorRGBA blend_colors(ColorRGBA base, ColorRGBA layer, BlendMode mode, float opacity) noexcept;
 
+void clear_buffer_rgba(std::uint32_t* buffer, int width, int height, ColorRGBA clear_color) noexcept;
+
+void composite_layer_rgba(
+    std::uint32_t* dest, int dest_w, int dest_h,
+    const std::uint32_t* src, int src_w, int src_h,
+    const QuadTransform& transform,
+    float opacity,
+    BlendMode mode,
+    const float* mask_alpha = nullptr
+) noexcept;
+
 } // namespace opencut

@@ -172,4 +172,160 @@ std::vector<float> generate_gaussian_kernel_1d(int radius, float sigma) {
     return kernel;
 }
 
+void apply_color_grading_rgba(std::uint32_t* pixels, int width, int height, const ColorAdjustments& adj) noexcept {
+    if (!pixels || width <= 0 || height <= 0) return;
+
+    int total = width * height;
+    for (int i = 0; i < total; ++i) {
+        std::uint32_t p = pixels[i];
+        ColorRGBA col{
+            (p & 0xFF) / 255.0f,
+            ((p >> 8) & 0xFF) / 255.0f,
+            ((p >> 16) & 0xFF) / 255.0f,
+            ((p >> 24) & 0xFF) / 255.0f
+        };
+
+        ColorRGBA res = apply_color_adjustments(col, adj);
+
+        pixels[i] = static_cast<std::uint32_t>(res.r * 255.0f + 0.5f) |
+                    (static_cast<std::uint32_t>(res.g * 255.0f + 0.5f) << 8) |
+                    (static_cast<std::uint32_t>(res.b * 255.0f + 0.5f) << 16) |
+                    (static_cast<std::uint32_t>(res.a * 255.0f + 0.5f) << 24);
+    }
+}
+
+void apply_gaussian_blur_rgba(std::uint32_t* pixels, int width, int height, int radius, float sigma) {
+    if (!pixels || width <= 0 || height <= 0 || radius <= 0) return;
+
+    if (sigma <= 0.0f) {
+        sigma = static_cast<float>(radius) / 2.0f;
+    }
+
+    auto kernel = generate_gaussian_kernel_1d(radius, sigma);
+
+    std::vector<std::uint32_t> temp(static_cast<std::size_t>(width) * height);
+
+    // Pass 1: Horizontal blur
+    for (int y = 0; y < height; ++y) {
+        int row_offset = y * width;
+        for (int x = 0; x < width; ++x) {
+            float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
+            for (int k = -radius; k <= radius; ++k) {
+                int sx = std::clamp(x + k, 0, width - 1);
+                std::uint32_t p = pixels[row_offset + sx];
+                float w = kernel[k + radius];
+
+                r += (p & 0xFF) * w;
+                g += ((p >> 8) & 0xFF) * w;
+                b += ((p >> 16) & 0xFF) * w;
+                a += ((p >> 24) & 0xFF) * w;
+            }
+
+            temp[row_offset + x] = static_cast<std::uint32_t>(std::clamp(r, 0.0f, 255.0f) + 0.5f) |
+                                  (static_cast<std::uint32_t>(std::clamp(g, 0.0f, 255.0f) + 0.5f) << 8) |
+                                  (static_cast<std::uint32_t>(std::clamp(b, 0.0f, 255.0f) + 0.5f) << 16) |
+                                  (static_cast<std::uint32_t>(std::clamp(a, 0.0f, 255.0f) + 0.5f) << 24);
+        }
+    }
+
+    // Pass 2: Vertical blur
+    for (int y = 0; y < height; ++y) {
+        int row_offset = y * width;
+        for (int x = 0; x < width; ++x) {
+            float r = 0.0f, g = 0.0f, b = 0.0f, a = 0.0f;
+            for (int k = -radius; k <= radius; ++k) {
+                int sy = std::clamp(y + k, 0, height - 1);
+                std::uint32_t p = temp[sy * width + x];
+                float w = kernel[k + radius];
+
+                r += (p & 0xFF) * w;
+                g += ((p >> 8) & 0xFF) * w;
+                b += ((p >> 16) & 0xFF) * w;
+                a += ((p >> 24) & 0xFF) * w;
+            }
+
+            pixels[row_offset + x] = static_cast<std::uint32_t>(std::clamp(r, 0.0f, 255.0f) + 0.5f) |
+                                    (static_cast<std::uint32_t>(std::clamp(g, 0.0f, 255.0f) + 0.5f) << 8) |
+                                    (static_cast<std::uint32_t>(std::clamp(b, 0.0f, 255.0f) + 0.5f) << 16) |
+                                    (static_cast<std::uint32_t>(std::clamp(a, 0.0f, 255.0f) + 0.5f) << 24);
+        }
+    }
+}
+
+void apply_vignette_rgba(std::uint32_t* pixels, int width, int height, const VignetteParams& params) noexcept {
+    if (!pixels || width <= 0 || height <= 0) return;
+
+    for (int y = 0; y < height; ++y) {
+        float v = (static_cast<float>(y) + 0.5f) / static_cast<float>(height);
+        int row = y * width;
+        for (int x = 0; x < width; ++x) {
+            float u = (static_cast<float>(x) + 0.5f) / static_cast<float>(width);
+            float vig = calculate_vignette({u, v}, params);
+            if (vig >= 0.999f) continue;
+
+            std::uint32_t vig_fixed = static_cast<std::uint32_t>(std::clamp(vig, 0.0f, 1.0f) * 256.0f + 0.5f);
+            if (vig_fixed >= 256) continue;
+
+            std::uint32_t p = pixels[row + x];
+            std::uint32_t rb = (p & 0x00FF00FF);
+            std::uint32_t g  = (p & 0x0000FF00);
+
+            rb = ((rb * vig_fixed) >> 8) & 0x00FF00FF;
+            g  = ((g * vig_fixed) >> 8) & 0x0000FF00;
+
+            pixels[row + x] = rb | g | (p & 0xFF000000);
+        }
+    }
+}
+
+void apply_chroma_key_rgba(std::uint32_t* pixels, int width, int height,
+                           float key_r, float key_g, float key_b,
+                           float similarity, float smoothness, float spill) noexcept {
+    if (!pixels || width <= 0 || height <= 0) return;
+
+    int total = width * height;
+    float sim = std::clamp(similarity, 0.0f, 1.0f);
+    float smooth = std::clamp(smoothness, 0.001f, 1.0f);
+    const float inv_sqrt3 = 0.577350269f; // 1.0f / sqrt(3)
+    const float inv_smooth = 1.0f / smooth;
+
+    for (int i = 0; i < total; ++i) {
+        std::uint32_t p = pixels[i];
+        if ((p & 0xFF000000) == 0) continue; // Early exit for completely transparent pixel
+
+        float r = (p & 0xFF) / 255.0f;
+        float g = ((p >> 8) & 0xFF) / 255.0f;
+        float b = ((p >> 16) & 0xFF) / 255.0f;
+        float a = ((p >> 24) & 0xFF) / 255.0f;
+
+        float dr = r - key_r;
+        float dg = g - key_g;
+        float db = b - key_b;
+        float dist = std::sqrt(dr * dr + dg * dg + db * db) * inv_sqrt3;
+
+        float mask = 1.0f;
+        if (dist < sim) {
+            mask = 0.0f;
+        } else if (dist < sim + smooth) {
+            float t = (dist - sim) * inv_smooth;
+            mask = t * t * (3.0f - 2.0f * t); // smoothstep
+        }
+
+        // Spill suppression
+        if (spill > 0.0f) {
+            float other_avg = (r + b) * 0.5f;
+            if (g > other_avg) {
+                g = g * (1.0f - spill) + other_avg * spill;
+            }
+        }
+
+        a *= mask;
+
+        pixels[i] = static_cast<std::uint32_t>(r * 255.0f + 0.5f) |
+                    (static_cast<std::uint32_t>(g * 255.0f + 0.5f) << 8) |
+                    (static_cast<std::uint32_t>(b * 255.0f + 0.5f) << 16) |
+                    (static_cast<std::uint32_t>(a * 255.0f + 0.5f) << 24);
+    }
+}
+
 } // namespace opencut

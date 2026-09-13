@@ -1,5 +1,6 @@
 import type { ElementWithBounds } from "./element-bounds";
 import type { ElementRef } from "@/timeline/types";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 function pointInRotatedRect({
 	px,
@@ -18,6 +19,14 @@ function pointInRotatedRect({
 	height: number;
 	rotation: number;
 }): boolean {
+	const bindings = getNativeTimelineBindings();
+	if (bindings) {
+		return (
+			bindings.pointInRotatedRect(px, py, cx, cy, width, height, rotation) !==
+			0
+		);
+	}
+
 	const angleRad = (rotation * Math.PI) / 180;
 	const cos = Math.cos(-angleRad);
 	const sin = Math.sin(-angleRad);

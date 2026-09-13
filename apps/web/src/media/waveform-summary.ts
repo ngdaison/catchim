@@ -2,6 +2,7 @@
 
 import { getSourceTimeAtClipTime } from "@/retime";
 import type { RetimeConfig } from "@/timeline";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 const RMS_ANALYSIS_WINDOW_SECONDS = 0.02;
 const DEFAULT_SOURCE_WAVEFORM_BUCKET_SIZE = 128;
@@ -13,6 +14,47 @@ function computePeakBuckets({
 	buffer: AudioBuffer;
 	buckets: SampleBucket[];
 }): number[] {
+	const bindings = getNativeTimelineBindings();
+	if (bindings && buckets.length > 0 && buffer.length > 0) {
+		try {
+			const numBuckets = buckets.length;
+			const startsPtr = bindings.malloc(numBuckets * 4);
+			const endsPtr = bindings.malloc(numBuckets * 4);
+			const outPeaksPtr = bindings.malloc(numBuckets * 4);
+			const starts = new Uint32Array(bindings.HEAPU32.buffer, startsPtr, numBuckets);
+			const ends = new Uint32Array(bindings.HEAPU32.buffer, endsPtr, numBuckets);
+			for (let i = 0; i < numBuckets; i++) {
+				starts[i] = buckets[i].bucketStart;
+				ends[i] = buckets[i].bucketEnd;
+			}
+
+			const chLen = buffer.length;
+			const chPtr = bindings.malloc(chLen * 4);
+			const outArray = new Float32Array(numBuckets);
+
+			for (let c = 0; c < buffer.numberOfChannels; c++) {
+				const chData = buffer.getChannelData(c);
+				new Float32Array(bindings.HEAPF32.buffer, chPtr, chLen).set(chData);
+				bindings.computePeakBuckets(chPtr, startsPtr, endsPtr, numBuckets, outPeaksPtr);
+				const channelPeaks = new Float32Array(bindings.HEAPF32.buffer, outPeaksPtr, numBuckets);
+				for (let i = 0; i < numBuckets; i++) {
+					if (channelPeaks[i] > outArray[i]) {
+						outArray[i] = channelPeaks[i];
+					}
+				}
+			}
+
+			bindings.free(chPtr);
+			bindings.free(startsPtr);
+			bindings.free(endsPtr);
+			bindings.free(outPeaksPtr);
+
+			return Array.from(outArray);
+		} catch (e) {
+			console.warn("[OpenCut] Native computePeakBuckets fallback:", e);
+		}
+	}
+
 	const channels = buffer.numberOfChannels;
 	const channelData: Float32Array[] = Array.from({ length: channels }, (_, c) =>
 		buffer.getChannelData(c),
@@ -182,11 +224,59 @@ export function computeRmsBuckets({
 	buffer: AudioBuffer;
 	buckets: SampleBucket[];
 }): number[] {
-	const channels = buffer.numberOfChannels;
 	const maxWindowLength = Math.max(
 		1,
 		Math.floor(buffer.sampleRate * RMS_ANALYSIS_WINDOW_SECONDS),
 	);
+
+	const bindings = getNativeTimelineBindings();
+	if (bindings && buckets.length > 0 && buffer.length > 0) {
+		try {
+			const numBuckets = buckets.length;
+			const startsPtr = bindings.malloc(numBuckets * 4);
+			const endsPtr = bindings.malloc(numBuckets * 4);
+			const outRmsPtr = bindings.malloc(numBuckets * 4);
+			const starts = new Uint32Array(bindings.HEAPU32.buffer, startsPtr, numBuckets);
+			const ends = new Uint32Array(bindings.HEAPU32.buffer, endsPtr, numBuckets);
+			for (let i = 0; i < numBuckets; i++) {
+				starts[i] = buckets[i].bucketStart;
+				ends[i] = buckets[i].bucketEnd;
+			}
+
+			const chLen = buffer.length;
+			const chPtr = bindings.malloc(chLen * 4);
+			const ch0 = buffer.getChannelData(0);
+			if (buffer.numberOfChannels === 1) {
+				new Float32Array(bindings.HEAPF32.buffer, chPtr, chLen).set(ch0);
+			} else {
+				const ch1 = buffer.getChannelData(1);
+				const ch0Ptr = bindings.malloc(chLen * 4);
+				const ch1Ptr = bindings.malloc(chLen * 4);
+				try {
+					bindings.HEAPF32.set(ch0, ch0Ptr >> 2);
+					bindings.HEAPF32.set(ch1, ch1Ptr >> 2);
+					bindings.downmixStereo(ch0Ptr, ch1Ptr, chPtr, chLen);
+				} finally {
+					bindings.free(ch0Ptr);
+					bindings.free(ch1Ptr);
+				}
+			}
+
+			bindings.computeRmsBuckets(chPtr, maxWindowLength, startsPtr, endsPtr, numBuckets, outRmsPtr);
+			const rmsResult = Array.from(new Float32Array(bindings.HEAPF32.buffer, outRmsPtr, numBuckets));
+
+			bindings.free(chPtr);
+			bindings.free(startsPtr);
+			bindings.free(endsPtr);
+			bindings.free(outRmsPtr);
+
+			return rmsResult;
+		} catch (e) {
+			console.warn("[OpenCut] Native computeRmsBuckets fallback:", e);
+		}
+	}
+
+	const channels = buffer.numberOfChannels;
 
 	const channelData: Float32Array[] = new Array(channels);
 	for (let c = 0; c < channels; c++) {

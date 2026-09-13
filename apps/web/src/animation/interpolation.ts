@@ -28,17 +28,6 @@ function byTimeAscending({
 	return leftTime - rightTime;
 }
 
-function isWithinTimePair({
-	time,
-	leftTime,
-	rightTime,
-}: {
-	time: number;
-	leftTime: number;
-	rightTime: number;
-}): boolean {
-	return time >= leftTime && time <= rightTime;
-}
 
 function lerpNumber({
 	leftValue,
@@ -284,68 +273,62 @@ export function getScalarChannelValueAtTime({
 		return lastKey.value;
 	}
 
-	for (
-		let keyIndex = 0;
-		keyIndex < normalizedChannel.keys.length - 1;
-		keyIndex++
-	) {
-		const leftKey = normalizedChannel.keys[keyIndex];
-		const rightKey = normalizedChannel.keys[keyIndex + 1];
-		if (time === rightKey.time) {
-			return rightKey.value;
+	let low = 0;
+	let high = normalizedChannel.keys.length - 1;
+	while (low + 1 < high) {
+		const mid = (low + high) >> 1;
+		if (normalizedChannel.keys[mid].time <= time) {
+			low = mid;
+		} else {
+			high = mid;
 		}
+	}
 
-		if (
-			!isWithinTimePair({
-				time,
-				leftTime: leftKey.time,
-				rightTime: rightKey.time,
-			})
-		) {
-			continue;
-		}
+	const leftKey = normalizedChannel.keys[low];
+	const rightKey = normalizedChannel.keys[high];
 
-		if (leftKey.segmentToNext === "step") {
-			return leftKey.value;
-		}
+	if (time === rightKey.time) {
+		return rightKey.value;
+	}
 
-		const span = rightKey.time - leftKey.time;
-		if (span === 0) {
-			return rightKey.value;
-		}
+	if (leftKey.segmentToNext === "step") {
+		return leftKey.value;
+	}
 
-		const progress = clamp({
-			value: (time - leftKey.time) / span,
-			min: 0,
-			max: 1,
-		});
-		if (leftKey.segmentToNext === "linear") {
-			return lerpNumber({
-				leftValue: leftKey.value,
-				rightValue: rightKey.value,
-				progress,
-			});
-		}
+	const span = rightKey.time - leftKey.time;
+	if (span === 0) {
+		return rightKey.value;
+	}
 
-		const curveProgress = solveBezierProgressForTime({
-			time,
-			leftKey,
-			rightKey,
-		});
-		const rightHandle =
-			leftKey.rightHandle ?? getDefaultRightHandle({ leftKey, rightKey });
-		const leftHandle =
-			rightKey.leftHandle ?? getDefaultLeftHandle({ leftKey, rightKey });
-		return getBezierPoint({
-			progress: curveProgress,
-			p0: leftKey.value,
-			p1: leftKey.value + rightHandle.dv,
-			p2: rightKey.value + leftHandle.dv,
-			p3: rightKey.value,
+	const progress = clamp({
+		value: (time - leftKey.time) / span,
+		min: 0,
+		max: 1,
+	});
+	if (leftKey.segmentToNext === "linear") {
+		return lerpNumber({
+			leftValue: leftKey.value,
+			rightValue: rightKey.value,
+			progress,
 		});
 	}
 
-	return lastKey.value;
+	const curveProgress = solveBezierProgressForTime({
+		time,
+		leftKey,
+		rightKey,
+	});
+	const rightHandle =
+		leftKey.rightHandle ?? getDefaultRightHandle({ leftKey, rightKey });
+	const leftHandle =
+		rightKey.leftHandle ?? getDefaultLeftHandle({ leftKey, rightKey });
+	return getBezierPoint({
+		progress: curveProgress,
+		p0: leftKey.value,
+		p1: leftKey.value + rightHandle.dv,
+		p2: rightKey.value + leftHandle.dv,
+		p3: rightKey.value,
+	});
 }
 
 export function getDiscreteChannelValueAtTime({
@@ -362,14 +345,23 @@ export function getDiscreteChannelValueAtTime({
 	}
 
 	const normalizedChannel = normalizeDiscreteChannel({ channel });
-	let currentValue = fallbackValue;
-	for (const key of normalizedChannel.keys) {
-		if (time < key.time) {
-			break;
-		}
-		currentValue = key.value;
+	const keys = normalizedChannel.keys;
+	if (time < keys[0].time) {
+		return fallbackValue;
 	}
-	return currentValue;
+
+	let low = 0;
+	let high = keys.length - 1;
+	while (low <= high) {
+		const mid = (low + high) >> 1;
+		if (keys[mid].time <= time) {
+			low = mid + 1;
+		} else {
+			high = mid - 1;
+		}
+	}
+
+	return keys[high].value;
 }
 
 export function getChannelValueAtTime({

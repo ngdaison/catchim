@@ -9,6 +9,7 @@ import {
 	setCanvasLetterSpacing,
 } from "./layout";
 import { FONT_SIZE_SCALE_REFERENCE } from "./typography";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 export type TextAlign = "left" | "center" | "right";
 export type TextFontWeight = "normal" | "bold";
@@ -83,8 +84,10 @@ export function resolveTextLayout({
 	const fontWeight = text.fontWeight === "bold" ? "bold" : "normal";
 	const fontStyle = text.fontStyle === "italic" ? "italic" : "normal";
 	const letterSpacing = text.letterSpacing ?? DEFAULTS.text.letterSpacing;
+	const lineHeightRatio = text.lineHeight ?? DEFAULTS.text.lineHeight;
 	const lineHeightPx =
-		scaledFontSize * (text.lineHeight ?? DEFAULTS.text.lineHeight);
+		getNativeTimelineBindings()?.measureLineHeight(scaledFontSize, lineHeightRatio) ??
+		(scaledFontSize * lineHeightRatio);
 	const fontSizeRatio = text.fontSize / 15;
 
 	return {

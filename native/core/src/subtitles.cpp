@@ -24,7 +24,7 @@ int64_t SrtParser::parse_timestamp(std::string_view ts) {
         auto mt = MediaTime::from_seconds_f64(total_sec);
         return mt ? mt->as_ticks() : static_cast<int64_t>(std::round(total_sec * 120000.0));
     }
-    return 0;
+    return -1;
 }
 
 std::string SrtParser::format_timestamp(int64_t ticks) {

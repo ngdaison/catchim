@@ -94,6 +94,18 @@ int ocw_timeline_snap(OcTimeline* timeline,
                       double threshold,
                       double* out_snapped_time,
                       double* out_delta);
+int ocw_snap_points_sorted(double target_time,
+                           const double* points_times,
+                           size_t num_points,
+                           double max_distance,
+                           double* out_snapped_time,
+                           int* out_matched_index);
+int ocw_snap_points_linear(double target_time,
+                           const double* points_times,
+                           size_t num_points,
+                           double max_distance,
+                           double* out_snapped_time,
+                           int* out_matched_index);
 
 // Time & Timecode
 int64_t oc_time_ticks_per_second(void);
@@ -114,12 +126,61 @@ float ocw_audio_evaluate_fade(double offset_ticks, double duration_ticks, double
 void ocw_compositor_blend(float b_r, float b_g, float b_b, float b_a,
                           float l_r, float l_g, float l_b, float l_a,
                           uint32_t blend_mode, float opacity, float* out_rgba);
+void ocw_compositor_clear_buffer(uint32_t* buffer, int width, int height, float r, float g, float b, float a);
+void ocw_compositor_composite_layer(uint32_t* dest, int dest_w, int dest_h,
+                                    const uint32_t* src, int src_w, int src_h,
+                                    float cx, float cy, float w, float h, float rot,
+                                    int flip_x, int flip_y,
+                                    float opacity, uint32_t blend_mode,
+                                    const float* mask_alpha);
 
 // Masks & Effects
 float ocw_mask_evaluate_alpha(float px, float py, int mask_type, float cx, float cy, float sx, float sy, float rot, float feather, int inverted);
+void ocw_mask_apply_to_buffer(uint32_t* pixels, int width, int height,
+                              int mask_type, float cx, float cy, float sx, float sy,
+                              float rot, float feather, int inverted);
 void ocw_effects_apply(float r, float g, float b, float a,
                        float brightness, float contrast, float saturation, float exposure,
                        float temp, float tint, float hue, float gamma, float* out_rgba);
+void ocw_effects_apply_color_grading(uint32_t* pixels, int width, int height,
+                                     float brightness, float contrast, float saturation,
+                                     float exposure, float temp, float tint,
+                                     float hue, float gamma);
+void ocw_effects_apply_gaussian_blur(uint32_t* pixels, int width, int height, int radius, float sigma);
+void ocw_effects_apply_vignette(uint32_t* pixels, int width, int height, float amount, float softness, float roundness);
+void ocw_effects_apply_chroma_key(uint32_t* pixels, int width, int height,
+                                  float key_r, float key_g, float key_b,
+                                  float similarity, float smoothness, float spill);
+
+// Audio Buffer DSP
+void ocw_audio_apply_gain_ramp(float* samples, size_t num_samples, float start_gain, float end_gain);
+void ocw_audio_mix_buffers(float* dest, const float* src, size_t num_samples, float volume);
+void ocw_audio_resample_linear(const float* src, size_t src_len, float* dst, size_t dst_len);
+void ocw_audio_compute_peak_buckets(const float* channel_data,
+                                    const uint32_t* bucket_starts,
+                                    const uint32_t* bucket_ends,
+                                    size_t num_buckets,
+                                    float* out_peaks);
+void ocw_audio_compute_rms_buckets(const float* channel_data,
+                                   uint32_t max_window_length,
+                                   const uint32_t* bucket_starts,
+                                   const uint32_t* bucket_ends,
+                                   size_t num_buckets,
+                                   float* out_rms);
+void ocw_audio_mix_channel_retime(float* output_data,
+                                  size_t output_start_sample,
+                                  size_t rendered_length,
+                                  size_t output_length,
+                                  double sample_rate,
+                                  const float* source_data,
+                                  size_t source_length,
+                                  double source_sample_rate,
+                                  double trim_start,
+                                  double retime_rate,
+                                  float gain);
+float ocw_audio_compute_buffer_peak(const float* samples, size_t num_samples);
+void ocw_audio_clamp_buffer_samples(float* samples, size_t num_samples, float max_peak);
+void ocw_audio_downmix_stereo(const float* left, const float* right, float* out, size_t num_samples);
 
 // Animation & Keyframes
 double ocw_animation_solve_bezier(double time, double t0, double t1, double t2, double t3);

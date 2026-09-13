@@ -64,6 +64,7 @@ if(EMSCRIPTEN)
     )
 
     target_compile_features(opencut_core_wasm PUBLIC cxx_std_20)
+    target_compile_options(opencut_core_wasm PRIVATE -O3 -msimd128)
     target_include_directories(opencut_core_wasm
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -77,6 +78,7 @@ if(EMSCRIPTEN)
     target_link_options(opencut_core_wasm PRIVATE
         "--no-entry"
         "-O3"
+        "-msimd128"
         "-sMODULARIZE=1"
         "-sEXPORT_NAME=createOpenCutCoreModule"
         "-sENVIRONMENT=web,worker"
@@ -85,6 +87,6 @@ if(EMSCRIPTEN)
         "-sNO_EXIT_RUNTIME=1"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sEXPORTED_RUNTIME_METHODS=['cwrap','ccall','UTF8ToString','stringToUTF8']"
-        "-sEXPORTED_FUNCTIONS=['_malloc','_free','_oc_timeline_create','_oc_timeline_destroy','_oc_timeline_add_track','_ocw_timeline_insert_clip','_ocw_timeline_delete_clip','_ocw_timeline_move_clip','_ocw_timeline_trim_clip','_ocw_timeline_split_clip','_ocw_timeline_can_place','_ocw_timeline_count_clips_in_range','_ocw_timeline_snap','_oc_time_ticks_per_second','_ocw_time_from_seconds','_ocw_time_to_seconds','_ocw_time_round_to_frame','_ocw_time_floor_to_frame','_ocw_time_last_frame','_ocw_time_snapped_seek','_ocw_time_format_timecode','_ocw_time_parse_timecode','_ocw_audio_decimate_waveform','_ocw_audio_evaluate_fade','_ocw_compositor_blend','_ocw_mask_evaluate_alpha','_ocw_effects_apply','_ocw_animation_solve_bezier','_ocw_animation_evaluate_bezier_point','_ocw_animation_evaluate_channel','_ocw_speed_map_timeline_to_source','_ocw_timeline_find_available_gap','_ocw_timeline_apply_ripple','_oc_scene_create','_oc_scene_destroy','_ocw_scene_add_item','_ocw_scene_build_display_list','_ocw_subtitles_parse_timestamp','_ocw_subtitles_format_timestamp','_ocw_text_measure_line_height','_ocw_text_break_lines_count','_ocw_geometry_point_in_rotated_rect','_ocw_geometry_test_snap']"
+        "-sEXPORTED_FUNCTIONS=['_malloc','_free','_oc_timeline_create','_oc_timeline_destroy','_oc_timeline_add_track','_ocw_timeline_insert_clip','_ocw_timeline_delete_clip','_ocw_timeline_move_clip','_ocw_timeline_trim_clip','_ocw_timeline_split_clip','_ocw_timeline_can_place','_ocw_timeline_count_clips_in_range','_ocw_timeline_snap','_oc_time_ticks_per_second','_ocw_time_from_seconds','_ocw_time_to_seconds','_ocw_time_round_to_frame','_ocw_time_floor_to_frame','_ocw_time_last_frame','_ocw_time_snapped_seek','_ocw_time_format_timecode','_ocw_time_parse_timecode','_ocw_audio_decimate_waveform','_ocw_audio_evaluate_fade','_ocw_compositor_blend','_ocw_compositor_clear_buffer','_ocw_compositor_composite_layer','_ocw_mask_evaluate_alpha','_ocw_mask_apply_to_buffer','_ocw_effects_apply','_ocw_effects_apply_color_grading','_ocw_effects_apply_gaussian_blur','_ocw_effects_apply_vignette','_ocw_effects_apply_chroma_key','_ocw_audio_apply_gain_ramp','_ocw_audio_mix_buffers','_ocw_audio_resample_linear','_ocw_audio_compute_peak_buckets','_ocw_audio_compute_rms_buckets','_ocw_audio_mix_channel_retime','_ocw_audio_compute_buffer_peak','_ocw_audio_clamp_buffer_samples','_ocw_audio_downmix_stereo','_ocw_snap_points_sorted','_ocw_snap_points_linear','_ocw_animation_solve_bezier','_ocw_animation_evaluate_bezier_point','_ocw_animation_evaluate_channel','_ocw_speed_map_timeline_to_source','_ocw_timeline_find_available_gap','_ocw_timeline_apply_ripple','_oc_scene_create','_oc_scene_destroy','_ocw_scene_add_item','_ocw_scene_build_display_list','_ocw_subtitles_parse_timestamp','_ocw_subtitles_format_timestamp','_ocw_text_measure_line_height','_ocw_text_break_lines_count','_ocw_geometry_point_in_rotated_rect','_ocw_geometry_test_snap']"
     )
 endif()

@@ -347,6 +347,75 @@ int ocw_timeline_snap(OcTimeline* timeline,
     return result.snapped ? 1 : 0;
 }
 
+int ocw_snap_points_sorted(double target_time,
+                           const double* points_times,
+                           size_t num_points,
+                           double max_distance,
+                           double* out_snapped_time,
+                           int* out_matched_index)
+{
+    if (points_times == nullptr || num_points == 0 || out_snapped_time == nullptr || out_matched_index == nullptr) {
+        if (out_snapped_time != nullptr) *out_snapped_time = target_time;
+        if (out_matched_index != nullptr) *out_matched_index = -1;
+        return 0;
+    }
+
+    double closest_distance = max_distance;
+    int closest_index = -1;
+    double snapped_time = target_time;
+
+    const double min_bound = target_time - max_distance;
+    const double max_bound = target_time + max_distance;
+
+    const double* first = points_times;
+    const double* last = points_times + num_points;
+    const double* it = std::lower_bound(first, last, min_bound);
+
+    for (; it != last && *it <= max_bound; ++it) {
+        double dist = std::abs(target_time - *it);
+        if (dist <= closest_distance) {
+            closest_distance = dist;
+            closest_index = static_cast<int>(it - first);
+            snapped_time = *it;
+        }
+    }
+
+    *out_snapped_time = snapped_time;
+    *out_matched_index = closest_index;
+    return closest_index >= 0 ? 1 : 0;
+}
+
+int ocw_snap_points_linear(double target_time,
+                           const double* points_times,
+                           size_t num_points,
+                           double max_distance,
+                           double* out_snapped_time,
+                           int* out_matched_index)
+{
+    if (points_times == nullptr || num_points == 0 || out_snapped_time == nullptr || out_matched_index == nullptr) {
+        if (out_snapped_time != nullptr) *out_snapped_time = target_time;
+        if (out_matched_index != nullptr) *out_matched_index = -1;
+        return 0;
+    }
+
+    double closest_distance = max_distance;
+    int closest_index = -1;
+    double snapped_time = target_time;
+
+    for (size_t i = 0; i < num_points; ++i) {
+        double dist = std::abs(target_time - points_times[i]);
+        if (dist <= closest_distance) {
+            closest_distance = dist;
+            closest_index = static_cast<int>(i);
+            snapped_time = points_times[i];
+        }
+    }
+
+    *out_snapped_time = snapped_time;
+    *out_matched_index = closest_index;
+    return closest_index >= 0 ? 1 : 0;
+}
+
 // Time & Timecode
 int64_t oc_time_ticks_per_second(void)
 {
@@ -468,6 +537,31 @@ void ocw_compositor_blend(float b_r, float b_g, float b_b, float b_a,
     out_rgba[3] = result.a;
 }
 
+void ocw_compositor_clear_buffer(uint32_t* buffer, int width, int height, float r, float g, float b, float a)
+{
+    opencut::clear_buffer_rgba(buffer, width, height, {r, g, b, a});
+}
+
+void ocw_compositor_composite_layer(uint32_t* dest, int dest_w, int dest_h,
+                                    const uint32_t* src, int src_w, int src_h,
+                                    float cx, float cy, float w, float h, float rot,
+                                    int flip_x, int flip_y,
+                                    float opacity, uint32_t blend_mode,
+                                    const float* mask_alpha)
+{
+    opencut::QuadTransform transform{
+        .center_x = cx,
+        .center_y = cy,
+        .width = w,
+        .height = h,
+        .rotation_degrees = rot,
+        .flip_x = flip_x != 0,
+        .flip_y = flip_y != 0,
+    };
+    auto mode = static_cast<opencut::BlendMode>(blend_mode);
+    opencut::composite_layer_rgba(dest, dest_w, dest_h, src, src_w, src_h, transform, opacity, mode, mask_alpha);
+}
+
 // Masks & Effects
 float ocw_mask_evaluate_alpha(float px, float py, int mask_type, float cx, float cy, float sx, float sy, float rot, float feather, int inverted)
 {
@@ -480,6 +574,21 @@ float ocw_mask_evaluate_alpha(float px, float py, int mask_type, float cx, float
         .inverted = inverted != 0,
     };
     return opencut::evaluate_mask_alpha({px, py}, def);
+}
+
+void ocw_mask_apply_to_buffer(uint32_t* pixels, int width, int height,
+                              int mask_type, float cx, float cy, float sx, float sy,
+                              float rot, float feather, int inverted)
+{
+    opencut::MaskDefinition def{
+        .type = static_cast<opencut::MaskShapeType>(mask_type),
+        .center = {cx, cy},
+        .size = {sx, sy},
+        .rotation_degrees = rot,
+        .feather = feather,
+        .inverted = inverted != 0,
+    };
+    opencut::apply_mask_rgba(pixels, width, height, def);
 }
 
 void ocw_effects_apply(float r, float g, float b, float a,
@@ -502,6 +611,142 @@ void ocw_effects_apply(float r, float g, float b, float a,
     out_rgba[1] = result.g;
     out_rgba[2] = result.b;
     out_rgba[3] = result.a;
+}
+
+void ocw_effects_apply_color_grading(uint32_t* pixels, int width, int height,
+                                     float brightness, float contrast, float saturation,
+                                     float exposure, float temp, float tint,
+                                     float hue, float gamma)
+{
+    opencut::ColorAdjustments adj{
+        .brightness = brightness,
+        .contrast = contrast,
+        .saturation = saturation,
+        .exposure = exposure,
+        .temperature = temp,
+        .tint = tint,
+        .hue_degrees = hue,
+        .gamma = gamma,
+    };
+    opencut::apply_color_grading_rgba(pixels, width, height, adj);
+}
+
+void ocw_effects_apply_gaussian_blur(uint32_t* pixels, int width, int height, int radius, float sigma)
+{
+    opencut::apply_gaussian_blur_rgba(pixels, width, height, radius, sigma);
+}
+
+void ocw_effects_apply_vignette(uint32_t* pixels, int width, int height, float amount, float softness, float roundness)
+{
+    opencut::VignetteParams params{
+        .amount = amount,
+        .softness = softness,
+        .roundness = roundness,
+    };
+    opencut::apply_vignette_rgba(pixels, width, height, params);
+}
+
+void ocw_effects_apply_chroma_key(uint32_t* pixels, int width, int height,
+                                  float key_r, float key_g, float key_b,
+                                  float similarity, float smoothness, float spill)
+{
+    opencut::apply_chroma_key_rgba(pixels, width, height, key_r, key_g, key_b, similarity, smoothness, spill);
+}
+
+// Audio Buffer DSP
+void ocw_audio_apply_gain_ramp(float* samples, size_t num_samples, float start_gain, float end_gain)
+{
+    opencut::apply_gain_ramp(samples, num_samples, start_gain, end_gain);
+}
+
+void ocw_audio_mix_buffers(float* dest, const float* src, size_t num_samples, float volume)
+{
+    opencut::mix_audio_buffers(dest, src, num_samples, volume);
+}
+
+void ocw_audio_resample_linear(const float* src, size_t src_len, float* dst, size_t dst_len)
+{
+    opencut::resample_audio_linear(src, src_len, dst, dst_len);
+}
+
+void ocw_audio_compute_peak_buckets(const float* channel_data,
+                                    const uint32_t* bucket_starts,
+                                    const uint32_t* bucket_ends,
+                                    size_t num_buckets,
+                                    float* out_peaks)
+{
+    if (channel_data == nullptr || bucket_starts == nullptr || bucket_ends == nullptr || out_peaks == nullptr || num_buckets == 0) {
+        return;
+    }
+    const float* const channels[] = { channel_data };
+    opencut::compute_peak_buckets(
+        std::span<const float* const>(channels, 1),
+        std::span<const uint32_t>(bucket_starts, num_buckets),
+        std::span<const uint32_t>(bucket_ends, num_buckets),
+        out_peaks
+    );
+}
+
+void ocw_audio_compute_rms_buckets(const float* channel_data,
+                                   uint32_t max_window_length,
+                                   const uint32_t* bucket_starts,
+                                   const uint32_t* bucket_ends,
+                                   size_t num_buckets,
+                                   float* out_rms)
+{
+    if (channel_data == nullptr || bucket_starts == nullptr || bucket_ends == nullptr || out_rms == nullptr || num_buckets == 0) {
+        return;
+    }
+    const float* const channels[] = { channel_data };
+    opencut::compute_rms_buckets(
+        std::span<const float* const>(channels, 1),
+        max_window_length,
+        std::span<const uint32_t>(bucket_starts, num_buckets),
+        std::span<const uint32_t>(bucket_ends, num_buckets),
+        out_rms
+    );
+}
+
+void ocw_audio_mix_channel_retime(float* output_data,
+                                  size_t output_start_sample,
+                                  size_t rendered_length,
+                                  size_t output_length,
+                                  double sample_rate,
+                                  const float* source_data,
+                                  size_t source_length,
+                                  double source_sample_rate,
+                                  double trim_start,
+                                  double retime_rate,
+                                  float gain)
+{
+    opencut::mix_audio_channel_retime(
+        output_data,
+        output_start_sample,
+        rendered_length,
+        output_length,
+        sample_rate,
+        source_data,
+        source_length,
+        source_sample_rate,
+        trim_start,
+        retime_rate,
+        gain
+    );
+}
+
+float ocw_audio_compute_buffer_peak(const float* samples, size_t num_samples)
+{
+    return opencut::compute_buffer_peak(samples, num_samples);
+}
+
+void ocw_audio_clamp_buffer_samples(float* samples, size_t num_samples, float max_peak)
+{
+    opencut::clamp_buffer_samples(samples, num_samples, max_peak);
+}
+
+void ocw_audio_downmix_stereo(const float* left, const float* right, float* out, size_t num_samples)
+{
+    opencut::downmix_stereo_to_mono(left, right, out, num_samples);
 }
 
 double ocw_animation_solve_bezier(double time, double t0, double t1, double t2, double t3) {

@@ -121,4 +121,29 @@ float evaluate_mask_alpha(Point2D p, const MaskDefinition& mask) noexcept {
     return apply_feather(d, mask.feather, mask.inverted);
 }
 
+void apply_mask_rgba(std::uint32_t* pixels, int width, int height, const MaskDefinition& mask) noexcept {
+    if (!pixels || width <= 0 || height <= 0) return;
+
+    bool is_normalized = (mask.size.x <= 2.0f && mask.size.y <= 2.0f);
+
+    for (int y = 0; y < height; ++y) {
+        int row = y * width;
+        float py = is_normalized ? (static_cast<float>(y) + 0.5f) / static_cast<float>(height)
+                                 : static_cast<float>(y) + 0.5f;
+
+        for (int x = 0; x < width; ++x) {
+            float px = is_normalized ? (static_cast<float>(x) + 0.5f) / static_cast<float>(width)
+                                     : static_cast<float>(x) + 0.5f;
+
+            float alpha_scale = evaluate_mask_alpha({px, py}, mask);
+            if (alpha_scale >= 0.999f) continue;
+
+            std::uint32_t p = pixels[row + x];
+            std::uint8_t a = static_cast<std::uint8_t>(((p >> 24) & 0xFF) * alpha_scale + 0.5f);
+
+            pixels[row + x] = (p & 0x00FFFFFF) | (static_cast<std::uint32_t>(a) << 24);
+        }
+    }
+}
+
 } // namespace opencut

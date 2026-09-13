@@ -25,6 +25,7 @@ import {
 	computeRmsBuckets,
 	type SampleBucket,
 } from "@/media/waveform-summary";
+import { getNativeTimelineBindings } from "@/native/opencut-core";
 
 const MAX_AUDIO_CHANNELS = 2;
 const EXPORT_SAMPLE_RATE = 44100;
@@ -74,6 +75,32 @@ export async function decodeAudioToFloat32({
 	const numChannels = audioBuffer.numberOfChannels;
 	const length = audioBuffer.length;
 	const samples = new Float32Array(length);
+
+	if (numChannels === 1) {
+		samples.set(audioBuffer.getChannelData(0));
+		return { samples, sampleRate: audioBuffer.sampleRate };
+	}
+
+	const bindings = getNativeTimelineBindings();
+	if (bindings && numChannels === 2 && length > 0) {
+		const byteSize = length * 4;
+		const leftPtr = bindings.malloc(byteSize);
+		const rightPtr = bindings.malloc(byteSize);
+		const outPtr = bindings.malloc(byteSize);
+		if (leftPtr !== 0 && rightPtr !== 0 && outPtr !== 0) {
+			try {
+				bindings.HEAPF32.set(audioBuffer.getChannelData(0), leftPtr >> 2);
+				bindings.HEAPF32.set(audioBuffer.getChannelData(1), rightPtr >> 2);
+				bindings.downmixStereo(leftPtr, rightPtr, outPtr, length);
+				samples.set(bindings.HEAPF32.subarray(outPtr >> 2, (outPtr >> 2) + length));
+				return { samples, sampleRate: audioBuffer.sampleRate };
+			} finally {
+				bindings.free(leftPtr);
+				bindings.free(rightPtr);
+				bindings.free(outPtr);
+			}
+		}
+	}
 
 	for (let i = 0; i < length; i++) {
 		let sum = 0;
@@ -699,6 +726,51 @@ function collectPeakRange({
 	const channels = buffer.numberOfChannels;
 	const peaks = new Float32Array(count);
 
+	const bindings = getNativeTimelineBindings();
+	if (bindings && count > 0) {
+		try {
+			const startsPtr = bindings.malloc(count * 4);
+			const endsPtr = bindings.malloc(count * 4);
+			const outPeaksPtr = bindings.malloc(count * 4);
+			const starts = new Uint32Array(bindings.HEAPU32.buffer, startsPtr, count);
+			const ends = new Uint32Array(bindings.HEAPU32.buffer, endsPtr, count);
+			for (let i = 0; i < count; i++) {
+				const { bucketStart, bucketEnd } = getSampleBucketRange({
+					startSample,
+					endSample,
+					bucketIndex: i,
+					bucketCount: count,
+				});
+				starts[i] = bucketStart;
+				ends[i] = bucketEnd;
+			}
+
+			for (let c = 0; c < channels; c++) {
+				const data = buffer.getChannelData(c);
+				const chPtr = bindings.malloc(data.length * 4);
+				try {
+					bindings.HEAPF32.set(data, chPtr >> 2);
+					bindings.computePeakBuckets(chPtr, startsPtr, endsPtr, count, outPeaksPtr);
+					const chPeaks = new Float32Array(bindings.HEAPF32.buffer, outPeaksPtr, count);
+					for (let i = 0; i < count; i++) {
+						if (chPeaks[i] > peaks[i]) {
+							peaks[i] = chPeaks[i];
+						}
+					}
+				} finally {
+					bindings.free(chPtr);
+				}
+			}
+
+			bindings.free(startsPtr);
+			bindings.free(endsPtr);
+			bindings.free(outPeaksPtr);
+			return peaks;
+		} catch (e) {
+			console.warn("[OpenCut] Native collectPeakRange fallback:", e);
+		}
+	}
+
 	for (let c = 0; c < channels; c++) {
 		const data = buffer.getChannelData(c);
 		for (let i = 0; i < count; i++) {
@@ -832,8 +904,51 @@ function mixAudioChannels({
 
 	const outputStartSample = Math.floor(startTime * sampleRate);
 	const renderedLength = Math.ceil(elementDuration * sampleRate);
-
 	const outputChannels = 2;
+
+	const bindings = getNativeTimelineBindings();
+	if (bindings && !hasAnimatedVolume({ element: element.timelineElement })) {
+		try {
+			const rate = retime?.rate ?? 1;
+			const gain = element.volume;
+			const outLen = outputLength;
+			const srcLen = buffer.length;
+
+			const outPtr = bindings.malloc(outLen * 4);
+			const srcPtr = bindings.malloc(srcLen * 4);
+
+			for (let channel = 0; channel < outputChannels; channel++) {
+				const outputData = outputBuffer.getChannelData(channel);
+				const sourceChannel = Math.min(channel, buffer.numberOfChannels - 1);
+				const sourceData = buffer.getChannelData(sourceChannel);
+
+				new Float32Array(bindings.HEAPF32.buffer, outPtr, outLen).set(outputData);
+				new Float32Array(bindings.HEAPF32.buffer, srcPtr, srcLen).set(sourceData);
+
+				bindings.mixAudioChannelRetime(
+					outPtr,
+					outputStartSample,
+					renderedLength,
+					outputLength,
+					sampleRate,
+					srcPtr,
+					srcLen,
+					buffer.sampleRate,
+					trimStart,
+					rate,
+					gain,
+				);
+
+				outputData.set(new Float32Array(bindings.HEAPF32.buffer, outPtr, outLen));
+			}
+
+			bindings.free(outPtr);
+			bindings.free(srcPtr);
+			return;
+		} catch (e) {
+			console.warn("[OpenCut] Native mixAudioChannels fallback:", e);
+		}
+	}
 	for (let channel = 0; channel < outputChannels; channel++) {
 		const outputData = outputBuffer.getChannelData(channel);
 		const sourceChannel = Math.min(channel, buffer.numberOfChannels - 1);

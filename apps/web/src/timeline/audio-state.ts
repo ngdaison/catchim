@@ -81,6 +81,12 @@ export function buildWaveformGainSamples({
 	element: AudioCapableElement;
 	count: number;
 }): number[] {
+	if (count <= 0) return [];
+	if (!hasAnimatedVolume({ element })) {
+		const gain = isElementMuted({ element }) ? 0 : dBToLinear(getElementVolume({ element }));
+		return new Array(count).fill(gain);
+	}
+
 	const durationSeconds = element.duration / TICKS_PER_SECOND;
 	return Array.from({ length: count }, (_, i) => {
 		const localTime = ((i + 0.5) / count) * durationSeconds;
@@ -103,6 +109,17 @@ export function buildAudioGainAutomation({
 }): Array<{ localTime: number; gain: number }> {
 	const startTime = Math.max(0, fromLocalTime);
 	const endTime = Math.max(startTime, toLocalTime);
+
+	if (!hasAnimatedVolume({ element })) {
+		const gain = trackMuted || isElementMuted({ element })
+			? 0
+			: dBToLinear(getElementVolume({ element }));
+		return [
+			{ localTime: startTime, gain },
+			{ localTime: endTime, gain },
+		];
+	}
+
 	const safeStep =
 		Number.isFinite(stepSeconds) && stepSeconds > 0
 			? stepSeconds
