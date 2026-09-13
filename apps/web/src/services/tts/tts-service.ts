@@ -95,7 +95,7 @@ export class TtsService {
 	}
 
 	/**
-	 * Preview a voice sample with optional custom text
+	 * Preview a voice sample with full character pitch, speed, and DSP effects
 	 */
 	static async previewVoice(
 		voice: TtsVoice,
@@ -110,7 +110,7 @@ export class TtsService {
 			: voice.previewSampleText;
 
 		try {
-			// Fetch synthesized audio from /api/tts with all voice parameters
+			// Fetch synthesized audio from /api/tts
 			const response = await fetch("/api/tts", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -118,8 +118,6 @@ export class TtsService {
 					text: textToSpeak,
 					voiceId: voice.id,
 					edgeVoiceName: voice.edgeVoiceName,
-					pitchHz: voice.pitchHz ?? 0,
-					rateMultiplier: voice.rateMultiplier ?? 1.0,
 					engine: voice.engine,
 					langCode: voice.langCode,
 					userPitch: 0,
@@ -132,48 +130,29 @@ export class TtsService {
 			}
 
 			const blob = await response.blob();
+			const audioContext = this.getAudioContext();
+			const arrayBuf = await blob.arrayBuffer();
+			const decoded = await audioContext.decodeAudioData(arrayBuf);
 
-			// If voice has special DSP audio effects (robot, radio, deep bass), process via Web Audio
-			if (voice.audioEffect && voice.audioEffect !== "none") {
-				const audioContext = this.getAudioContext();
-				const arrayBuf = await blob.arrayBuffer();
-				const decoded = await audioContext.decodeAudioData(arrayBuf);
-				const processed = await this.applyAudioEffects(decoded, voice.audioEffect);
-				const wavBlob = audioBufferToWavBlob(processed);
-				const audioUrl = URL.createObjectURL(wavBlob);
-				const audio = new Audio(audioUrl);
-				currentPreviewAudio = audio;
+			// Apply genuine voice character transformation (pitch factor + DSP effects)
+			const transformed = await this.applyVoiceTransform(decoded, voice, 1.0, 0);
 
-				audio.onended = () => {
-					URL.revokeObjectURL(audioUrl);
-					if (currentPreviewAudio === audio) currentPreviewAudio = null;
-					onEnded?.();
-				};
-				audio.onerror = () => {
-					URL.revokeObjectURL(audioUrl);
-					if (currentPreviewAudio === audio) currentPreviewAudio = null;
-					onEnded?.();
-				};
-				await audio.play();
-			} else {
-				const audioUrl = URL.createObjectURL(blob);
-				const audio = new Audio(audioUrl);
-				currentPreviewAudio = audio;
+			const wavBlob = audioBufferToWavBlob(transformed);
+			const audioUrl = URL.createObjectURL(wavBlob);
+			const audio = new Audio(audioUrl);
+			currentPreviewAudio = audio;
 
-				audio.onended = () => {
-					URL.revokeObjectURL(audioUrl);
-					if (currentPreviewAudio === audio) currentPreviewAudio = null;
-					onEnded?.();
-				};
-
-				audio.onerror = (e) => {
-					URL.revokeObjectURL(audioUrl);
-					if (currentPreviewAudio === audio) currentPreviewAudio = null;
-					this.previewViaWebSpeech(voice, textToSpeak, onEnded, onError);
-				};
-
-				await audio.play();
-			}
+			audio.onended = () => {
+				URL.revokeObjectURL(audioUrl);
+				if (currentPreviewAudio === audio) currentPreviewAudio = null;
+				onEnded?.();
+			};
+			audio.onerror = () => {
+				URL.revokeObjectURL(audioUrl);
+				if (currentPreviewAudio === audio) currentPreviewAudio = null;
+				onEnded?.();
+			};
+			await audio.play();
 		} catch (err) {
 			console.warn("[TTS preview failed, falling back to Web Speech]:", err);
 			this.previewViaWebSpeech(voice, textToSpeak, onEnded, onError);
@@ -195,7 +174,7 @@ export class TtsService {
 			window.speechSynthesis.cancel();
 			const utterance = new SpeechSynthesisUtterance(text);
 			utterance.lang = voice.language;
-			utterance.pitch = (voice.pitchHz ? 1 + voice.pitchHz / 100 : 1.0);
+			utterance.pitch = voice.pitchFactor ?? 1.0;
 			utterance.rate = voice.rateMultiplier ?? 1.0;
 
 			const availableVoices = window.speechSynthesis.getVoices();
@@ -222,87 +201,261 @@ export class TtsService {
 	}
 
 	/**
-	 * Apply Web Audio DSP effects like Robot AM ring modulation, Radio filter, and Deep bass
+	 * Apply full character voice transformation:
+	 * 1. Resampling pitch shift (Chipmunk +68%, Child girl +38%, Grandpa -18%, Titan -38%)
+	 * 2. Character-specific DSP effects (Robot ring-mod, Radio bandpass, Grandpa tremor, Titan rumble, Echo)
 	 */
-	static async applyAudioEffects(
+	static async applyVoiceTransform(
 		buffer: AudioBuffer,
-		effect?: "none" | "robot" | "chipmunk" | "radio" | "deep-bass" | "echo",
+		voice: TtsVoice,
+		speed = 1.0,
+		userPitch = 0,
 	): Promise<AudioBuffer> {
-		if (!effect || effect === "none") {
-			return buffer;
+		const basePitchFactor = voice.pitchFactor ?? 1.0;
+		// User pitch slider ranges from -40 to +40, mapped to logarithmic multiplier
+		const userPitchFactor = Math.pow(2, (userPitch / 100) * 0.75);
+		const totalRate = Math.max(0.4, Math.min(3.0, basePitchFactor * userPitchFactor * speed));
+
+		let currentBuffer = buffer;
+
+		// Step 1: High-fidelity pitch/speed resampling via native browser OfflineAudioContext
+		if (Math.abs(totalRate - 1.0) > 0.02) {
+			const targetLength = Math.max(1, Math.round(buffer.length / totalRate));
+			const offlineCtx = new OfflineAudioContext(
+				buffer.numberOfChannels,
+				targetLength,
+				buffer.sampleRate,
+			);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = buffer;
+			source.playbackRate.value = totalRate;
+			source.connect(offlineCtx.destination);
+			source.start(0);
+			currentBuffer = await offlineCtx.startRendering();
 		}
 
-		const numChannels = buffer.numberOfChannels;
-		const length = buffer.length;
-		const sampleRate = buffer.sampleRate;
+		const effect = voice.audioEffect ?? "none";
+		if (effect === "none") {
+			return currentBuffer;
+		}
 
+		// Step 2: Apply DSP Character Effects
+		const numChannels = currentBuffer.numberOfChannels;
+		const length = currentBuffer.length;
+		const sampleRate = currentBuffer.sampleRate;
+
+		// Effect: Robot AI (Ring modulation + metallic formant)
 		if (effect === "robot") {
-			// Real electronic Robot AM ring-modulation: multiplies audio by 55Hz carrier sine wave
 			const audioCtx = this.getAudioContext();
 			const outBuffer = audioCtx.createBuffer(numChannels, length, sampleRate);
-			const carrierFreq = 55;
+			const carrierFreq = 56;
 			for (let ch = 0; ch < numChannels; ch++) {
-				const input = buffer.getChannelData(ch);
+				const input = currentBuffer.getChannelData(ch);
 				const output = outBuffer.getChannelData(ch);
 				for (let i = 0; i < length; i++) {
-					const carrier = 0.5 + 0.5 * Math.sin((2 * Math.PI * carrierFreq * i) / sampleRate);
-					output[i] = input[i] * carrier * 1.35;
+					const carrier = 0.35 + 0.65 * Math.sin((2 * Math.PI * carrierFreq * i) / sampleRate);
+					output[i] = input[i] * carrier * 1.45;
 				}
 			}
 			return outBuffer;
 		}
 
-		if (effect === "radio") {
+		// Effect: Old Grandfather (tremor vibrato + warm lowpass)
+		if (effect === "grandpa") {
+			const audioCtx = this.getAudioContext();
+			const outBuffer = audioCtx.createBuffer(numChannels, length, sampleRate);
+			for (let ch = 0; ch < numChannels; ch++) {
+				const input = currentBuffer.getChannelData(ch);
+				const output = outBuffer.getChannelData(ch);
+				for (let i = 0; i < length; i++) {
+					const t = i / sampleRate;
+					const tremor = 1.0 + 0.16 * Math.sin(2 * Math.PI * 5.2 * t);
+					output[i] = input[i] * tremor;
+				}
+			}
 			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
 			const source = offlineCtx.createBufferSource();
-			source.buffer = buffer;
-
-			// Vintage radio bandpass: highpass 450Hz + lowpass 3000Hz
-			const hp = offlineCtx.createBiquadFilter();
-			hp.type = "highpass";
-			hp.frequency.value = 450;
-
+			source.buffer = outBuffer;
 			const lp = offlineCtx.createBiquadFilter();
 			lp.type = "lowpass";
-			lp.frequency.value = 3000;
+			lp.frequency.value = 4200;
+			source.connect(lp);
+			lp.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
 
-			// Distortion waveshaper
+		// Effect: Chipmunk (Highpass 380Hz + high shelf boost)
+		if (effect === "chipmunk") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const hp = offlineCtx.createBiquadFilter();
+			hp.type = "highpass";
+			hp.frequency.value = 380;
+			const hs = offlineCtx.createBiquadFilter();
+			hs.type = "highshelf";
+			hs.frequency.value = 3500;
+			hs.gain.value = 4;
+			source.connect(hp);
+			hp.connect(hs);
+			hs.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Child Girl (Anime cute girl presence filter)
+		if (effect === "child-girl") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const peak = offlineCtx.createBiquadFilter();
+			peak.type = "peaking";
+			peak.frequency.value = 2800;
+			peak.gain.value = 4.5;
+			source.connect(peak);
+			peak.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Child Boy (Playful kid presence filter)
+		if (effect === "child-boy") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const peak = offlineCtx.createBiquadFilter();
+			peak.type = "peaking";
+			peak.frequency.value = 2200;
+			peak.gain.value = 3.5;
+			source.connect(peak);
+			peak.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Deep Titan / Monster (Heavy bass boost + saturation)
+		if (effect === "deep-bass") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const bass = offlineCtx.createBiquadFilter();
+			bass.type = "lowshelf";
+			bass.frequency.value = 130;
+			bass.gain.value = 12; // +12dB deep rumble
+
 			const shaper = offlineCtx.createWaveShaper();
 			const n = 256;
 			const curve = new Float32Array(n);
 			for (let i = 0; i < n; i++) {
 				const x = (i * 2) / n - 1;
-				curve[i] = Math.tanh(x * 1.75);
+				curve[i] = Math.tanh(x * 1.35);
 			}
 			shaper.curve = curve;
 
+			source.connect(bass);
+			bass.connect(shaper);
+			shaper.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Radio / Police dispatch (vintage bandpass + distortion)
+		if (effect === "radio") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const hp = offlineCtx.createBiquadFilter();
+			hp.type = "highpass";
+			hp.frequency.value = 480;
+			const lp = offlineCtx.createBiquadFilter();
+			lp.type = "lowpass";
+			lp.frequency.value = 2800;
+			const shaper = offlineCtx.createWaveShaper();
+			const n = 256;
+			const curve = new Float32Array(n);
+			for (let i = 0; i < n; i++) {
+				const x = (i * 2) / n - 1;
+				curve[i] = Math.tanh(x * 2.2);
+			}
+			shaper.curve = curve;
 			source.connect(hp);
 			hp.connect(lp);
 			lp.connect(shaper);
 			shaper.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Demon (Low-shelf boost + 28Hz ring mod)
+		if (effect === "demon") {
+			const audioCtx = this.getAudioContext();
+			const outBuffer = audioCtx.createBuffer(numChannels, length, sampleRate);
+			const carrierFreq = 28;
+			for (let ch = 0; ch < numChannels; ch++) {
+				const input = currentBuffer.getChannelData(ch);
+				const output = outBuffer.getChannelData(ch);
+				for (let i = 0; i < length; i++) {
+					const carrier = 0.5 + 0.5 * Math.sin((2 * Math.PI * carrierFreq * i) / sampleRate);
+					const sample = input[i] * carrier * 1.5;
+					output[i] = Math.tanh(sample * 1.3);
+				}
+			}
+			return outBuffer;
+		}
+
+		// Effect: Stadium Arena Echo
+		if (effect === "echo") {
+			const extraLength = Math.round(sampleRate * 0.8);
+			const offlineCtx = new OfflineAudioContext(numChannels, length + extraLength, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const delay = offlineCtx.createDelay(1.0);
+			delay.delayTime.value = 0.22;
+			const feedback = offlineCtx.createGain();
+			feedback.gain.value = 0.42;
+
+			source.connect(offlineCtx.destination);
+			source.connect(delay);
+			delay.connect(feedback);
+			feedback.connect(delay);
+			delay.connect(offlineCtx.destination);
 
 			source.start(0);
 			return await offlineCtx.startRendering();
 		}
 
-		if (effect === "deep-bass") {
+		// Effect: ASMR (Gentle lowpass rolloff)
+		if (effect === "asmr") {
 			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
 			const source = offlineCtx.createBufferSource();
-			source.buffer = buffer;
-
-			const bass = offlineCtx.createBiquadFilter();
-			bass.type = "lowshelf";
-			bass.frequency.value = 140;
-			bass.gain.value = 9; // +9dB deep bass presence
-
-			source.connect(bass);
-			bass.connect(offlineCtx.destination);
-
+			source.buffer = currentBuffer;
+			const lp = offlineCtx.createBiquadFilter();
+			lp.type = "lowpass";
+			lp.frequency.value = 3600;
+			source.connect(lp);
+			lp.connect(offlineCtx.destination);
 			source.start(0);
 			return await offlineCtx.startRendering();
 		}
 
-		return buffer;
+		// Effect: Vlogger (Punchy presence boost)
+		if (effect === "vlogger") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+			const peak = offlineCtx.createBiquadFilter();
+			peak.type = "peaking";
+			peak.frequency.value = 3200;
+			peak.gain.value = 4.0;
+			source.connect(peak);
+			peak.connect(offlineCtx.destination);
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		return currentBuffer;
 	}
 
 	/**
@@ -320,7 +473,7 @@ export class TtsService {
 			throw new Error("Văn bản không được để trống.");
 		}
 
-		// 1. Fetch synthesized audio from /api/tts with full neural parameters
+		// 1. Fetch synthesized base audio from /api/tts
 		const response = await fetch("/api/tts", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -328,12 +481,10 @@ export class TtsService {
 				text: cleanText,
 				voiceId: voice.id,
 				edgeVoiceName: voice.edgeVoiceName,
-				pitchHz: voice.pitchHz ?? 0,
-				rateMultiplier: voice.rateMultiplier ?? 1.0,
-				userPitch: pitch,
-				userSpeed: speed,
 				engine: voice.engine,
 				langCode: voice.langCode,
+				userPitch: 0,
+				userSpeed: 1.0,
 			}),
 		});
 
@@ -344,10 +495,10 @@ export class TtsService {
 		const blob = await response.blob();
 		const arrayBuffer = await blob.arrayBuffer();
 		const audioContext = this.getAudioContext();
-		const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+		const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-		// 2. Apply DSP audio effects (robot, radio, deep bass)
-		const processedBuffer = await this.applyAudioEffects(decodedBuffer, voice.audioEffect);
+		// 2. Apply full character voice transformation (pitch, speed, DSP effect, user controls)
+		const processedBuffer = await this.applyVoiceTransform(decodedBuffer, voice, speed, pitch);
 
 		// 3. Apply volume adjustment if needed
 		const finalBuffer = (volume !== 1.0)

@@ -8,6 +8,20 @@ export type VoiceCategory =
 
 export type VoiceGender = "female" | "male" | "child" | "special";
 
+export type VoiceAudioEffect =
+	| "none"
+	| "robot"
+	| "chipmunk"
+	| "radio"
+	| "deep-bass"
+	| "echo"
+	| "grandpa"
+	| "demon"
+	| "asmr"
+	| "vlogger"
+	| "child-girl"
+	| "child-boy";
+
 export interface TtsVoice {
 	id: string;
 	name: string;
@@ -23,9 +37,10 @@ export interface TtsVoice {
 	langCode: string; // 'vi', 'en', etc.
 	pitchOffset?: number;
 	rateOffset?: number;
-	pitchHz?: number; // Base pitch offset in Hz e.g. +40, -25, +140
-	rateMultiplier?: number; // Base rate multiplier e.g. 1.08, 0.85
-	audioEffect?: "none" | "robot" | "chipmunk" | "radio" | "deep-bass" | "echo";
+	pitchHz?: number; // Base pitch offset in Hz
+	rateMultiplier?: number; // Base rate multiplier
+	pitchFactor?: number; // Real pitch/resample factor e.g. 1.65 (chipmunk), 1.35 (girl), 0.82 (grandpa), 0.62 (titan)
+	audioEffect?: VoiceAudioEffect;
 }
 
 export interface TtsSynthesisOptions {
