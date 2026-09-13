@@ -23,6 +23,7 @@ const PROPERTY_TAB_LABEL_KEYS: Record<string, TranslationKey> = {
 	masks: "properties.masks",
 	speed: "properties.speed",
 	text: "properties.text",
+	tts: "properties.tts",
 	transform: "properties.transform",
 };
 

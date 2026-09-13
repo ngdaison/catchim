@@ -402,3 +402,36 @@ export function OcRippleIcon({
 	);
 }
 
+export function OcSpeechIcon({
+	className = "",
+	size = 24,
+	strokeWidth = 1.5,
+}: IconProps) {
+	return (
+		<svg
+			width={size}
+			height={size}
+			viewBox="0 0 24 24"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			className={className}
+		>
+			<title>Text to Speech</title>
+			<path
+				d="M12 2C6.477 2 2 6.03 2 11c0 2.29.96 4.38 2.56 5.96L3.5 21.5l5.05-1.44c1.07.32 2.22.49 3.45.49 5.523 0 10-4.03 10-9s-4.477-9-10-9z"
+				stroke="currentColor"
+				strokeWidth={strokeWidth}
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			/>
+			<path
+				d="M8 11.5v-1m2.5 2.5V9m3 4V8m2.5 3v-1"
+				stroke="currentColor"
+				strokeWidth={strokeWidth}
+				strokeLinecap="round"
+				strokeLinejoin="round"
+			/>
+		</svg>
+	);
+}
+

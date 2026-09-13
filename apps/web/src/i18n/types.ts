@@ -394,6 +394,7 @@ export interface LocaleMessages {
 		speed: string;
 		changePitch: string;
 		text: string;
+		tts: string;
 		textAlign: string;
 		textAlignCenter: string;
 		textAlignLeft: string;
@@ -458,5 +459,23 @@ export interface LocaleMessages {
 		heavy: string;
 		light: string;
 		medium: string;
+	};
+	tts: {
+		textToRead: string;
+		characters: string;
+		enterTextPlaceholder: string;
+		selectVoice: string;
+		catAll: string;
+		catVietnamese: string;
+		catEnglish: string;
+		catTrending: string;
+		catStory: string;
+		catFun: string;
+		speed: string;
+		pitch: string;
+		applyToTimeline: string;
+		generating: string;
+		emptyTextError: string;
+		successToast: string;
 	};
 }

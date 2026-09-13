@@ -14,6 +14,8 @@ import {
 } from "@/params/registry";
 import type { TimelineElement } from "@/timeline";
 import type { MediaTime } from "@/wasm";
+import { Button } from "@/components/ui/button";
+import { usePropertiesStore } from "@/components/editor/panels/properties/stores/properties-store";
 
 export function ElementParamsTab({
 	element,
@@ -93,21 +95,40 @@ function ElementParamField({
 	});
 
 	return (
-		<PropertyParamField
-			param={param}
-			value={resolvedValue}
-			onPreview={animatedParam.onPreview}
-			onCommit={animatedParam.onCommit}
-			keyframe={
-				param.keyframable === false
-					? undefined
-					: {
-							isActive: animatedParam.isKeyframedAtTime,
-							isDisabled: !isPlayheadWithinElementRange,
-							onToggle: animatedParam.toggleKeyframe,
-						}
-			}
-		/>
+		<>
+			<PropertyParamField
+				param={param}
+				value={resolvedValue}
+				onPreview={animatedParam.onPreview}
+				onCommit={animatedParam.onCommit}
+				keyframe={
+					param.keyframable === false
+						? undefined
+						: {
+								isActive: animatedParam.isKeyframedAtTime,
+								isDisabled: !isPlayheadWithinElementRange,
+								onToggle: animatedParam.toggleKeyframe,
+							}
+				}
+			/>
+			{element.type === "text" && param.key === "content" && (
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={() =>
+						usePropertiesStore.getState().setActiveTab({
+							elementType: "text",
+							tabId: "tts",
+						})
+					}
+					className="w-full mt-1.5 gap-2 text-xs font-medium border-dashed hover:border-primary hover:text-primary transition-colors cursor-pointer"
+				>
+					<span>🔊</span>
+					<span>Chuyển đổi văn bản thành lời nói</span>
+				</Button>
+			)}
+		</>
 	);
 }
 

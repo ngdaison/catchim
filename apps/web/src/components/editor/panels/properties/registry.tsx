@@ -27,7 +27,8 @@ import { ClipEffectsTab, StandaloneEffectTab } from "@/effects/components/effect
 import { MasksTab } from "@/masks/components/masks-tab";
 import { SpeedTab } from "@/speed/components/speed-tab";
 import { GraphicTab } from "@/graphics/components/graphic-tab";
-import { OcShapesIcon } from "@/components/icons";
+import { OcShapesIcon, OcSpeechIcon } from "@/components/icons";
+import { TextToSpeechTab } from "@/text/components/text-to-speech-tab";
 
 const TRANSFORM_PARAM_KEYS = [
 	"transform.positionX",
@@ -220,6 +221,17 @@ function buildStandaloneEffectTab({
 	};
 }
 
+function buildTtsTab({ element }: { element: TextElement }): PropertiesTabDef {
+	return {
+		id: "tts",
+		label: "Text to Speech",
+		icon: <OcSpeechIcon size={16} />,
+		content: ({ trackId }) => (
+			<TextToSpeechTab element={element} trackId={trackId} />
+		),
+	};
+}
+
 function getTextConfig({
 	element,
 }: {
@@ -229,6 +241,7 @@ function getTextConfig({
 		defaultTab: "text",
 		tabs: [
 			buildTextTab({ element }),
+			buildTtsTab({ element }),
 			buildTransformTab({ element }),
 			buildBlendingTab({ element }),
 		],
