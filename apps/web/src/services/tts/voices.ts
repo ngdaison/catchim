@@ -6,7 +6,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	// ==========================================
 	{
 		id: "vi-female-sweet",
-		name: "Cô gái trẻ (Hoài My)",
+		name: "Cô gái trẻ",
 		language: "vi-VN",
 		gender: "female",
 		categories: ["vietnamese", "trending"],
@@ -22,7 +22,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	},
 	{
 		id: "vi-male-warm",
-		name: "Chàng trai ấm áp (Nam Minh)",
+		name: "Chàng trai ấm áp",
 		language: "vi-VN",
 		gender: "male",
 		categories: ["vietnamese", "trending", "story"],
@@ -38,7 +38,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	},
 	{
 		id: "vi-female-google",
-		name: "Chị Google (Huyền thoại)",
+		name: "Chị Google",
 		language: "vi-VN",
 		gender: "female",
 		categories: ["vietnamese", "trending"],
@@ -53,7 +53,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	},
 	{
 		id: "vi-child-girl",
-		name: "Bé Bông (Bé gái Đáng yêu)",
+		name: "Bé Bông (Bé gái)",
 		language: "vi-VN",
 		gender: "child",
 		categories: ["vietnamese", "fun"],
@@ -69,7 +69,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	},
 	{
 		id: "vi-child-boy",
-		name: "Bé Bo (Bé trai Tinh nghịch)",
+		name: "Bé Bo (Bé trai)",
 		language: "vi-VN",
 		gender: "child",
 		categories: ["vietnamese", "fun"],
@@ -85,7 +85,7 @@ export const TTS_VOICES: TtsVoice[] = [
 	},
 	{
 		id: "vi-male-story",
-		name: "Bác An (Ông lão Cổ tích)",
+		name: "Bác An (Ông lão)",
 		language: "vi-VN",
 		gender: "male",
 		categories: ["vietnamese", "story"],

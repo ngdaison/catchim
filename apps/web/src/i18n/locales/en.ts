@@ -486,6 +486,7 @@ export const en: LocaleMessages = {
 		characters: "characters",
 		enterTextPlaceholder: "Enter text to convert to speech...",
 		selectVoice: "Select Voice",
+		voices: "voices",
 		catAll: "All",
 		catVietnamese: "Vietnamese",
 		catEnglish: "English",

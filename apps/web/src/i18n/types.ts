@@ -465,6 +465,7 @@ export interface LocaleMessages {
 		characters: string;
 		enterTextPlaceholder: string;
 		selectVoice: string;
+		voices: string;
 		catAll: string;
 		catVietnamese: string;
 		catEnglish: string;

@@ -487,6 +487,7 @@ export const vi: LocaleMessages = {
 		characters: "ký tự",
 		enterTextPlaceholder: "Nhập văn bản cần chuyển thành giọng nói...",
 		selectVoice: "Chọn giọng đọc",
+		voices: "giọng",
 		catAll: "Tất cả",
 		catVietnamese: "Tiếng Việt",
 		catEnglish: "Tiếng Anh",

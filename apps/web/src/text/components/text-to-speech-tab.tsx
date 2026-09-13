@@ -63,6 +63,25 @@ export function TextToSpeechTab({
 		};
 	}, []);
 
+	const categoryCounts = useMemo(() => {
+		const counts: Record<VoiceCategory, number> = {
+			all: TTS_VOICES.length,
+			vietnamese: 0,
+			english: 0,
+			trending: 0,
+			story: 0,
+			fun: 0,
+		};
+		for (const v of TTS_VOICES) {
+			for (const c of v.categories) {
+				if (c in counts) {
+					counts[c]++;
+				}
+			}
+		}
+		return counts;
+	}, []);
+
 	const filteredVoices = useMemo(() => {
 		if (selectedCategory === "all") return TTS_VOICES;
 		return TTS_VOICES.filter((v) => v.categories.includes(selectedCategory));
@@ -182,27 +201,45 @@ export function TextToSpeechTab({
 			</div>
 
 			{/* Category Filter Pills (CapCut style) */}
-			<div className="flex flex-col gap-1.5">
-				<Label className="text-muted-foreground text-xs font-medium">
-					{t("tts.selectVoice") || "Chọn giọng đọc"} ({filteredVoices.length})
-				</Label>
+			<div className="flex flex-col gap-1.5 pt-1">
+				<div className="flex items-center justify-between text-xs">
+					<Label className="text-muted-foreground font-medium">
+						{t("tts.selectVoice") || "Chọn giọng đọc"}
+					</Label>
+					<span className="text-muted-foreground text-[11px] font-medium">
+						{filteredVoices.length} / {TTS_VOICES.length} {t("tts.voices") || "giọng"}
+					</span>
+				</div>
 				<div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hidden">
-					{CATEGORIES.map((cat) => (
-						<button
-							key={cat.id}
-							type="button"
-							onClick={() => startTransition(() => setSelectedCategory(cat.id))}
-							className={cn(
-								"shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
-								selectedCategory === cat.id
-									? "bg-primary text-primary-foreground shadow-xs"
-									: "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
-							)}
-						>
-							<span>{cat.icon}</span>
-							<span>{t(cat.labelKey as any) || cat.id}</span>
-						</button>
-					))}
+					{CATEGORIES.map((cat) => {
+						const count = categoryCounts[cat.id] ?? 0;
+						return (
+							<button
+								key={cat.id}
+								type="button"
+								onClick={() => startTransition(() => setSelectedCategory(cat.id))}
+								className={cn(
+									"shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
+									selectedCategory === cat.id
+										? "bg-primary text-primary-foreground shadow-xs"
+										: "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
+								)}
+							>
+								<span>{cat.icon}</span>
+								<span>{t(cat.labelKey as any) || cat.id}</span>
+								<span
+									className={cn(
+										"text-[10px] ml-0.5 font-semibold",
+										selectedCategory === cat.id
+											? "text-primary-foreground/90"
+											: "text-muted-foreground/80",
+									)}
+								>
+									({count})
+								</span>
+							</button>
+						);
+					})}
 				</div>
 			</div>
 
