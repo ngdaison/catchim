@@ -455,6 +455,210 @@ export class TtsService {
 			return await offlineCtx.startRendering();
 		}
 
+		// Effect: Cave Reverb (Cavernous spatial echo)
+		if (effect === "cave-reverb") {
+			const extraLength = Math.round(sampleRate * 1.2);
+			const offlineCtx = new OfflineAudioContext(numChannels, length + extraLength, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const delay1 = offlineCtx.createDelay(1.0);
+			delay1.delayTime.value = 0.16;
+			const delay2 = offlineCtx.createDelay(1.0);
+			delay2.delayTime.value = 0.32;
+
+			const fb = offlineCtx.createGain();
+			fb.gain.value = 0.48;
+
+			const lp = offlineCtx.createBiquadFilter();
+			lp.type = "lowpass";
+			lp.frequency.value = 2500;
+
+			source.connect(offlineCtx.destination);
+			source.connect(delay1);
+			delay1.connect(delay2);
+			delay2.connect(lp);
+			lp.connect(fb);
+			fb.connect(delay1);
+			lp.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Astronaut Radio (Space capsule dispatch)
+		if (effect === "astronaut") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const hp = offlineCtx.createBiquadFilter();
+			hp.type = "highpass";
+			hp.frequency.value = 550;
+
+			const lp = offlineCtx.createBiquadFilter();
+			lp.type = "lowpass";
+			lp.frequency.value = 2400;
+
+			const shaper = offlineCtx.createWaveShaper();
+			const n = 256;
+			const curve = new Float32Array(n);
+			for (let i = 0; i < n; i++) {
+				const x = (i * 2) / n - 1;
+				curve[i] = Math.tanh(x * 2.5);
+			}
+			shaper.curve = curve;
+
+			source.connect(hp);
+			hp.connect(lp);
+			lp.connect(shaper);
+			shaper.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Ghost Story (Spooky eerie liêu trai)
+		if (effect === "ghost") {
+			const audioCtx = this.getAudioContext();
+			const outBuffer = audioCtx.createBuffer(numChannels, length, sampleRate);
+			for (let ch = 0; ch < numChannels; ch++) {
+				const input = currentBuffer.getChannelData(ch);
+				const output = outBuffer.getChannelData(ch);
+				for (let i = 0; i < length; i++) {
+					const t = i / sampleRate;
+					const eerieTremor = 1.0 + 0.22 * Math.sin(2 * Math.PI * 3.8 * t);
+					output[i] = input[i] * eerieTremor;
+				}
+			}
+			const extraLength = Math.round(sampleRate * 0.5);
+			const offlineCtx = new OfflineAudioContext(numChannels, length + extraLength, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = outBuffer;
+
+			const delay = offlineCtx.createDelay(1.0);
+			delay.delayTime.value = 0.18;
+			const fb = offlineCtx.createGain();
+			fb.gain.value = 0.35;
+
+			source.connect(offlineCtx.destination);
+			source.connect(delay);
+			delay.connect(fb);
+			fb.connect(delay);
+			delay.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Circus Clown (Quirky cartoon vibrato)
+		if (effect === "clown") {
+			const audioCtx = this.getAudioContext();
+			const outBuffer = audioCtx.createBuffer(numChannels, length, sampleRate);
+			for (let ch = 0; ch < numChannels; ch++) {
+				const input = currentBuffer.getChannelData(ch);
+				const output = outBuffer.getChannelData(ch);
+				for (let i = 0; i < length; i++) {
+					const t = i / sampleRate;
+					const wobble = 1.0 + 0.25 * Math.sin(2 * Math.PI * 6.5 * t);
+					output[i] = input[i] * wobble;
+				}
+			}
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = outBuffer;
+
+			const peak = offlineCtx.createBiquadFilter();
+			peak.type = "peaking";
+			peak.frequency.value = 3400;
+			peak.gain.value = 4.0;
+
+			source.connect(peak);
+			peak.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Food Reviewer (Warm & mouth-watering presence)
+		if (effect === "food-reviewer") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const lowWarmth = offlineCtx.createBiquadFilter();
+			lowWarmth.type = "peaking";
+			lowWarmth.frequency.value = 450;
+			lowWarmth.gain.value = 3.5;
+
+			const highCrisp = offlineCtx.createBiquadFilter();
+			highCrisp.type = "peaking";
+			highCrisp.frequency.value = 3200;
+			highCrisp.gain.value = 3.8;
+
+			source.connect(lowWarmth);
+			lowWarmth.connect(highCrisp);
+			highCrisp.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: TVC Commercial (Punchy broadcast compression)
+		if (effect === "tvc-commercial") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const shaper = offlineCtx.createWaveShaper();
+			const n = 256;
+			const curve = new Float32Array(n);
+			for (let i = 0; i < n; i++) {
+				const x = (i * 2) / n - 1;
+				curve[i] = Math.tanh(x * 1.55);
+			}
+			shaper.curve = curve;
+
+			const highBoost = offlineCtx.createBiquadFilter();
+			highBoost.type = "highshelf";
+			highBoost.frequency.value = 3800;
+			highBoost.gain.value = 4.0;
+
+			source.connect(shaper);
+			shaper.connect(highBoost);
+			highBoost.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
+		// Effect: Godfather Mafia (Deep raspy whisper)
+		if (effect === "mafia") {
+			const offlineCtx = new OfflineAudioContext(numChannels, length, sampleRate);
+			const source = offlineCtx.createBufferSource();
+			source.buffer = currentBuffer;
+
+			const shaper = offlineCtx.createWaveShaper();
+			const n = 256;
+			const curve = new Float32Array(n);
+			for (let i = 0; i < n; i++) {
+				const x = (i * 2) / n - 1;
+				curve[i] = Math.tanh(x * 1.6);
+			}
+			shaper.curve = curve;
+
+			const lp = offlineCtx.createBiquadFilter();
+			lp.type = "lowpass";
+			lp.frequency.value = 3800;
+
+			source.connect(shaper);
+			shaper.connect(lp);
+			lp.connect(offlineCtx.destination);
+
+			source.start(0);
+			return await offlineCtx.startRendering();
+		}
+
 		return currentBuffer;
 	}
 

@@ -20,7 +20,14 @@ export type VoiceAudioEffect =
 	| "asmr"
 	| "vlogger"
 	| "child-girl"
-	| "child-boy";
+	| "child-boy"
+	| "cave-reverb"
+	| "astronaut"
+	| "ghost"
+	| "clown"
+	| "food-reviewer"
+	| "tvc-commercial"
+	| "mafia";
 
 export interface TtsVoice {
 	id: string;
