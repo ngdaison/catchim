@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Env vars
+.env*
+!.env.example
+
+# Cache & Build
+.turbo/
+.content-collections/
+.font-cache/
+*.tsbuildinfo
+next-env.d.ts
