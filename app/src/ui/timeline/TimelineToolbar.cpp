@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include <QHBoxLayout>
+#include <QMenu>
 
 namespace catchim::ui {
 
@@ -10,32 +11,38 @@ TimelineToolbar::TimelineToolbar(editor::EditorEngine& engine, QWidget* parent)
     , engine_(engine)
 {
     setFixedHeight(40);
+    setStyleSheet("background-color: #0e0e11; border-bottom: 1px solid #27272a;");
     setupUi();
     refresh();
 }
 
 void TimelineToolbar::setupUi() {
     auto* layout = new QHBoxLayout(this);
-    layout->setContentsMargins(8, 4, 8, 4);
+    layout->setContentsMargins(10, 4, 10, 4);
     layout->setSpacing(6);
 
     auto makeBtn = [this](const QString& text, const QString& tip) {
         auto* btn = new QPushButton(text, this);
-        btn->setFixedSize(28, 28);
+        btn->setFixedSize(30, 28);
         btn->setToolTip(tip);
         btn->setStyleSheet(R"(
             QPushButton {
-                background: transparent;
-                color: #DEDEDE;
+                background: #18181b;
+                color: #f4f4f5;
                 font-size: 13px;
-                border-radius: 4px;
+                border: 1px solid #27272a;
+                border-radius: 6px;
+                padding: 0;
             }
             QPushButton:hover {
-                background: #242424;
+                background: #27272a;
+                border-color: #38bdf8;
+                color: #38bdf8;
             }
             QPushButton:checked {
-                background: #00223D;
-                color: #16A9F3;
+                background: #0284c7;
+                border-color: #38bdf8;
+                color: #ffffff;
             }
         )");
         return btn;
@@ -51,7 +58,7 @@ void TimelineToolbar::setupUi() {
     deleteBtn_ = makeBtn("🗑", "Xóa phần tử đang chọn (Delete)");
     connect(deleteBtn_, &QPushButton::clicked, this, &TimelineToolbar::onDeleteClicked);
 
-    bookmarkBtn_ = makeBtn("🔖", "Đánh dấu (Bookmark/Marker)");
+    bookmarkBtn_ = makeBtn("🔖", "Đánh dấu (Bookmark/Marker - M)");
     connect(bookmarkBtn_, &QPushButton::clicked, [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
@@ -60,16 +67,61 @@ void TimelineToolbar::setupUi() {
         }
     });
 
+    // Add Track Menu Button
+    auto* addTrackBtn = new QPushButton("＋ Track", this);
+    addTrackBtn->setFixedHeight(28);
+    addTrackBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #18181b;
+            color: #f4f4f5;
+            font-size: 11px;
+            font-weight: 600;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 0px 8px;
+        }
+        QPushButton:hover {
+            background: #27272a;
+            border-color: #38bdf8;
+            color: #38bdf8;
+        }
+    )");
+
+    auto* trackMenu = new QMenu(addTrackBtn);
+    trackMenu->addAction("📹 Thêm Video Track", [this]() {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            tl->addTrack(editor::TrackType::Video, "Video " + std::to_string(tl->allTracks().size() + 1));
+            engine_.project().setDirty(true);
+        }
+    });
+    trackMenu->addAction("🎵 Thêm Audio Track", [this]() {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            tl->addTrack(editor::TrackType::Audio, "Audio " + std::to_string(tl->allTracks().size() + 1));
+            engine_.project().setDirty(true);
+        }
+    });
+    trackMenu->addAction("🆃 Thêm Text Track", [this]() {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            tl->addTrack(editor::TrackType::Text, "Text " + std::to_string(tl->allTracks().size() + 1));
+            engine_.project().setDirty(true);
+        }
+    });
+    addTrackBtn->setMenu(trackMenu);
+
     layout->addWidget(splitBtn_);
     layout->addWidget(dupBtn_);
     layout->addWidget(deleteBtn_);
     layout->addWidget(bookmarkBtn_);
+    layout->addWidget(addTrackBtn);
 
     layout->addStretch();
 
     // Center Scene selector
     auto* sceneLabel = new QLabel("Cảnh chính (Main scene)", this);
-    sceneLabel->setStyleSheet("color: #DEDEDE; font-weight: 500; font-size: 12px; padding: 2px 8px; background: #1A1A1A; border: 1px solid #292929; border-radius: 4px;");
+    sceneLabel->setStyleSheet("color: #f4f4f5; font-weight: 600; font-size: 12px; padding: 4px 12px; background: #141417; border: 1px solid #27272a; border-radius: 6px;");
     layout->addWidget(sceneLabel);
 
     layout->addStretch();
@@ -96,24 +148,6 @@ void TimelineToolbar::setupUi() {
     zoomSlider_->setFixedWidth(100);
     zoomSlider_->setRange(10, 500); // 10% to 500%
     zoomSlider_->setValue(100);
-    zoomSlider_->setStyleSheet(R"(
-        QSlider::groove:horizontal {
-            height: 4px;
-            background: #292929;
-            border-radius: 2px;
-        }
-        QSlider::sub-page:horizontal {
-            background: #16A9F3;
-            border-radius: 2px;
-        }
-        QSlider::handle:horizontal {
-            background: #DEDEDE;
-            width: 12px;
-            margin-top: -4px;
-            margin-bottom: -4px;
-            border-radius: 6px;
-        }
-    )");
     connect(zoomSlider_, &QSlider::valueChanged, this, &TimelineToolbar::onZoomSliderChanged);
 
     connect(zoomOutBtn, &QPushButton::clicked, [this]() {

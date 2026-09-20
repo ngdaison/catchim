@@ -32,50 +32,50 @@ struct Palette {
 
 inline Palette getDarkPalette() {
     Palette p;
-    p.background = QColor("#0D0D0D");
-    p.panelBackground = QColor("#1A1A1A");
-    p.textPrimary = QColor("#DEDEDE");
-    p.textSecondary = QColor("#808080");
-    p.primaryAccent = QColor("#16A9F3");
-    p.secondary = QColor("#00223D");
-    p.border = QColor("#292929");
-    p.panelBorder = QColor("#2E2E2E");
-    p.hover = QColor("#242424");
-    p.selected = QColor(255, 255, 255, 15);
-    p.destructive = QColor("#EA1616");
+    p.background = QColor("#09090b");       // zinc-950
+    p.panelBackground = QColor("#121215");  // zinc-900 surface
+    p.textPrimary = QColor("#f4f4f5");      // zinc-100
+    p.textSecondary = QColor("#a1a1aa");    // zinc-400
+    p.primaryAccent = QColor("#38bdf8");    // sky-400
+    p.secondary = QColor("#27272a");        // zinc-800
+    p.border = QColor("#27272a");           // zinc-800
+    p.panelBorder = QColor("#27272a");      // zinc-800
+    p.hover = QColor("#1e1e24");            // zinc-800 hover
+    p.selected = QColor("#0284c7");         // sky-600
+    p.destructive = QColor("#ef4444");      // red-500
 
-    // Clip colors
-    p.clipVideo = QColor("#232D41");
-    p.clipAudio = QColor("#8F5DBA");
-    p.clipText = QColor("#5DBAA0");
-    p.clipGraphic = QColor("#BA5D7A");
-    p.clipEffect = QColor("#5D93BA");
-    p.clipBookmark = QColor("#009DFF");
-    p.waveformColor = QColor(255, 255, 255, 178); // rgba(255, 255, 255, 0.7)
+    // Clip colors matching web timeline
+    p.clipVideo = QColor("#1e293b");        // slate-800
+    p.clipAudio = QColor("#581c87");        // purple-900
+    p.clipText = QColor("#065f46");         // emerald-900
+    p.clipGraphic = QColor("#831843");      // pink-900
+    p.clipEffect = QColor("#1e3a8a");       // blue-900
+    p.clipBookmark = QColor("#38bdf8");     // sky-400
+    p.waveformColor = QColor(255, 255, 255, 180);
     return p;
 }
 
 inline Palette getLightPalette() {
     Palette p;
-    p.background = QColor("#FFFFFF");
-    p.panelBackground = QColor("#F8FAFC");
-    p.textPrimary = QColor("#1C1C1C");
-    p.textSecondary = QColor("#7F7F7F");
-    p.primaryAccent = QColor("#16A9F3");
-    p.secondary = QColor("#F0F8FF");
-    p.border = QColor("#E8E8E8");
-    p.panelBorder = QColor("#DEDEDE");
-    p.hover = QColor("#F1F5F9");
-    p.selected = QColor(0, 0, 0, 15);
-    p.destructive = QColor("#EA1616");
+    p.background = QColor("#f8fafc");
+    p.panelBackground = QColor("#ffffff");
+    p.textPrimary = QColor("#0f172a");
+    p.textSecondary = QColor("#64748b");
+    p.primaryAccent = QColor("#0284c7");
+    p.secondary = QColor("#f1f5f9");
+    p.border = QColor("#e2e8f0");
+    p.panelBorder = QColor("#cbd5e1");
+    p.hover = QColor("#f1f5f9");
+    p.selected = QColor("#e0f2fe");
+    p.destructive = QColor("#ef4444");
 
-    p.clipVideo = QColor("#CBD5E1");
-    p.clipAudio = QColor("#8F5DBA");
-    p.clipText = QColor("#5DBAA0");
-    p.clipGraphic = QColor("#BA5D7A");
-    p.clipEffect = QColor("#5D93BA");
-    p.clipBookmark = QColor("#009DFF");
-    p.waveformColor = QColor(255, 255, 255, 178);
+    p.clipVideo = QColor("#94a3b8");
+    p.clipAudio = QColor("#c084fc");
+    p.clipText = QColor("#6ee7b7");
+    p.clipGraphic = QColor("#f472b6");
+    p.clipEffect = QColor("#60a5fa");
+    p.clipBookmark = QColor("#0284c7");
+    p.waveformColor = QColor(0, 0, 0, 180);
     return p;
 }
 #endif

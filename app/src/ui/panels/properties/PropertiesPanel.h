@@ -5,7 +5,13 @@
 #include <QLabel>
 #include <QDoubleSpinBox>
 #include <QSlider>
-#include <QStackedWidget>
+#include <QLineEdit>
+#include <QTextEdit>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QGroupBox>
+#include <QTabWidget>
 #include "editor/EditorEngine.h"
 
 namespace catchim::ui {
@@ -19,6 +25,9 @@ public:
 
 private slots:
     void onTransformChanged();
+    void onSpeedChanged();
+    void onTextChanged();
+    void onAudioChanged();
 
 private:
     void setupUi();
@@ -28,13 +37,37 @@ private:
     QWidget* emptyView_{nullptr};
     QWidget* inspectorView_{nullptr};
 
+    QLabel* clipNameHeader_{nullptr};
+    QLabel* clipTypeBadge_{nullptr};
+
+    // Transform
     QDoubleSpinBox* posXSpin_{nullptr};
     QDoubleSpinBox* posYSpin_{nullptr};
     QDoubleSpinBox* scaleXSpin_{nullptr};
     QDoubleSpinBox* scaleYSpin_{nullptr};
     QDoubleSpinBox* rotateSpin_{nullptr};
-    QDoubleSpinBox* opacitySpin_{nullptr};
-    QDoubleSpinBox* volumeSpin_{nullptr};
+    QSlider* opacitySlider_{nullptr};
+    QLabel* opacityValLabel_{nullptr};
+    QComboBox* blendModeCombo_{nullptr};
+
+    // Speed / Retime
+    QDoubleSpinBox* speedSpin_{nullptr};
+    QSlider* speedSlider_{nullptr};
+    QCheckBox* reverseCheck_{nullptr};
+
+    // Text properties
+    QWidget* textGroup_{nullptr};
+    QTextEdit* textContentEdit_{nullptr};
+    QDoubleSpinBox* fontSizeSpin_{nullptr};
+    QPushButton* textColorBtn_{nullptr};
+    std::string currentTextColor_{"#FFFFFF"};
+
+    // Audio properties
+    QWidget* audioGroup_{nullptr};
+    QSlider* volumeSlider_{nullptr};
+    QLabel* volumeValLabel_{nullptr};
+    QDoubleSpinBox* fadeInSpin_{nullptr};
+    QDoubleSpinBox* fadeOutSpin_{nullptr};
 
     bool isUpdatingUi_{false};
 };

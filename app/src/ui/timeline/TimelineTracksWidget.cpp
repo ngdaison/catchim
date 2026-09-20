@@ -3,8 +3,13 @@
 #if defined(HAVE_QT6)
 #include "ui/theme/Theme.h"
 #include "media/waveform/WaveformGenerator.h"
+#include "media/probe/MediaProbe.h"
 #include <QPainter>
 #include <QMouseEvent>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
 #include <cmath>
 
 namespace catchim::ui {
@@ -19,6 +24,7 @@ TimelineTracksWidget::TimelineTracksWidget(
     , mediaLibrary_(mediaLibrary)
 {
     setMouseTracking(true);
+    setAcceptDrops(true);
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
@@ -51,7 +57,7 @@ int TimelineTracksWidget::timeToPixel(core::TimelineTime time) const {
 TimelineTracksWidget::HitTestResult TimelineTracksWidget::hitTest(const QPoint& pos) const {
     HitTestResult res;
     auto* tl = engine_.activeTimeline();
-    if (!tl || pos.x() < Metrics::trackLabelsWidth) return res;
+    if (!tl) return res;
 
     int yOffset = Metrics::timelineContentTopPadding - scrollY_;
 
@@ -62,6 +68,17 @@ TimelineTracksWidget::HitTestResult TimelineTracksWidget::hitTest(const QPoint& 
 
         if (pos.y() >= yOffset && pos.y() < yOffset + trackHeight) {
             res.track = track;
+
+            if (pos.x() < Metrics::trackLabelsWidth) {
+                // Header buttons
+                if (pos.x() >= Metrics::trackLabelsWidth - 40 && pos.x() < Metrics::trackLabelsWidth - 20) {
+                    res.isMuteBtn = true;
+                } else if (pos.x() >= Metrics::trackLabelsWidth - 20) {
+                    res.isHideBtn = true;
+                }
+                return res;
+            }
+
             // Check clips
             for (const auto& clip : track->clips()) {
                 int clipLeft = timeToPixel(clip.startTime());
@@ -89,7 +106,7 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
     const auto& palette = Theme::instance().palette();
 
     // Background tracks container
-    painter.fillRect(rect(), QColor("#111111"));
+    painter.fillRect(rect(), QColor("#0c0c0e"));
 
     auto* tl = engine_.activeTimeline();
     if (!tl) return;
@@ -104,8 +121,8 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 
         // Track lane background
         QRect trackRect(Metrics::trackLabelsWidth, yOffset, width() - Metrics::trackLabelsWidth, trackHeight);
-        painter.fillRect(trackRect, QColor("#161616"));
-        painter.setPen(QColor("#202020"));
+        painter.fillRect(trackRect, QColor("#141417"));
+        painter.setPen(QColor("#1f1f23"));
         painter.drawLine(trackRect.bottomLeft(), trackRect.bottomRight());
 
         // Draw clips on this track
@@ -124,14 +141,14 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
                 case editor::ClipType::Text: clipBg = palette.clipText; break;
                 case editor::ClipType::Graphic: clipBg = palette.clipGraphic; break;
                 case editor::ClipType::Effect: clipBg = palette.clipEffect; break;
-                case editor::ClipType::Image: clipBg = palette.clipVideo.lighter(110); break;
+                case editor::ClipType::Image: clipBg = palette.clipVideo.lighter(115); break;
                 case editor::ClipType::Sticker: clipBg = palette.clipGraphic; break;
             }
 
             // Fill clip body
             painter.setBrush(clipBg);
-            painter.setPen(isSelected ? QPen(palette.primaryAccent, 2.0) : QPen(QColor(0, 0, 0, 80), 1.0));
-            painter.drawRoundedRect(clipRect.adjusted(1, 1, -1, -1), 4, 4);
+            painter.setPen(isSelected ? QPen(palette.primaryAccent, 2.0) : QPen(QColor(0, 0, 0, 100), 1.0));
+            painter.drawRoundedRect(clipRect.adjusted(1, 1, -1, -1), 6, 6);
 
             // Draw Audio Waveform if audio clip
             if (clip.type() == editor::ClipType::Audio) {
@@ -145,8 +162,8 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
                     size_t count = std::min<size_t>(wf->buckets.size(), clipW / 2);
                     for (size_t b = 0; b < count; ++b) {
                         int bx = clipX + static_cast<int>(b * 2);
-                        int h1 = static_cast<int>(wf->buckets[b].maxPeak * (trackHeight / 2 - 4));
-                        int h2 = static_cast<int>(wf->buckets[b].minPeak * (trackHeight / 2 - 4));
+                        int h1 = static_cast<int>(wf->buckets[b].maxPeak * (trackHeight / 2 - 6));
+                        int h2 = static_cast<int>(wf->buckets[b].minPeak * (trackHeight / 2 - 6));
                         painter.drawLine(bx, midY - h1, bx, midY - h2);
                     }
                 }
@@ -156,7 +173,7 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
             painter.setPen(QColor("#FFFFFF"));
             painter.setFont(QFont("Inter", 8, QFont::Bold));
             QString label = QString::fromStdString(clip.name());
-            painter.drawText(clipRect.adjusted(6, 4, -6, -4), Qt::AlignLeft | Qt::AlignTop, label);
+            painter.drawText(clipRect.adjusted(8, 6, -8, -6), Qt::AlignLeft | Qt::AlignTop, label);
         }
 
         yOffset += trackHeight + Metrics::trackGap;
@@ -164,8 +181,8 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 
     // 2. Draw Track Labels Column on the left (112px, fixed overlay)
     QRect labelsCol(0, 0, Metrics::trackLabelsWidth, height());
-    painter.fillRect(labelsCol, QColor("#141414"));
-    painter.setPen(QColor("#292929"));
+    painter.fillRect(labelsCol, QColor("#111114"));
+    painter.setPen(QColor("#27272a"));
     painter.drawLine(Metrics::trackLabelsWidth - 1, 0, Metrics::trackLabelsWidth - 1, height());
 
     yOffset = Metrics::timelineContentTopPadding - scrollY_;
@@ -175,30 +192,28 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
         else if (track->type() != editor::TrackType::Video) trackHeight = Metrics::trackHeightText;
 
         QRect labelCell(0, yOffset, Metrics::trackLabelsWidth - 1, trackHeight);
-        painter.setPen(QColor("#202020"));
+        painter.setPen(QColor("#1f1f23"));
         painter.drawLine(labelCell.bottomLeft(), labelCell.bottomRight());
 
         // Track Icon & Name
-        painter.setFont(QFont("Inter", 8));
-        painter.setPen(QColor("#A0A0A0"));
+        painter.setFont(QFont("Inter", 8, QFont::DemiBold));
+        painter.setPen(QColor("#f4f4f5"));
         QString typeIcon = "📹";
         if (track->type() == editor::TrackType::Audio) typeIcon = "🎵";
         else if (track->type() == editor::TrackType::Text) typeIcon = "🆃";
         else if (track->type() == editor::TrackType::Graphic) typeIcon = "◨";
         else if (track->type() == editor::TrackType::Effect) typeIcon = "✨";
 
-        painter.drawText(8, yOffset + 16, typeIcon);
-        painter.drawText(28, yOffset + 16, QString::fromStdString(track->name()));
+        painter.drawText(8, yOffset + 18, typeIcon);
+        painter.drawText(26, yOffset + 18, QString::fromStdString(track->name()));
 
         // Mute / Visibility indicators
-        if (track->isMuted()) {
-            painter.setPen(palette.destructive);
-            painter.drawText(Metrics::trackLabelsWidth - 32, yOffset + 16, "🔇");
-        }
-        if (track->isHidden()) {
-            painter.setPen(palette.destructive);
-            painter.drawText(Metrics::trackLabelsWidth - 16, yOffset + 16, "👁");
-        }
+        painter.setFont(QFont("Inter", 9));
+        painter.setPen(track->isMuted() ? palette.destructive : QColor("#71717a"));
+        painter.drawText(Metrics::trackLabelsWidth - 36, yOffset + 18, track->isMuted() ? "🔇" : "🔊");
+
+        painter.setPen(track->isHidden() ? palette.destructive : QColor("#71717a"));
+        painter.drawText(Metrics::trackLabelsWidth - 18, yOffset + 18, track->isHidden() ? "🚫" : "👁");
 
         yOffset += trackHeight + Metrics::trackGap;
     }
@@ -206,7 +221,7 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
     // 3. Draw Playhead Vertical Line across all tracks
     int playheadX = timeToPixel(engine_.playback().currentTime());
     if (playheadX >= Metrics::trackLabelsWidth && playheadX < width()) {
-        painter.setPen(QPen(palette.primaryAccent, 1.5));
+        painter.setPen(QPen(palette.primaryAccent, 2.0));
         painter.drawLine(playheadX, 0, playheadX, height());
     }
 }
@@ -214,6 +229,19 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 void TimelineTracksWidget::mousePressEvent(QMouseEvent* event) {
     if (event->button() == Qt::LeftButton) {
         auto hit = hitTest(event->pos());
+        if (hit.track && (hit.isMuteBtn || hit.isHideBtn)) {
+            auto* track = const_cast<editor::Track*>(hit.track);
+            if (hit.isMuteBtn) {
+                track->setMuted(!track->isMuted());
+            } else if (hit.isHideBtn) {
+                track->setHidden(!track->isHidden());
+            }
+            engine_.project().setDirty(true);
+            update();
+            event->accept();
+            return;
+        }
+
         if (hit.clip) {
             activeClipId_ = hit.clip->id();
             dragStartPos_ = event->pos();
@@ -234,9 +262,8 @@ void TimelineTracksWidget::mousePressEvent(QMouseEvent* event) {
             event->accept();
             return;
         } else {
-            // Click on empty space
+            // Click on empty space -> Seek
             engine_.deselectAll();
-            // Seek playhead to click position
             core::TimelineTime clickTime = pixelToTime(event->pos().x());
             emit seekRequested(clickTime);
             update();
@@ -249,12 +276,11 @@ void TimelineTracksWidget::mousePressEvent(QMouseEvent* event) {
 
 void TimelineTracksWidget::mouseMoveEvent(QMouseEvent* event) {
     if (dragMode_ == DragMode::None) {
-        // Update cursor for trim handles
         auto hit = hitTest(event->pos());
         if (hit.isTrimStart || hit.isTrimEnd) {
             setCursor(Qt::SizeHorCursor);
-        } else if (hit.clip) {
-            setCursor(Qt::ArrowCursor);
+        } else if (hit.isMuteBtn || hit.isHideBtn) {
+            setCursor(Qt::PointingHandCursor);
         } else {
             setCursor(Qt::ArrowCursor);
         }
@@ -293,6 +319,64 @@ void TimelineTracksWidget::mouseReleaseEvent(QMouseEvent* event) {
         return;
     }
     QWidget::mouseReleaseEvent(event);
+}
+
+void TimelineTracksWidget::dragEnterEvent(QDragEnterEvent* event) {
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    }
+}
+
+void TimelineTracksWidget::dragMoveEvent(QDragMoveEvent* event) {
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    }
+}
+
+void TimelineTracksWidget::dropEvent(QDropEvent* event) {
+    const auto* mime = event->mimeData();
+    if (!mime->hasUrls()) return;
+
+    core::TimelineTime dropTime = pixelToTime(event->position().toPoint().x());
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+
+    for (const auto& url : mime->urls()) {
+        QString localPath = url.toLocalFile();
+        if (localPath.isEmpty()) continue;
+
+        auto probeRes = media::MediaProbe::probe(localPath.toStdString());
+        if (probeRes.ok()) {
+            auto asset = probeRes.unwrap();
+            mediaLibrary_.addAsset(asset);
+
+            core::TrackId targetTrack = tl->mainTrack().id();
+            if (asset->type() == media::MediaType::Audio) {
+                for (const auto* t : tl->allTracks()) {
+                    if (t->type() == editor::TrackType::Audio) {
+                        targetTrack = t->id();
+                        break;
+                    }
+                }
+            }
+
+            editor::Clip clip(
+                core::ClipId::generate(),
+                (asset->type() == media::MediaType::Video) ? editor::ClipType::Video :
+                (asset->type() == media::MediaType::Audio) ? editor::ClipType::Audio : editor::ClipType::Image,
+                asset->fileName(),
+                dropTime,
+                asset->duration()
+            );
+            clip.setMediaId(asset->id());
+            engine_.addClip(targetTrack, std::move(clip));
+
+            dropTime = dropTime + asset->duration();
+        }
+    }
+
+    event->acceptProposedAction();
+    update();
 }
 
 } // namespace catchim::ui

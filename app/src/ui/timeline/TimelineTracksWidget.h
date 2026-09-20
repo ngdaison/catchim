@@ -30,6 +30,9 @@ protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
 
 private:
     enum class DragMode { None, MovingClip, TrimmingStart, TrimmingEnd, BoxSelecting };
@@ -39,6 +42,9 @@ private:
         const editor::Clip* clip{nullptr};
         bool isTrimStart{false};
         bool isTrimEnd{false};
+        bool isMuteBtn{false};
+        bool isHideBtn{false};
+        bool isLockBtn{false};
     };
 
     HitTestResult hitTest(const QPoint& pos) const;
