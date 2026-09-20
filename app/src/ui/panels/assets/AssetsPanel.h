@@ -20,6 +20,9 @@ public:
 
     void refresh();
 
+    QSize sizeHint() const override { return QSize(340, 600); }
+    QSize minimumSizeHint() const override { return QSize(280, 400); }
+
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;

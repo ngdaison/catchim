@@ -26,6 +26,9 @@ public:
     void toggleSafeZones();
     void toggleFullscreen();
 
+    QSize sizeHint() const override { return QSize(760, 600); }
+    QSize minimumSizeHint() const override { return QSize(380, 300); }
+
 private slots:
     void onPlayPauseClicked();
     void onZoomChanged(int index);

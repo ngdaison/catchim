@@ -23,6 +23,9 @@ public:
 
     void refresh();
 
+    QSize sizeHint() const override { return QSize(320, 600); }
+    QSize minimumSizeHint() const override { return QSize(280, 300); }
+
 private slots:
     void onTransformChanged();
     void onSpeedChanged();

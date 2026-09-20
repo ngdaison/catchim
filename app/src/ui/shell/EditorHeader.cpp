@@ -39,6 +39,10 @@ void EditorHeader::setupUi() {
             background: #27272a;
             border-color: #38bdf8;
         }
+        QPushButton::menu-indicator {
+            image: none;
+            width: 0px;
+        }
     )");
 
     auto* logoMenu = new QMenu(logoButton);

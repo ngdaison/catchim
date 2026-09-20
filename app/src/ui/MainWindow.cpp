@@ -71,22 +71,32 @@ void MainWindow::setupUi() {
     assetsPanel_ = new AssetsPanel(engine_, mediaLibrary_, horizontalSplitter_);
     assetsPanel_->setObjectName("assetsPanel");
     assetsPanel_->setProperty("class", "Panel");
+    assetsPanel_->setMinimumWidth(280);
 
     previewPanel_ = new PreviewPanel(engine_, renderEngine_, mediaLibrary_, horizontalSplitter_);
     previewPanel_->setObjectName("previewPanel");
     previewPanel_->setProperty("class", "Panel");
+    previewPanel_->setMinimumWidth(380);
 
     propertiesPanel_ = new PropertiesPanel(engine_, horizontalSplitter_);
     propertiesPanel_->setObjectName("propertiesPanel");
     propertiesPanel_->setProperty("class", "Panel");
+    propertiesPanel_->setMinimumWidth(280);
 
     horizontalSplitter_->addWidget(assetsPanel_);
     horizontalSplitter_->addWidget(previewPanel_);
     horizontalSplitter_->addWidget(propertiesPanel_);
 
-    // Set horizontal proportions (20% Assets, 55% Preview, 25% Properties)
-    horizontalSplitter_->setStretchFactor(0, 20);
-    horizontalSplitter_->setStretchFactor(1, 55);
+    horizontalSplitter_->setCollapsible(0, false);
+    horizontalSplitter_->setCollapsible(1, false);
+    horizontalSplitter_->setCollapsible(2, false);
+
+    // Initial sizes (340px Assets, 780px Preview, 320px Properties)
+    horizontalSplitter_->setSizes({340, 780, 320});
+
+    // Set horizontal proportions (25% Assets, 50% Preview, 25% Properties)
+    horizontalSplitter_->setStretchFactor(0, 25);
+    horizontalSplitter_->setStretchFactor(1, 50);
     horizontalSplitter_->setStretchFactor(2, 25);
 
     verticalSplitter_->addWidget(horizontalSplitter_);
@@ -95,15 +105,21 @@ void MainWindow::setupUi() {
     timelinePanel_ = new TimelinePanel(engine_, mediaLibrary_, verticalSplitter_);
     timelinePanel_->setObjectName("timelinePanel");
     timelinePanel_->setProperty("class", "Panel");
+    timelinePanel_->setMinimumHeight(180);
     connect(timelinePanel_, &TimelinePanel::clipSelected, [this](core::ClipId /* id */) {
         propertiesPanel_->refresh();
     });
 
     verticalSplitter_->addWidget(timelinePanel_);
+    verticalSplitter_->setCollapsible(0, false);
+    verticalSplitter_->setCollapsible(1, false);
 
-    // Proportions (60% Panels, 40% Timeline)
-    verticalSplitter_->setStretchFactor(0, 60);
-    verticalSplitter_->setStretchFactor(1, 40);
+    // Initial sizes (580px Panels, 320px Timeline)
+    verticalSplitter_->setSizes({580, 320});
+
+    // Proportions (65% Panels, 35% Timeline)
+    verticalSplitter_->setStretchFactor(0, 65);
+    verticalSplitter_->setStretchFactor(1, 35);
 
     rootLayout->addWidget(verticalSplitter_, 1);
 }

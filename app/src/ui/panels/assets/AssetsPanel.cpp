@@ -51,49 +51,51 @@ void AssetsPanel::setupUi() {
 
     // Left vertical TabBar (Media, Audio, Text, Stickers, Effects, Subtitles, Settings)
     tabList_ = new QListWidget(this);
-    tabList_->setFixedWidth(64);
+    tabList_->setFixedWidth(44);
     tabList_->setIconSize(QSize(20, 20));
+    tabList_->setFocusPolicy(Qt::NoFocus);
+    tabList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    tabList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     tabList_->setStyleSheet(R"(
         QListWidget {
             background-color: #0c0c0e;
+            border: none;
             border-right: 1px solid #27272a;
-            padding: 8px 0px;
+            padding: 6px 0px;
         }
         QListWidget::item {
-            height: 52px;
-            color: #a1a1aa;
-            border-radius: 8px;
-            margin: 2px 6px;
-            font-size: 11px;
-            font-weight: 500;
+            height: 36px;
+            width: 36px;
+            border-radius: 6px;
+            margin: 2px 4px;
         }
         QListWidget::item:hover {
             background-color: #1e1e24;
-            color: #f4f4f5;
         }
         QListWidget::item:selected {
             background-color: #27272a;
-            color: #38bdf8;
-            font-weight: 600;
         }
     )");
 
-    auto addTab = [this](const QString& title, UiIcon icon) {
-        auto* item = new QListWidgetItem(tabList_);
-        item->setIcon(UiIcons::get(icon, QColor("#a1a1aa"), 20));
-        item->setText(title);
-        item->setTextAlignment(Qt::AlignCenter);
+    static const std::vector<std::pair<QString, UiIcon>> kTabDefs = {
+        {"Tệp đa phương tiện (Media)", UiIcon::Media},
+        {"Âm thanh & SFX (Audio)", UiIcon::Audio},
+        {"Văn bản & Tiêu đề (Text)", UiIcon::Text},
+        {"Nhãn dán (Stickers)", UiIcon::Stickers},
+        {"Hiệu ứng video (Effects)", UiIcon::Effects},
+        {"Chuyển tiếp (Transitions)", UiIcon::Transitions},
+        {"Phụ đề & Tự động nhận diện (Captions)", UiIcon::Captions},
+        {"Lớp điều chỉnh màu (Adjustment)", UiIcon::Adjustment},
+        {"Cài đặt khung hình (Canvas Settings)", UiIcon::Settings}
     };
 
-    addTab("Media", UiIcon::Media);
-    addTab("Audio", UiIcon::Audio);
-    addTab("Text", UiIcon::Text);
-    addTab("Sticker", UiIcon::Stickers);
-    addTab("Effects", UiIcon::Effects);
-    addTab("Chuyển", UiIcon::Transitions);
-    addTab("Phụ đề", UiIcon::Captions);
-    addTab("Chỉnh", UiIcon::Adjustment);
-    addTab("Canvas", UiIcon::Settings);
+    for (size_t i = 0; i < kTabDefs.size(); ++i) {
+        auto* item = new QListWidgetItem(tabList_);
+        item->setIcon(UiIcons::get(kTabDefs[i].second, (i == 0) ? QColor("#38bdf8") : QColor("#a1a1aa"), 20));
+        item->setToolTip(kTabDefs[i].first);
+        item->setSizeHint(QSize(36, 36));
+        item->setTextAlignment(Qt::AlignCenter);
+    }
     tabList_->setCurrentRow(0);
 
     viewsStack_ = new QStackedWidget(this);
@@ -107,7 +109,16 @@ void AssetsPanel::setupUi() {
     viewsStack_->addWidget(createAdjustmentView());
     viewsStack_->addWidget(createSettingsView());
 
-    connect(tabList_, &QListWidget::currentRowChanged, viewsStack_, &QStackedWidget::setCurrentIndex);
+    connect(tabList_, &QListWidget::currentRowChanged, [this](int row) {
+        viewsStack_->setCurrentIndex(row);
+        for (int i = 0; i < tabList_->count(); ++i) {
+            auto* it = tabList_->item(i);
+            if (it && i < static_cast<int>(kTabDefs.size())) {
+                QColor col = (i == row) ? QColor("#38bdf8") : QColor("#a1a1aa");
+                it->setIcon(UiIcons::get(kTabDefs[i].second, col, 20));
+            }
+        }
+    });
 
     mainLayout->addWidget(tabList_);
     mainLayout->addWidget(viewsStack_, 1);
@@ -136,6 +147,7 @@ QWidget* AssetsPanel::createMediaView() {
             border-radius: 6px;
             font-weight: 600;
             font-size: 12px;
+            padding: 0px 12px;
         }
         QPushButton:hover {
             background-color: #27272a;
@@ -149,6 +161,20 @@ QWidget* AssetsPanel::createMediaView() {
     // Search bar
     mediaSearchInput_ = new QLineEdit(view);
     mediaSearchInput_->setPlaceholderText("Tìm kiếm tệp trong dự án...");
+    mediaSearchInput_->setFixedHeight(34);
+    mediaSearchInput_->setStyleSheet(R"(
+        QLineEdit {
+            background-color: #141417;
+            color: #f4f4f5;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 12px;
+        }
+        QLineEdit:focus {
+            border-color: #38bdf8;
+        }
+    )");
     connect(mediaSearchInput_, &QLineEdit::textChanged, [this](const QString& q) {
         for (int i = 0; i < mediaListWidget_->count(); ++i) {
             auto* item = mediaListWidget_->item(i);
