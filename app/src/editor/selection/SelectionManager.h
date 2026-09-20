@@ -14,6 +14,7 @@ struct SelectionState {
 
     [[nodiscard]] bool empty() const noexcept { return selectedIds.empty(); }
     [[nodiscard]] size_t size() const noexcept { return selectedIds.size(); }
+    bool operator==(const SelectionState& other) const = default;
 };
 
 class SelectionManager {

@@ -202,6 +202,12 @@
 #include "media/TtsVoiceService.h"
 #include "editor/panels/PanelLayoutConfig.h"
 #include "audio/AudioMediaUtils.h"
+#include "editor/timeline/controllers/SeekController.h"
+#include "editor/timeline/controllers/PlayheadController.h"
+#include "editor/timeline/controllers/KeyframeDragController.h"
+#include "editor/timeline/controllers/ResizeController.h"
+#include "editor/selection/SelectionStateEngine.h"
+#include "editor/timeline/TimelineCreationDefaults.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -10963,6 +10969,290 @@ void runAudioMediaUtilsTests() {
     std::cout << "[PASS] runAudioMediaUtilsTests" << std::endl;
 }
 
+void runSeekControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    SeekConfig config;
+    config.zoomLevel = 2.0;
+    config.duration = TimelineTime::fromSeconds(10.0);
+    config.activeProjectFps = FrameRate{30, 1};
+
+    bool clearedSelection = false;
+    config.clearSelectedElements = [&]() { clearedSelection = true; };
+
+    TimelineTime seekTarget{0};
+    config.seek = [&](TimelineTime t) { seekTarget = t; };
+
+    TimelineViewState viewState;
+    config.setTimelineViewState = [&](const TimelineViewState& vs) { viewState = vs; };
+
+    SeekController controller(config);
+    TEST_ASSERT(!controller.isPending());
+
+    // 1. Pixel to time
+    // 50px/sec * 2.0 zoom = 100 px/sec
+    auto t1 = SeekController::pixelToTime(100.0, 0.0, 0.0, 2.0, TimelineTime::fromSeconds(10.0));
+    TEST_ASSERT(std::abs(t1.toSeconds() - 1.0) < 1e-3);
+
+    // 2. Click gesture detection
+    PendingSeekSession session{SeekSource::Tracks, 100.0, 50.0, 1000};
+    TEST_ASSERT(SeekController::isClickGesture(102.0, 51.0, 1200, session));
+    TEST_ASSERT(!SeekController::isClickGesture(120.0, 50.0, 1200, session)); // moved too far
+    TEST_ASSERT(!SeekController::isClickGesture(100.0, 50.0, 1600, session)); // too slow (> 500ms)
+
+    // 3. Mouse down & click interaction
+    controller.onMouseDown(SeekSource::Tracks, 150.0, 40.0, 2000);
+    TEST_ASSERT(controller.isPending());
+
+    bool handled = controller.onClick(SeekSource::Tracks, 151.0, 41.0, 2100, 0.0, 0.0);
+    TEST_ASSERT(handled);
+    TEST_ASSERT(!controller.isPending());
+    TEST_ASSERT(clearedSelection);
+    TEST_ASSERT(seekTarget > TimelineTime(0));
+    TEST_ASSERT(viewState.playheadTime == seekTarget);
+
+    std::cout << "[PASS] runSeekControllerTests" << std::endl;
+}
+
+void runPlayheadControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    PlayheadConfig config;
+    config.zoomLevel = 1.0;
+    config.duration = TimelineTime::fromSeconds(20.0);
+    config.activeProjectFps = FrameRate{30, 1};
+
+    TimelineTime currentSeek{0};
+    config.seek = [&](TimelineTime t) { currentSeek = t; };
+
+    bool isScrubbing = false;
+    config.setScrubbing = [&](bool s) { isScrubbing = s; };
+
+    config.snapPointsProvider = [&]() -> std::vector<TimelineTime> {
+        return {TimelineTime::fromSeconds(5.0), TimelineTime::fromSeconds(10.0)};
+    };
+
+    PlayheadController controller(config);
+    TEST_ASSERT(!controller.isScrubbing());
+
+    // 1. Pixel to time
+    auto pt = PlayheadController::pixelToTime(250.0, 0.0, 1.0, TimelineTime::fromSeconds(20.0));
+    TEST_ASSERT(std::abs(pt.toSeconds() - 5.0) < 1e-3);
+
+    // 2. Playhead scrub interaction
+    controller.onPlayheadMouseDown(100.0, 0.0);
+    TEST_ASSERT(controller.isScrubbing());
+    TEST_ASSERT(isScrubbing);
+
+    controller.handleMouseMove(248.0, 0.0); // Near 250px (5.0s), should snap to 5.0s
+    TEST_ASSERT(std::abs(currentSeek.toSeconds() - 5.0) < 1e-3);
+
+    controller.handleMouseUp(248.0, 0.0, 0.0);
+    TEST_ASSERT(!controller.isScrubbing());
+    TEST_ASSERT(!isScrubbing);
+
+    // 3. Playback auto-scroll
+    config.isPlaying = true;
+    controller.setConfig(config);
+    double scrollLeft = 0.0;
+    // Playhead at 15s (750px), viewport 500px, content 1000px
+    bool scrolled = controller.handlePlaybackUpdate(TimelineTime::fromSeconds(15.0), 500.0, 1000.0, scrollLeft);
+    TEST_ASSERT(scrolled);
+    TEST_ASSERT(scrollLeft > 0.0);
+
+    std::cout << "[PASS] runPlayheadControllerTests" << std::endl;
+}
+
+void runKeyframeDragControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    KeyframeDragConfig config;
+    config.zoomLevel = 1.0;
+    config.fps = FrameRate{30, 1};
+    config.elementDuration = TimelineTime::fromSeconds(5.0);
+    config.displayedStartTime = TimelineTime::fromSeconds(2.0);
+
+    std::vector<std::string> committedIds;
+    int64_t committedDelta = 0;
+    config.commitDrag = [&](const std::vector<std::string>& ids, int64_t delta) {
+        committedIds = ids;
+        committedDelta = delta;
+    };
+
+    KeyframeDragController controller(config);
+    TEST_ASSERT(!controller.isActive());
+
+    // 1. Clamping helper
+    auto clamped1 = KeyframeDragController::calculateClampedTime(
+        TimelineTime::fromSeconds(2.0),
+        TimelineTime::fromSeconds(1.0).ticks(),
+        TimelineTime::fromSeconds(5.0)
+    );
+    TEST_ASSERT(std::abs(clamped1.toSeconds() - 3.0) < 1e-3);
+
+    auto clamped2 = KeyframeDragController::calculateClampedTime(
+        TimelineTime::fromSeconds(2.0),
+        TimelineTime::fromSeconds(10.0).ticks(),
+        TimelineTime::fromSeconds(5.0)
+    );
+    TEST_ASSERT(std::abs(clamped2.toSeconds() - 5.0) < 1e-3);
+
+    // 2. Mouse down and drag
+    controller.onKeyframeMouseDown({"kf-1", "kf-2"}, 100.0);
+    TEST_ASSERT(controller.isActive());
+    TEST_ASSERT(!controller.dragState().isDragging); // Still pending
+
+    // Move past threshold (5px)
+    controller.handleMouseMove(160.0); // +60px = +1.2s
+    TEST_ASSERT(controller.dragState().isDragging);
+    TEST_ASSERT(controller.dragState().draggingKeyframeIds.size() == 2);
+    TEST_ASSERT(controller.dragState().deltaTicks > 0);
+
+    controller.handleMouseUp();
+    TEST_ASSERT(!controller.isActive());
+    TEST_ASSERT(committedIds.size() == 2);
+    TEST_ASSERT(committedDelta > 0);
+
+    std::cout << "[PASS] runKeyframeDragControllerTests" << std::endl;
+}
+
+void runResizeControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    ResizeConfig config;
+    config.zoomLevel = 1.0;
+    config.fps = FrameRate{30, 1};
+    config.snappingEnabled = true;
+
+    std::vector<GroupResizeUpdate> previewUpdates;
+    config.previewElements = [&](const std::vector<GroupResizeUpdate>& u) { previewUpdates = u; };
+
+    std::vector<GroupResizeUpdate> committedUpdates;
+    config.commitElements = [&](const std::vector<GroupResizeUpdate>& u) { committedUpdates = u; };
+
+    ResizeController controller(config);
+    TEST_ASSERT(!controller.isResizing());
+
+    GroupResizeMember member;
+    member.trackId = TrackId("track-1");
+    member.elementId = ClipId("clip-10");
+    member.startTime = TimelineTime::fromSeconds(2.0);
+    member.duration = TimelineTime::fromSeconds(4.0);
+    member.trimStart = TimelineTime(0);
+    member.trimEnd = TimelineTime(0);
+
+    controller.onResizeStart(ResizeSide::Right, 300.0, {member});
+    TEST_ASSERT(controller.isResizing());
+
+    // Move right by 50px (+1.0s)
+    controller.handleMouseMove(350.0);
+    TEST_ASSERT(!previewUpdates.empty());
+
+    controller.handleMouseUp();
+    TEST_ASSERT(!controller.isResizing());
+    TEST_ASSERT(!committedUpdates.empty());
+
+    std::cout << "[PASS] runResizeControllerTests" << std::endl;
+}
+
+void runSelectionStateEngineTests() {
+    using namespace catchim::editor;
+
+    // 1. Deduplication
+    auto deduped = SelectionStateEngine::dedupeIds({"a", "b", "a", "c", "b"});
+    TEST_ASSERT(deduped.size() == 3);
+    TEST_ASSERT(deduped[0] == "a" && deduped[1] == "b" && deduped[2] == "c");
+
+    // 2. Replace & Clear
+    auto state = SelectionStateEngine::replaceSelection({"item-1", "item-2"});
+    TEST_ASSERT(state.selectedIds.size() == 2);
+    TEST_ASSERT(state.anchorId.has_value() && *state.anchorId == "item-2");
+
+    auto emptyState = SelectionStateEngine::clearSelection();
+    TEST_ASSERT(emptyState.selectedIds.empty());
+    TEST_ASSERT(!emptyState.anchorId.has_value());
+
+    // 3. Prune
+    auto pruned = SelectionStateEngine::pruneSelection(state, {"item-2", "item-3"});
+    TEST_ASSERT(pruned.selectedIds.size() == 1);
+    TEST_ASSERT(pruned.selectedIds[0] == "item-2");
+    TEST_ASSERT(pruned.anchorId.has_value() && *pruned.anchorId == "item-2");
+
+    // 4. Toggle
+    auto toggled = SelectionStateEngine::toggleSelection(pruned, "item-4");
+    TEST_ASSERT(toggled.selectedIds.size() == 2);
+    TEST_ASSERT(SelectionStateEngine::isSelected(toggled, "item-4"));
+
+    auto untoggled = SelectionStateEngine::toggleSelection(toggled, "item-4");
+    TEST_ASSERT(untoggled.selectedIds.size() == 1);
+    TEST_ASSERT(!SelectionStateEngine::isSelected(untoggled, "item-4"));
+
+    // 5. Select range
+    std::vector<std::string> ordered = {"x1", "x2", "x3", "x4", "x5"};
+    SelectionState rangeBase = SelectionStateEngine::replaceSelection({"x2"});
+    auto rangeSelected = SelectionStateEngine::selectRange(rangeBase, ordered, "x4", false);
+    TEST_ASSERT(rangeSelected.selectedIds.size() == 3); // x2, x3, x4
+
+    // 6. Box selection
+    BoxSelectionChange boxChange{
+        .intersectedIds = {"x3", "x4"},
+        .initialSelectedIds = {"x1"},
+        .initialAnchorId = "x1",
+        .isAdditive = true
+    };
+    auto boxState = SelectionStateEngine::applyBoxSelection(boxChange);
+    TEST_ASSERT(boxState.selectedIds.size() == 3);
+
+    // 7. Scope management
+    bool cleared = false;
+    SelectionStateEngine::activateScope(ScopeEntry{
+        .hasSelection = []() { return true; },
+        .clear = [&]() { cleared = true; },
+        .clearActive = [&]() { cleared = true; }
+    });
+    TEST_ASSERT(SelectionStateEngine::hasActiveScopeSelection());
+    TEST_ASSERT(SelectionStateEngine::clearActiveScope());
+    TEST_ASSERT(cleared);
+    SelectionStateEngine::resetActiveScope();
+
+    std::cout << "[PASS] runSelectionStateEngineTests" << std::endl;
+}
+
+void runTimelineCreationDefaultsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    TEST_ASSERT(TimelineCreationDefaults::defaultNewElementDuration() == TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(TimelineCreationDefaults::toElementDurationTicks(std::nullopt) == TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(TimelineCreationDefaults::toElementDurationTicks(2.5) == TimelineTime::fromSeconds(2.5));
+
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName(TrackType::Video) == "Video track");
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName(TrackType::Audio) == "Audio track");
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName(TrackType::Text) == "Text track");
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName(TrackType::Graphic) == "Graphic track");
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName(TrackType::Effect) == "Effect track");
+    TEST_ASSERT(TimelineCreationDefaults::getDefaultTrackName("graphic") == "Graphic track");
+
+    TEST_ASSERT(TimelineCreationDefaults::isVolumeDbValid(0.0));
+    TEST_ASSERT(TimelineCreationDefaults::isVolumeDbValid(-60.0));
+    TEST_ASSERT(TimelineCreationDefaults::isVolumeDbValid(20.0));
+    TEST_ASSERT(!TimelineCreationDefaults::isVolumeDbValid(-65.0));
+    TEST_ASSERT(!TimelineCreationDefaults::isVolumeDbValid(25.0));
+
+    TEST_ASSERT(TimelineCreationDefaults::clampVolumeDb(30.0) == 20.0);
+    TEST_ASSERT(TimelineCreationDefaults::clampVolumeDb(-100.0) == -60.0);
+
+    TEST_ASSERT(TimelineCreationDefaults::isZoomLevelValid(1.0));
+    TEST_ASSERT(!TimelineCreationDefaults::isZoomLevelValid(0.05));
+    TEST_ASSERT(!TimelineCreationDefaults::isZoomLevelValid(150.0));
+
+    std::cout << "[PASS] runTimelineCreationDefaultsTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -11152,6 +11442,12 @@ int main() {
     runTtsVoiceServiceTests();
     runPanelLayoutConfigTests();
     runAudioMediaUtilsTests();
-    std::cout << ">>> ALL 187 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runSeekControllerTests();
+    runPlayheadControllerTests();
+    runKeyframeDragControllerTests();
+    runResizeControllerTests();
+    runSelectionStateEngineTests();
+    runTimelineCreationDefaultsTests();
+    std::cout << ">>> ALL 193 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

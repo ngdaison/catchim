@@ -289,6 +289,18 @@ add_library(catchim_editor STATIC
     src/editor/commands/CommandManager.h
     src/editor/panels/PanelLayoutConfig.cpp
     src/editor/panels/PanelLayoutConfig.h
+    src/editor/timeline/controllers/SeekController.cpp
+    src/editor/timeline/controllers/SeekController.h
+    src/editor/timeline/controllers/PlayheadController.cpp
+    src/editor/timeline/controllers/PlayheadController.h
+    src/editor/timeline/controllers/KeyframeDragController.cpp
+    src/editor/timeline/controllers/KeyframeDragController.h
+    src/editor/timeline/controllers/ResizeController.cpp
+    src/editor/timeline/controllers/ResizeController.h
+    src/editor/selection/SelectionStateEngine.cpp
+    src/editor/selection/SelectionStateEngine.h
+    src/editor/timeline/TimelineCreationDefaults.cpp
+    src/editor/timeline/TimelineCreationDefaults.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 

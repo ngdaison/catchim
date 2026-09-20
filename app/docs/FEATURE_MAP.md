@@ -1671,6 +1671,61 @@ Quy ước trạng thái:
 | Timeline Audio Presence & Audible Clip Collection | `web/src/media/audio.ts` | `catchim::audio::AudioMediaUtils::timelineHasAudio`, `collectAudibleClips` | Verified |
 | Decibel to Linear Gain Conversions | `web/src/timeline/audio-state.ts` | `catchim::audio::AudioMediaUtils::dBToLinear`, `linearToDb` | Verified |
 
+---
+
+## 176. Timeline Seek Controller & Gesture Dispatcher
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Ruler and Tracks Click Gesture Detection | `web/src/timeline/controllers/seek-controller.ts` | `catchim::editor::SeekController::isClickGesture`, `onMouseDown`, `onClick` | Verified |
+| Pixel-to-Time Conversion with Zoom & Scroll | `web/src/timeline/controllers/seek-controller.ts` | `catchim::editor::SeekController::pixelToTime` | Verified |
+| Frame Snapping & Selection Deselection on Seek | `web/src/timeline/controllers/seek-controller.ts` | `catchim::editor::SeekController::onClick` | Verified |
+
+---
+
+## 177. Playhead Scrub & Auto-Scroll Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Playhead Scrubbing Session Management | `web/src/timeline/controllers/playhead-controller.ts` | `catchim::editor::PlayheadController`, `PlayheadScrubSession` | Verified |
+| Multi-Source Snapping (Elements, Bookmarks, Keyframes) | `web/src/timeline/controllers/playhead-controller.ts` | `catchim::editor::PlayheadController::scrub` | Verified |
+| Playback Auto-Scroll & Viewport Tracking | `web/src/timeline/controllers/playhead-controller.ts` | `catchim::editor::PlayheadController::handlePlaybackUpdate` | Verified |
+
+---
+
+## 178. Keyframe Drag & Retime Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Drag Threshold (5px) & Pending/Active States | `web/src/timeline/controllers/keyframe-drag-controller.ts` | `catchim::editor::KeyframeDragController`, `KeyframeDragState` | Verified |
+| Frame-Quantized Delta Ticks Calculation | `web/src/timeline/controllers/keyframe-drag-controller.ts` | `catchim::editor::KeyframeDragController::handleMouseMove` | Verified |
+| Keyframe Clamping & Visual Offset Preview | `web/src/timeline/controllers/keyframe-drag-controller.ts` | `catchim::editor::KeyframeDragController::calculateClampedTime`, `getVisualOffsetPx` | Verified |
+
+---
+
+## 179. Multi-Element Group Resize Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Resize Session & Left/Right Side Handling | `web/src/timeline/controllers/resize-controller.ts` | `catchim::editor::ResizeController`, `ActiveResizeSession` | Verified |
+| Neighbor Bound Constraint & Group Snapping | `web/src/timeline/controllers/resize-controller.ts` | `catchim::editor::ResizeController::computeSnappedDelta` | Verified |
+| Realtime Group Resize Preview & Change Detection | `web/src/timeline/controllers/resize-controller.ts` | `catchim::editor::ResizeController::handleMouseMove`, `hasResizeChanges`, `handleMouseUp` | Verified |
+
+---
+
+## 180. Pure Selection State Engine & Scope Management
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Immutable Selection Mutations (Replace, Clear, Prune, Toggle) | `web/src/selection/state.ts` | `catchim::editor::SelectionStateEngine::replaceSelection`, `clearSelection`, `pruneSelection`, `toggleSelection` | Verified |
+| Ordered Range & Additive Box Selection | `web/src/selection/state.ts` | `catchim::editor::SelectionStateEngine::selectRange`, `applyBoxSelection` | Verified |
+| Scope Activation & Active Scope Cancellation | `web/src/selection/scope.ts` | `catchim::editor::SelectionStateEngine::activateScope`, `clearActiveScope`, `hasActiveScopeSelection` | Verified |
+
+---
+
+## 181. Timeline Creation Defaults & Scale Standards
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Default New Element Duration (5.0s) & Unit Converter | `web/src/timeline/creation.ts` | `catchim::editor::TimelineCreationDefaults::defaultNewElementDuration`, `toElementDurationTicks` | Verified |
+| Standard Track Type Names (Video, Audio, Text, Graphic, Effect) | `web/src/timeline/tracks.ts` | `catchim::editor::TimelineCreationDefaults::getDefaultTrackName` | Verified |
+| Scale & Volume dB Ranges (-60dB to 20dB, 0.1 to 100 zoom) | `web/src/timeline/scale.ts`, `audio-constants.ts` | `catchim::editor::TimelineCreationDefaults::isVolumeDbValid`, `clampVolumeDb`, `clampZoomLevel` | Verified |
+
+
 
 
 
