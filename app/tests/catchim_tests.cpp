@@ -160,6 +160,12 @@
 #include "editor/actions/KeybindingMigrationEngine.h"
 #include "editor/animation/AnimationKeyframeQueryEngine.h"
 #include "editor/history/CommandReactorPipeline.h"
+#include "editor/timeline/TimelinePixelUtils.h"
+#include "editor/timeline/TimelineZoomUtils.h"
+#include "editor/timeline/TimelineDragData.h"
+#include "render/background/BackgroundPresets.h"
+#include "editor/params/ParamChannelLayoutEngine.h"
+#include "core/i18n/I18nEngine.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -9125,6 +9131,237 @@ void runCommandReactorPipelineTests() {
     std::cout << "[PASS] runCommandReactorPipelineTests" << std::endl;
 }
 
+void runTimelinePixelUtilsTests() {
+    double basePx = TimelinePixelUtils::BASE_TIMELINE_PIXELS_PER_SECOND;
+    TEST_ASSERT(basePx == 50.0);
+    double zMin = TimelinePixelUtils::TIMELINE_ZOOM_MIN;
+    TEST_ASSERT(zMin == 0.1);
+    double zMax = TimelinePixelUtils::TIMELINE_ZOOM_MAX;
+    TEST_ASSERT(zMax == 100.0);
+    double lineW = TimelinePixelUtils::TIMELINE_INDICATOR_LINE_WIDTH_PX;
+    TEST_ASSERT(lineW == 2.0);
+
+    TEST_ASSERT(TimelinePixelUtils::getTimelinePixelsPerSecond(1.0) == 50.0);
+    TEST_ASSERT(TimelinePixelUtils::getTimelinePixelsPerSecond(2.0) == 100.0);
+
+    const auto t2 = TimelineTime::fromSeconds(2.0);
+    TEST_ASSERT(TimelinePixelUtils::timelineTimeToPixels(t2, 1.0) == 100.0);
+    TEST_ASSERT(TimelinePixelUtils::timelineTimeToPixels(t2, 0.5) == 50.0);
+
+    // Grid snapping
+    TEST_ASSERT(TimelinePixelUtils::snapPixelToDeviceGrid(10.33, 1.0) == 10.0);
+    TEST_ASSERT(TimelinePixelUtils::snapPixelToDeviceGrid(10.33, 2.0) == 10.5);
+    TEST_ASSERT(TimelinePixelUtils::snapPixelToDeviceGrid(10.74, 2.0) == 10.5);
+    TEST_ASSERT(TimelinePixelUtils::snapPixelToDeviceGrid(10.76, 2.0) == 11.0);
+
+    // timelineTimeToSnappedPixels
+    const auto t01 = TimelineTime::fromSeconds(0.1);
+    TEST_ASSERT(TimelinePixelUtils::timelineTimeToSnappedPixels(t01, 1.0, 1.0) == 5.0);
+
+    // getCenteredLineLeft
+    TEST_ASSERT(TimelinePixelUtils::getCenteredLineLeft(100.0, 2.0) == 99.0);
+    TEST_ASSERT(TimelinePixelUtils::getCenteredLineLeft(50.0, 4.0) == 48.0);
+
+    std::cout << "[PASS] runTimelinePixelUtilsTests" << std::endl;
+}
+
+void runTimelineZoomUtilsTests() {
+    // Zoom min for duration 10s and container 1000px:
+    // availableWidth = 1000 * 0.25 = 250; zoomToFit = 250 / (10 * 50) = 0.5
+    const auto d10 = TimelineTime::fromSeconds(10.0);
+    const double minZoom = TimelineZoomUtils::getTimelineZoomMin(d10, 1000.0);
+    TEST_ASSERT(std::abs(minZoom - 0.5) < 1e-4);
+
+    // Zoom percent
+    TEST_ASSERT(TimelineZoomUtils::getZoomPercent(0.1, 0.1, 100.0) == 0.0);
+    TEST_ASSERT(TimelineZoomUtils::getZoomPercent(100.0, 0.1, 100.0) == 1.0);
+
+    // Padding px
+    const double padAtMin = TimelineZoomUtils::getTimelinePaddingPx(1000.0, 0.1, 0.1);
+    TEST_ASSERT(std::abs(padAtMin - 750.0) < 1e-4); // 1000 * 0.75
+
+    // Slider <-> Zoom mapping
+    TEST_ASSERT(std::abs(TimelineZoomUtils::sliderToZoom(0.0, 0.1, 100.0) - 0.1) < 1e-4);
+    TEST_ASSERT(std::abs(TimelineZoomUtils::sliderToZoom(1.0, 0.1, 100.0) - 100.0) < 1e-4);
+
+    TEST_ASSERT(std::abs(TimelineZoomUtils::zoomToSlider(0.1, 0.1, 100.0) - 0.0) < 1e-4);
+    TEST_ASSERT(std::abs(TimelineZoomUtils::zoomToSlider(100.0, 0.1, 100.0) - 1.0) < 1e-4);
+
+    // Roundtrip
+    const double testSlider = 0.42;
+    const double roundtripZoom = TimelineZoomUtils::sliderToZoom(testSlider, 0.1, 100.0);
+    const double roundtripSlider = TimelineZoomUtils::zoomToSlider(roundtripZoom, 0.1, 100.0);
+    TEST_ASSERT(std::abs(roundtripSlider - testSlider) < 1e-4);
+
+    std::cout << "[PASS] runTimelineZoomUtilsTests" << std::endl;
+}
+
+void runTimelineDragDataTests() {
+    TEST_ASSERT(TimelineDragEngine::DEFAULT_NEW_ELEMENT_DURATION == TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(TimelineDragEngine::toElementDurationTicks(std::nullopt) == TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(TimelineDragEngine::toElementDurationTicks(3.5) == TimelineTime::fromSeconds(3.5));
+
+    // mouseTimeFromClientX: clientX=300, containerLeft=100, scrollLeft=50, zoom=1.0
+    // mouseX = 300 - 100 + 50 = 250; pixelsPerSec = 50; seconds = 5.0
+    const auto mouseTime = TimelineDragEngine::getMouseTimeFromClientX(300.0, 100.0, 50.0, 1.0);
+    TEST_ASSERT(std::abs(mouseTime.toSeconds() - 5.0) < 1e-4);
+
+    // Drag data variant
+    MediaDragData media{
+        .id = "m_101",
+        .name = "clip.mp4",
+        .mediaType = ClipType::Video
+    };
+    TimelineDragData d1 = media;
+    TEST_ASSERT(TimelineDragEngine::getDragDataId(d1) == "m_101");
+    TEST_ASSERT(TimelineDragEngine::getDragDataName(d1) == "clip.mp4");
+    TEST_ASSERT(TimelineDragEngine::getDragDataType(d1) == "media");
+
+    TextDragData text{
+        .id = "t_202",
+        .name = "My Text",
+        .content = "Sample Subtitle"
+    };
+    TimelineDragData d2 = text;
+    TEST_ASSERT(TimelineDragEngine::getDragDataId(d2) == "t_202");
+    TEST_ASSERT(TimelineDragEngine::getDragDataName(d2) == "My Text");
+    TEST_ASSERT(TimelineDragEngine::getDragDataType(d2) == "text");
+
+    StickerDragData sticker{
+        .id = "s_303",
+        .name = "Star",
+        .stickerId = "star_icon"
+    };
+    TimelineDragData d3 = sticker;
+    TEST_ASSERT(TimelineDragEngine::getDragDataType(d3) == "sticker");
+
+    GraphicDragData graphic{
+        .id = "g_404",
+        .name = "Rectangle",
+        .definitionId = "rect_1",
+        .params = nlohmann::json{{"fill", "#ff0000"}}
+    };
+    TimelineDragData d4 = graphic;
+    TEST_ASSERT(TimelineDragEngine::getDragDataType(d4) == "graphic");
+
+    EffectDragData effect{
+        .id = "e_505",
+        .name = "Blur",
+        .effectType = "gaussian_blur",
+        .targetElementTypes = {ClipType::Video, ClipType::Image}
+    };
+    TimelineDragData d5 = effect;
+    TEST_ASSERT(TimelineDragEngine::getDragDataType(d5) == "effect");
+
+    std::cout << "[PASS] runTimelineDragDataTests" << std::endl;
+}
+
+void runBackgroundPresetsTests() {
+    int defBlur = BackgroundPresets::DEFAULT_BACKGROUND_BLUR_INTENSITY;
+    TEST_ASSERT(defBlur == 10);
+    std::string defColor = BackgroundPresets::DEFAULT_BACKGROUND_COLOR;
+    TEST_ASSERT(defColor == "#000000");
+
+    const auto& presets = BackgroundPresets::getBlurPresets();
+    TEST_ASSERT(presets.size() == 3);
+
+    auto pLight = BackgroundPresets::findBlurPreset("Light");
+    TEST_ASSERT(pLight.has_value() && pLight->value == 100);
+
+    auto pMed = BackgroundPresets::findBlurPreset("Medium");
+    TEST_ASSERT(pMed.has_value() && pMed->value == 200);
+
+    auto pHeavy = BackgroundPresets::findBlurPreset("Heavy");
+    TEST_ASSERT(pHeavy.has_value() && pHeavy->value == 500);
+
+    auto pNone = BackgroundPresets::findBlurPreset("Invalid");
+    TEST_ASSERT(!pNone.has_value());
+
+    TEST_ASSERT(BackgroundPresets::clampBlurIntensity(-5) == 0);
+    TEST_ASSERT(BackgroundPresets::clampBlurIntensity(1500) == 1000);
+    TEST_ASSERT(BackgroundPresets::clampBlurIntensity(250) == 250);
+
+    std::cout << "[PASS] runBackgroundPresetsTests" << std::endl;
+}
+
+void runParamChannelLayoutEngineTests() {
+    // srgb <-> linear
+    TEST_ASSERT(std::abs(ParamChannelLayoutEngine::srgbToLinear(0.0) - 0.0) < 1e-4);
+    TEST_ASSERT(std::abs(ParamChannelLayoutEngine::srgbToLinear(1.0) - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(ParamChannelLayoutEngine::linearToSrgb(0.0) - 0.0) < 1e-4);
+    TEST_ASSERT(std::abs(ParamChannelLayoutEngine::linearToSrgb(1.0) - 1.0) < 1e-4);
+
+    const double roundtrip = ParamChannelLayoutEngine::linearToSrgb(ParamChannelLayoutEngine::srgbToLinear(0.5));
+    TEST_ASSERT(std::abs(roundtrip - 0.5) < 1e-4);
+
+    // parseColorToLinearRgba
+    auto white = ParamChannelLayoutEngine::parseColorToLinearRgba("#ffffff");
+    TEST_ASSERT(white.has_value());
+    TEST_ASSERT(std::abs(white->r - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(white->g - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(white->b - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(white->a - 1.0) < 1e-4);
+
+    auto black = ParamChannelLayoutEngine::parseColorToLinearRgba("#000000");
+    TEST_ASSERT(black.has_value());
+    TEST_ASSERT(black->r == 0.0 && black->g == 0.0 && black->b == 0.0);
+
+    // formatLinearRgba
+    TEST_ASSERT(ParamChannelLayoutEngine::formatLinearRgba(white.value()) == "#ffffff");
+    TEST_ASSERT(ParamChannelLayoutEngine::formatLinearRgba(black.value()) == "#000000");
+
+    // Coercion
+    TEST_ASSERT(ParamChannelLayoutEngine::coerceParamValueNumber(10.33, 0.0, 20.0, 0.5) == 10.5);
+    TEST_ASSERT(ParamChannelLayoutEngine::coerceParamValueNumber(25.0, 0.0, 20.0, 1.0) == 20.0);
+    TEST_ASSERT(ParamChannelLayoutEngine::coerceParamValueNumber(-5.0, 0.0, 20.0, 1.0) == 0.0);
+
+    auto selA = ParamChannelLayoutEngine::coerceParamValueSelect("optionA", {"optionA", "optionB"});
+    TEST_ASSERT(selA.has_value() && *selA == "optionA");
+
+    auto selC = ParamChannelLayoutEngine::coerceParamValueSelect("optionC", {"optionA", "optionB"});
+    TEST_ASSERT(!selC.has_value());
+
+    std::cout << "[PASS] runParamChannelLayoutEngineTests" << std::endl;
+}
+
+void runI18nEngineTests() {
+    auto& i18n = I18nEngine::instance();
+    TEST_ASSERT(i18n.setLocale("en"));
+    TEST_ASSERT(i18n.currentLocale() == "en");
+
+    // Lookup in English
+    TEST_ASSERT(i18n.t("common.apply") == "Apply");
+    TEST_ASSERT(i18n.t("common.cancel") == "Cancel");
+    TEST_ASSERT(i18n.t("settings.aspectRatio") == "Aspect ratio");
+    TEST_ASSERT(i18n.hasKey("settings.aspectRatio"));
+
+    // Switch to Vietnamese
+    TEST_ASSERT(i18n.setLocale("vi"));
+    TEST_ASSERT(i18n.currentLocale() == "vi");
+    TEST_ASSERT(i18n.t("common.apply") == "Áp dụng");
+    TEST_ASSERT(i18n.t("common.cancel") == "Hủy");
+    TEST_ASSERT(i18n.t("settings.aspectRatio") == "Tỉ lệ khung hình");
+
+    // Template interpolation
+    std::string exportMsg = i18n.t("export.exporting", {{"name", "VideoFinal"}});
+    TEST_ASSERT(exportMsg == "Đang xuất VideoFinal...");
+
+    // Custom translation
+    i18n.addTranslation("vi", "custom.hello", "Xin chào {user}!");
+    TEST_ASSERT(i18n.t("custom.hello", {{"user", "Catchim"}}) == "Xin chào Catchim!");
+
+    // Missing key fallback
+    TEST_ASSERT(i18n.t("missing.key.123") == "missing.key.123");
+
+    // Invalid locale rejection
+    TEST_ASSERT(!i18n.setLocale("invalid_locale"));
+
+    // Restore to English
+    i18n.setLocale("en");
+
+    std::cout << "[PASS] runI18nEngineTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -9272,7 +9509,13 @@ int main() {
     runKeybindingMigrationEngineTests();
     runAnimationKeyframeQueryEngineTests();
     runCommandReactorPipelineTests();
-    std::cout << ">>> ALL 145 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTimelinePixelUtilsTests();
+    runTimelineZoomUtilsTests();
+    runTimelineDragDataTests();
+    runBackgroundPresetsTests();
+    runParamChannelLayoutEngineTests();
+    runI18nEngineTests();
+    std::cout << ">>> ALL 151 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
 

@@ -1307,4 +1307,55 @@ Quy ước trạng thái:
 | Command Lifecycle Reactor Registration & Notification | `web/src/core/index.ts` | `catchim::editor::CommandReactorPipeline::registerReactor`, `unregisterReactor`, `notifyReactors` | Verified |
 | Empty Overlay & Audio Tracks Auto-Pruning | `web/src/core/index.ts` | `catchim::editor::CommandReactorPipeline::pruneEmptyTracks`, `createAutoPruneReactor` | Verified |
 
+---
+
+## 134. Timeline Pixel & Device Grid Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Time to Pixel Conversion & Zoom Scaling | `web/src/timeline/pixel-utils.ts`, `scale.ts` | `catchim::editor::TimelinePixelUtils::getTimelinePixelsPerSecond`, `timelineTimeToPixels` | Verified |
+| HiDPI Device Grid Snapping & Centering | `web/src/timeline/pixel-utils.ts` | `catchim::editor::TimelinePixelUtils::snapPixelToDeviceGrid`, `timelineTimeToSnappedPixels`, `getCenteredLineLeft` | Verified |
+
+---
+
+## 135. Timeline Zoom Levels & Exponential Slider Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Zoom To Fit Minimum Level & Dynamic Container Padding | `web/src/timeline/zoom-utils.ts` | `catchim::editor::TimelineZoomUtils::getTimelineZoomMin`, `getTimelinePaddingPx`, `getZoomPercent` | Verified |
+| Exponential Zoom to Linear Slider Bidirectional Mapping | `web/src/timeline/zoom-utils.ts` | `catchim::editor::TimelineZoomUtils::sliderToZoom`, `zoomToSlider` | Verified |
+
+---
+
+## 136. Timeline Drag Data & Element Creation Defaults
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Default New Element Duration (5s) | `web/src/timeline/creation.ts` | `catchim::editor::TimelineDragEngine::toElementDurationTicks`, `DEFAULT_NEW_ELEMENT_DURATION` | Verified |
+| ClientX to Timeline Time Conversion | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragEngine::getMouseTimeFromClientX` | Verified |
+| Drag Data Variant Hierarchy (Media, Text, Sticker, Graphic, Effect) | `web/src/timeline/drag.ts` | `catchim::editor::TimelineDragData`, `TimelineDragEngine::getDragDataId`, `getDragDataName`, `getDragDataType` | Verified |
+
+---
+
+## 137. Canvas Background Blur & Color Presets
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Background Blur Intensity Presets (Light, Medium, Heavy) | `web/src/background/blur.ts` | `catchim::render::BackgroundPresets::getBlurPresets`, `findBlurPreset`, `clampBlurIntensity` | Verified |
+| Default Canvas Background Color (#000000) | `web/src/background/color.ts` | `catchim::render::BackgroundPresets::DEFAULT_BACKGROUND_COLOR` | Verified |
+
+---
+
+## 138. Param Channel Layout & sRGB/Linear Conversion Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| IEC 61966-2-1 sRGB to Linear RGBA Conversion | `web/src/params/index.ts` | `catchim::editor::ParamChannelLayoutEngine::srgbToLinear`, `linearToSrgb` | Verified |
+| Linear RGBA Color Parsing & Hex8 Formatting | `web/src/params/index.ts` | `catchim::editor::ParamChannelLayoutEngine::parseColorToLinearRgba`, `formatLinearRgba` | Verified |
+| Param Value Range Clamping & Stepped Coercion | `web/src/params/index.ts` | `catchim::editor::ParamChannelLayoutEngine::coerceParamValueNumber`, `coerceParamValueSelect` | Verified |
+
+---
+
+## 139. Internationalization (I18n) Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Multi-Locale Dictionary (en, vi) & Hierarchy Lookup | `web/src/i18n/` | `catchim::core::I18nEngine::t`, `hasKey`, `supportedLocales`, `setLocale` | Verified |
+| Dynamic Template Parameter Interpolation ({name}, {count}) | `web/src/i18n/` | `catchim::core::I18nEngine::interpolate` | Verified |
+
+
 
