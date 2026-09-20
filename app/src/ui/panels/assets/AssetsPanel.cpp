@@ -144,6 +144,9 @@ QWidget* AssetsPanel::createMediaView() {
     mediaListWidget_ = new QListWidget(view);
     mediaListWidget_->setObjectName("mediaListWidget");
     mediaListWidget_->setAcceptDrops(false);
+    mediaListWidget_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    mediaListWidget_->setTextElideMode(Qt::ElideMiddle);
+    mediaListWidget_->setWordWrap(true);
     connect(mediaListWidget_, &QListWidget::itemDoubleClicked, this, &AssetsPanel::onMediaItemDoubleClicked);
     layout->addWidget(mediaListWidget_, 1);
 
@@ -166,9 +169,10 @@ QWidget* AssetsPanel::createAudioView() {
 
     auto* sfxScroll = new QScrollArea(view);
     sfxScroll->setWidgetResizable(true);
+    sfxScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* sfxContainer = new QWidget(sfxScroll);
     auto* sfxLayout = new QVBoxLayout(sfxContainer);
-    sfxLayout->setContentsMargins(0, 0, 0, 0);
+    sfxLayout->setContentsMargins(0, 0, 4, 0);
     sfxLayout->setSpacing(6);
 
     struct SfxEntry {
@@ -205,6 +209,7 @@ QWidget* AssetsPanel::createAudioView() {
         auto* nameLabel = new QLabel(QString("<b>%1</b><br><span style='color:%2;'>%3 • %4s</span>")
             .arg(sfx.name).arg(pal.textSecondary.name()).arg(sfx.category).arg(sfx.duration, 0, 'f', 1), row);
         nameLabel->setTextFormat(Qt::RichText);
+        nameLabel->setWordWrap(true);
         rLayout->addWidget(nameLabel, 1);
 
         auto* addBtn = new QPushButton("Thêm", row);
@@ -237,6 +242,7 @@ QWidget* AssetsPanel::createTextView() {
 
     auto* scroll = new QScrollArea(view);
     scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
     auto* container = new QWidget(scroll);
     auto* cLayout = new QVBoxLayout(container);
@@ -590,9 +596,10 @@ QWidget* AssetsPanel::createTransitionsView() {
 
     auto* scroll = new QScrollArea(view);
     scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* container = new QWidget(scroll);
     auto* cLayout = new QVBoxLayout(container);
-    cLayout->setContentsMargins(0, 0, 0, 0);
+    cLayout->setContentsMargins(0, 0, 4, 0);
     cLayout->setSpacing(6);
 
     struct TransitionItem {
@@ -707,9 +714,10 @@ QWidget* AssetsPanel::createAdjustmentView() {
 
     auto* scroll = new QScrollArea(view);
     scroll->setWidgetResizable(true);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     auto* container = new QWidget(scroll);
     auto* cLayout = new QVBoxLayout(container);
-    cLayout->setContentsMargins(0, 0, 0, 0);
+    cLayout->setContentsMargins(0, 0, 4, 0);
     cLayout->setSpacing(8);
 
     auto makeSliderRow = [container](const QString& title, int min, int max, int def) -> std::pair<QSlider*, QLabel*> {
@@ -903,6 +911,7 @@ void AssetsPanel::refresh() {
         }
 
         item->setText(label);
+        item->setToolTip(QString::fromStdString(asset->fileName()));
         item->setData(Qt::UserRole, QString::fromStdString(asset->id().str()));
     }
 }

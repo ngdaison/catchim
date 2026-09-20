@@ -199,10 +199,20 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
             }
 
             // Clip label text
-            painter.setPen(QColor("#FFFFFF"));
-            painter.setFont(QFont("Inter", 8, QFont::Bold));
-            QString label = QString::fromStdString(clip.name());
-            painter.drawText(clipRect.adjusted(8, 6, -8, -6), Qt::AlignLeft | Qt::AlignTop, label);
+            if (clipRect.width() > 14) {
+                painter.save();
+                painter.setClipRect(clipRect.adjusted(2, 2, -2, -2));
+                painter.setPen(QColor("#FFFFFF"));
+                QFont font("Inter", 8, QFont::Bold);
+                painter.setFont(font);
+                QFontMetrics fm(font);
+                int availW = clipRect.width() - 16;
+                if (availW > 8) {
+                    QString label = fm.elidedText(QString::fromStdString(clip.name()), Qt::ElideRight, availW);
+                    painter.drawText(clipRect.adjusted(8, 6, -8, -6), Qt::AlignLeft | Qt::AlignTop, label);
+                }
+                painter.restore();
+            }
         }
 
         yOffset += trackHeight + Metrics::trackGap;

@@ -13,6 +13,36 @@
 
 namespace catchim::ui {
 
+class ElidedLabel : public QLabel {
+public:
+    explicit ElidedLabel(QWidget* parent = nullptr)
+        : QLabel(parent) {
+        setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
+    }
+    void setFullText(const QString& text) {
+        fullText_ = text;
+        setToolTip(text);
+        updateElided();
+    }
+    const QString& fullText() const { return fullText_; }
+protected:
+    void resizeEvent(QResizeEvent* event) override {
+        QLabel::resizeEvent(event);
+        updateElided();
+    }
+private:
+    void updateElided() {
+        if (fullText_.isEmpty()) {
+            setText("");
+            return;
+        }
+        QFontMetrics fm(font());
+        int availWidth = std::max(40, width());
+        setText(fm.elidedText(fullText_, Qt::ElideMiddle, availWidth));
+    }
+    QString fullText_;
+};
+
 PropertiesPanel::PropertiesPanel(editor::EditorEngine& engine, QWidget* parent)
     : QWidget(parent)
     , engine_(engine)
@@ -46,12 +76,13 @@ void PropertiesPanel::setupUi() {
     // 2. Inspector Scroll Area
     auto* scrollArea = new QScrollArea(this);
     scrollArea->setWidgetResizable(true);
+    scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scrollArea->setStyleSheet("QScrollArea { border: none; background: transparent; }");
 
     inspectorView_ = new QWidget(scrollArea);
     auto* insLayout = new QVBoxLayout(inspectorView_);
-    insLayout->setContentsMargins(12, 12, 12, 12);
-    insLayout->setSpacing(12);
+    insLayout->setContentsMargins(8, 8, 8, 8);
+    insLayout->setSpacing(8);
 
     // Header info card
     auto* headerCard = new QWidget(inspectorView_);
@@ -60,7 +91,7 @@ void PropertiesPanel::setupUi() {
     hLayout->setContentsMargins(8, 8, 8, 8);
     clipTypeBadge_ = new QLabel("VIDEO", headerCard);
     clipTypeBadge_->setStyleSheet("background: #0284c7; color: #ffffff; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px;");
-    clipNameHeader_ = new QLabel("Clip Name", headerCard);
+    clipNameHeader_ = new ElidedLabel(headerCard);
     clipNameHeader_->setProperty("class", "SectionTitle");
     hLayout->addWidget(clipTypeBadge_);
     hLayout->addWidget(clipNameHeader_, 1);
@@ -71,13 +102,21 @@ void PropertiesPanel::setupUi() {
         sb->setRange(minVal, maxVal);
         sb->setSingleStep(step);
         sb->setValue(defaultVal);
+        sb->setMinimumWidth(60);
         return sb;
+    };
+
+    auto setupForm = [](QFormLayout* form) {
+        form->setSpacing(6);
+        form->setLabelAlignment(Qt::AlignLeft);
+        form->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+        form->setContentsMargins(6, 10, 6, 8);
     };
 
     // A. Transform Group
     auto* transformGroup = new QGroupBox("Biến đổi vị trí (Transform)", inspectorView_);
     auto* tForm = new QFormLayout(transformGroup);
-    tForm->setSpacing(8);
+    setupForm(tForm);
 
     posXSpin_ = makeSpin(-5000, 5000, 10, 0);
     connect(posXSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onTransformChanged);
@@ -94,7 +133,8 @@ void PropertiesPanel::setupUi() {
     opacitySlider_->setRange(0, 100);
     opacitySlider_->setValue(100);
     opacityValLabel_ = new QLabel("100%", transformGroup);
-    opacityValLabel_->setFixedWidth(36);
+    opacityValLabel_->setFixedWidth(40);
+    opacityValLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     auto* opLayout = new QHBoxLayout();
     opLayout->addWidget(opacitySlider_, 1);
     opLayout->addWidget(opacityValLabel_);
@@ -104,6 +144,8 @@ void PropertiesPanel::setupUi() {
     });
 
     blendModeCombo_ = new QComboBox(transformGroup);
+    blendModeCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    blendModeCombo_->setMinimumContentsLength(6);
     blendModeCombo_->addItems({"Bình thường (Normal)", "Nhân màu (Multiply)", "Làm sáng (Screen)", "Phủ lên (Overlay)", "Tối màu (Darken)", "Sáng màu (Lighten)", "Né màu (Color Dodge)"});
     connect(blendModeCombo_, &QComboBox::currentIndexChanged, this, &PropertiesPanel::onTransformChanged);
 
@@ -119,9 +161,10 @@ void PropertiesPanel::setupUi() {
     // B. Speed / Retime Group
     auto* speedGroup = new QGroupBox("Tốc độ phát (Speed / Retime)", inspectorView_);
     auto* sForm = new QFormLayout(speedGroup);
-    sForm->setSpacing(8);
+    setupForm(sForm);
 
     speedSpin_ = makeSpin(0.1, 10.0, 0.1, 1.0);
+    speedSpin_->setFixedWidth(64);
     connect(speedSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onSpeedChanged);
     speedSlider_ = new QSlider(Qt::Horizontal, speedGroup);
     speedSlider_->setRange(10, 500); // 0.1x to 5.0x
@@ -146,7 +189,7 @@ void PropertiesPanel::setupUi() {
     // C. Text Formatting Group
     textGroup_ = new QGroupBox("Nội dung & Định dạng chữ", inspectorView_);
     auto* txtForm = new QFormLayout(textGroup_);
-    txtForm->setSpacing(8);
+    setupForm(txtForm);
 
     textContentEdit_ = new QTextEdit(textGroup_);
     textContentEdit_->setFixedHeight(64);
@@ -154,6 +197,7 @@ void PropertiesPanel::setupUi() {
     connect(textContentEdit_, &QTextEdit::textChanged, this, &PropertiesPanel::onTextChanged);
 
     fontSizeSpin_ = makeSpin(6, 300, 2, 48);
+    fontSizeSpin_->setFixedWidth(64);
     connect(fontSizeSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onTextChanged);
 
     textColorBtn_ = new QPushButton("Chọn màu chữ...", textGroup_);
@@ -177,13 +221,14 @@ void PropertiesPanel::setupUi() {
     // D. Audio Controls Group
     audioGroup_ = new QGroupBox("Âm thanh (Audio)", inspectorView_);
     auto* aForm = new QFormLayout(audioGroup_);
-    aForm->setSpacing(8);
+    setupForm(aForm);
 
     volumeSlider_ = new QSlider(Qt::Horizontal, audioGroup_);
     volumeSlider_->setRange(0, 200);
     volumeSlider_->setValue(100);
     volumeValLabel_ = new QLabel("100%", audioGroup_);
-    volumeValLabel_->setFixedWidth(36);
+    volumeValLabel_->setFixedWidth(40);
+    volumeValLabel_->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     auto* volLayout = new QHBoxLayout();
     volLayout->addWidget(volumeSlider_, 1);
     volLayout->addWidget(volumeValLabel_);
@@ -193,8 +238,10 @@ void PropertiesPanel::setupUi() {
     });
 
     fadeInSpin_ = makeSpin(0.0, 10.0, 0.1, 0.0);
+    fadeInSpin_->setFixedWidth(64);
     connect(fadeInSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onAudioChanged);
     fadeOutSpin_ = makeSpin(0.0, 10.0, 0.1, 0.0);
+    fadeOutSpin_->setFixedWidth(64);
     connect(fadeOutSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onAudioChanged);
 
     aForm->addRow("Âm lượng:", volLayout);
@@ -205,9 +252,11 @@ void PropertiesPanel::setupUi() {
     // E. Graphic Controls Group
     graphicGroup_ = new QGroupBox("Hình khối (Graphic / Shape)", inspectorView_);
     auto* gForm = new QFormLayout(graphicGroup_);
-    gForm->setSpacing(8);
+    setupForm(gForm);
 
     shapeCombo_ = new QComboBox(graphicGroup_);
+    shapeCombo_->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+    shapeCombo_->setMinimumContentsLength(6);
     shapeCombo_->addItem("Hình chữ nhật (Rectangle)", "rectangle");
     shapeCombo_->addItem("Hình tròn (Circle)", "circle");
     shapeCombo_->addItem("Ngôi sao (Star)", "star");
@@ -228,9 +277,11 @@ void PropertiesPanel::setupUi() {
     });
 
     cornerRadiusSpin_ = makeSpin(0.0, 100.0, 1.0, 8.0);
+    cornerRadiusSpin_->setFixedWidth(64);
     connect(cornerRadiusSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onGraphicChanged);
 
     strokeWidthSpin_ = makeSpin(0.0, 50.0, 1.0, 0.0);
+    strokeWidthSpin_->setFixedWidth(64);
     connect(strokeWidthSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onGraphicChanged);
 
     gForm->addRow("Loại hình:", shapeCombo_);
@@ -244,8 +295,10 @@ void PropertiesPanel::setupUi() {
     auto* effLayout = new QVBoxLayout(activeEffectsGroup_);
     effLayout->setSpacing(6);
     activeEffectLabel_ = new QLabel("Hiệu ứng: Không có", activeEffectsGroup_);
+    activeEffectLabel_->setWordWrap(true);
     activeEffectLabel_->setProperty("class", "SecondaryLabel");
     activeTransitionLabel_ = new QLabel("Chuyển cảnh: Không có", activeEffectsGroup_);
+    activeTransitionLabel_->setWordWrap(true);
     activeTransitionLabel_->setProperty("class", "SecondaryLabel");
     effLayout->addWidget(activeEffectLabel_);
     effLayout->addWidget(activeTransitionLabel_);
@@ -288,7 +341,11 @@ void PropertiesPanel::refresh() {
     isUpdatingUi_ = true;
 
     // Header info
-    clipNameHeader_->setText(QString::fromStdString(clip->name()));
+    if (auto* el = dynamic_cast<ElidedLabel*>(clipNameHeader_)) {
+        el->setFullText(QString::fromStdString(clip->name()));
+    } else {
+        clipNameHeader_->setText(QString::fromStdString(clip->name()));
+    }
     QString typeStr = "VIDEO";
     if (clip->type() == editor::ClipType::Audio) typeStr = "AUDIO";
     else if (clip->type() == editor::ClipType::Text) typeStr = "TEXT";
