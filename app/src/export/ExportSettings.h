@@ -44,4 +44,13 @@ struct ExportSettings {
     }
 };
 
+struct ExportResult {
+    bool success{false};
+    std::string outputPath;
+    std::string error;
+    bool isCancelled{false};
+    int64_t totalFrames{0};
+    double durationSeconds{0.0};
+};
+
 } // namespace catchim::exporting

@@ -178,6 +178,12 @@
 #include "editor/animation/AnimationValueResolvers.h"
 #include "editor/timeline/TimelineTrackDefaults.h"
 #include "media/TtsVoiceRegistry.h"
+#include "editor/playback/PlaybackManager.h"
+#include "editor/timeline/TimelineManager.h"
+#include "render/RendererManager.h"
+#include "editor/project/SaveManager.h"
+#include "media/MediaManager.h"
+#include "audio/AudioManager.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -9840,6 +9846,391 @@ void runTtsVoiceRegistryTests() {
     std::cout << "[PASS] runTtsVoiceRegistryTests" << std::endl;
 }
 
+void runPlaybackManagerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    PlaybackManager pm;
+    TEST_ASSERT(!pm.isPlaying());
+    TEST_ASSERT(pm.currentTime().ticks() == 0);
+    TEST_ASSERT(pm.volume() == 1.0);
+    TEST_ASSERT(!pm.isMuted());
+    TEST_ASSERT(!pm.isScrubbing());
+
+    int stateChanges = 0;
+    pm.subscribe([&]() { ++stateChanges; });
+
+    TimelineTime totalDur = TimelineTime::fromSeconds(10.0); // 1,200,000 ticks
+
+    // Play & Pause & Toggle
+    pm.play(totalDur);
+    TEST_ASSERT(pm.isPlaying());
+    TEST_ASSERT(stateChanges >= 1);
+
+    pm.pause();
+    TEST_ASSERT(!pm.isPlaying());
+
+    pm.toggle(totalDur);
+    TEST_ASSERT(pm.isPlaying());
+    pm.toggle(totalDur);
+    TEST_ASSERT(!pm.isPlaying());
+
+    // Seek
+    int seekCalls = 0;
+    TimelineTime lastSeekTime{0};
+    pm.onSeek([&](TimelineTime t) {
+        ++seekCalls;
+        lastSeekTime = t;
+    });
+
+    pm.seek(TimelineTime::fromSeconds(4.0), totalDur);
+    TEST_ASSERT(pm.currentTime().toSeconds() == 4.0);
+    TEST_ASSERT(seekCalls == 1);
+    TEST_ASSERT(lastSeekTime.toSeconds() == 4.0);
+
+    // Seek clamp < 0
+    pm.seek(TimelineTime(-5000), totalDur);
+    TEST_ASSERT(pm.currentTime().ticks() == 0);
+
+    // Seek clamp > totalDuration
+    pm.seek(TimelineTime::fromSeconds(20.0), totalDur);
+    TEST_ASSERT(pm.currentTime() == totalDur);
+
+    // Volume & Mute
+    pm.setVolume(0.5);
+    TEST_ASSERT(pm.volume() == 0.5);
+    TEST_ASSERT(!pm.isMuted());
+
+    pm.mute();
+    TEST_ASSERT(pm.isMuted());
+    TEST_ASSERT(pm.volume() == 0.0);
+
+    pm.unmute();
+    TEST_ASSERT(!pm.isMuted());
+    TEST_ASSERT(pm.volume() == 0.5);
+
+    pm.toggleMute();
+    TEST_ASSERT(pm.isMuted());
+    pm.toggleMute();
+    TEST_ASSERT(!pm.isMuted());
+
+    // Scrubbing
+    pm.setScrubbing(true);
+    TEST_ASSERT(pm.isScrubbing());
+    pm.setScrubbing(false);
+    TEST_ASSERT(!pm.isScrubbing());
+
+    // Step forward & backward
+    FrameRate fps{30, 1}; // 4000 ticks per frame
+    pm.seek(TimelineTime::fromSeconds(1.0), totalDur);
+    pm.stepForward(totalDur, fps);
+    TEST_ASSERT(pm.currentTime().ticks() == TimelineTime::fromSeconds(1.0).ticks() + 4000);
+
+    pm.stepBackward(totalDur, fps);
+    TEST_ASSERT(pm.currentTime().ticks() == TimelineTime::fromSeconds(1.0).ticks());
+
+    // Reconcile timeline scope
+    pm.seek(TimelineTime::fromSeconds(8.0), totalDur);
+    pm.play(totalDur);
+    // Shorten duration to 5.0 seconds -> should clamp and pause
+    pm.reconcileTimelineScope(TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(pm.currentTime().toSeconds() == 5.0);
+    TEST_ASSERT(!pm.isPlaying());
+
+    std::cout << "[PASS] runPlaybackManagerTests" << std::endl;
+}
+
+void runTimelineManagerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    Project project("Test Project");
+    TimelineManager tm(project);
+
+    int changeCount = 0;
+    tm.subscribe([&]() { ++changeCount; });
+
+    TEST_ASSERT(tm.getTotalDuration().ticks() == 0);
+    TEST_ASSERT(tm.getLastFrameTime().ticks() == 0);
+
+    // Add track
+    auto t1 = tm.addTrack(TrackType::Video, "Video 1");
+    auto t2 = tm.addTrack(TrackType::Audio, "Audio 1");
+    TEST_ASSERT(changeCount == 2);
+    TEST_ASSERT(project.isDirty());
+
+    // Toggle mute and visibility
+    TEST_ASSERT(tm.toggleTrackMute(t1));
+    TEST_ASSERT(tm.toggleTrackVisibility(t1));
+
+    // Insert elements
+    Clip c1(ClipId::generate(), ClipType::Video, "Clip 1", TimelineTime(0), TimelineTime::fromSeconds(3.0));
+    auto c1Id = c1.id();
+    TEST_ASSERT(tm.insertElement(t1, std::move(c1)));
+    TEST_ASSERT(tm.getTotalDuration().toSeconds() == 3.0);
+
+    // Duplicate element
+    auto dupIds = tm.duplicateElements({ c1Id });
+    TEST_ASSERT(dupIds.size() == 1);
+    TEST_ASSERT(tm.getTotalDuration().toSeconds() == 6.0);
+
+    // Split element
+    TEST_ASSERT(tm.splitElements({ c1Id }, TimelineTime::fromSeconds(1.5)));
+
+    // Move element
+    TEST_ASSERT(tm.moveElement(dupIds[0], t1, TimelineTime::fromSeconds(7.0)));
+    TEST_ASSERT(tm.getTotalDuration().toSeconds() == 10.0);
+
+    // Last frame time
+    FrameRate fps{30, 1};
+    auto lastFrame = tm.getLastFrameTime(fps);
+    TEST_ASSERT(lastFrame.ticks() == TimelineTime::fromSeconds(10.0).ticks() - fps.frameDuration().ticks());
+
+    // Delete elements
+    TEST_ASSERT(tm.deleteElements(dupIds));
+
+    // Remove track
+    TEST_ASSERT(tm.removeTrack(t2));
+
+    std::cout << "[PASS] runTimelineManagerTests" << std::endl;
+}
+
+void runRendererManagerTests() {
+    using namespace catchim::render;
+    using namespace catchim::core;
+    using namespace catchim::exporting;
+    using namespace catchim::editor;
+
+    RendererManager rm;
+    TEST_ASSERT(!rm.isDegraded());
+
+    int notifyCount = 0;
+    rm.subscribe([&]() { ++notifyCount; });
+
+    rm.setDegraded(true);
+    TEST_ASSERT(rm.isDegraded());
+    TEST_ASSERT(notifyCount == 1);
+
+    // Snapshot with valid canvas
+    auto snap = rm.createSnapshot(TimelineTime::fromSeconds(1.5), CanvasSize{1920, 1080}, "My Project");
+    TEST_ASSERT(snap.success);
+    TEST_ASSERT(!snap.filename.empty());
+    TEST_ASSERT(snap.width == 1920);
+    TEST_ASSERT(snap.height == 1080);
+
+    // Snapshot with invalid canvas
+    auto snapInvalid = rm.createSnapshot(TimelineTime(0), CanvasSize{0, 0});
+    TEST_ASSERT(!snapInvalid.success);
+
+    // Export with empty project
+    ExportSettings settings;
+    settings.outputPath = "output.mp4";
+    auto expEmpty = rm.exportProject(settings, TimelineTime(0));
+    TEST_ASSERT(!expEmpty.success);
+
+    // Export with cancellation
+    auto expCancel = rm.exportProject(settings, TimelineTime::fromSeconds(5.0), nullptr, []() { return true; });
+    TEST_ASSERT(!expCancel.success);
+    TEST_ASSERT(expCancel.isCancelled);
+
+    // Export successful with progress
+    double lastProgress = 0.0;
+    auto expOk = rm.exportProject(
+        settings,
+        TimelineTime::fromSeconds(5.0),
+        [&](double p) { lastProgress = p; }
+    );
+    TEST_ASSERT(expOk.success);
+    TEST_ASSERT(lastProgress == 1.0);
+    std::string outP = expOk.outputPath;
+    TEST_ASSERT(outP == "output.mp4");
+    TEST_ASSERT(expOk.durationSeconds == 5.0);
+    TEST_ASSERT(expOk.totalFrames == 150); // 5s * 30fps
+
+    std::cout << "[PASS] runRendererManagerTests" << std::endl;
+}
+
+void runSaveManagerTests() {
+    using namespace catchim::editor;
+
+    int saveCount = 0;
+    SaveManager sm([&]() { ++saveCount; }, 500);
+
+    TEST_ASSERT(sm.debounceMs() == 500);
+    TEST_ASSERT(!sm.isDirty());
+    TEST_ASSERT(!sm.isPaused());
+    TEST_ASSERT(!sm.isSaving());
+
+    // When not running, markDirty does not immediately trigger saveAction
+    sm.markDirty();
+    TEST_ASSERT(sm.isDirty());
+    TEST_ASSERT(saveCount == 0);
+
+    // Start -> markDirty triggers saveNow
+    sm.start();
+    sm.markDirty();
+    TEST_ASSERT(saveCount == 1);
+    TEST_ASSERT(!sm.isDirty());
+
+    // Pause -> markDirty does not trigger until resume
+    sm.pause();
+    TEST_ASSERT(sm.isPaused());
+    sm.markDirty(true);
+    TEST_ASSERT(saveCount == 1);
+    TEST_ASSERT(sm.isDirty());
+
+    sm.resume();
+    TEST_ASSERT(!sm.isPaused());
+    TEST_ASSERT(saveCount == 2);
+    TEST_ASSERT(!sm.isDirty());
+
+    // Flush
+    sm.flush();
+    TEST_ASSERT(saveCount == 3);
+
+    // Stop
+    sm.stop();
+    sm.markDirty();
+    TEST_ASSERT(saveCount == 3);
+
+    std::cout << "[PASS] runSaveManagerTests" << std::endl;
+}
+
+void runMediaManagerTests() {
+    using namespace catchim::media;
+    using namespace catchim::core;
+
+    MediaManager mm;
+    TEST_ASSERT(mm.getAssets().empty());
+    TEST_ASSERT(!mm.isLoadingMedia());
+
+    int changeCount = 0;
+    mm.subscribe([&]() { ++changeCount; });
+
+    // Add media assets
+    MediaAsset a1(MediaId("asset_1"), "/path/video1.mp4", MediaType::Video);
+    MediaAsset a2(MediaId("asset_2"), "/path/audio1.mp3", MediaType::Audio);
+
+    TEST_ASSERT(mm.addMediaAsset(a1));
+    TEST_ASSERT(mm.addMediaAsset(a2));
+    TEST_ASSERT(!mm.addMediaAsset(a1)); // duplicate id returns false
+    TEST_ASSERT(mm.getAssets().size() == 2);
+    TEST_ASSERT(changeCount == 2);
+
+    // Find asset
+    const auto* found = mm.findAsset(MediaId("asset_1"));
+    TEST_ASSERT(found != nullptr);
+    std::string aName = found->fileName();
+    TEST_ASSERT(aName == "video1.mp4");
+
+    const auto* notFound = mm.findAsset(MediaId("asset_none"));
+    TEST_ASSERT(notFound == nullptr);
+
+    // Remove single asset
+    TEST_ASSERT(mm.removeMediaAsset(MediaId("asset_1")));
+    TEST_ASSERT(mm.getAssets().size() == 1);
+    TEST_ASSERT(!mm.removeMediaAsset(MediaId("asset_1"))); // already removed
+
+    // Remove batch assets
+    MediaAsset a3(MediaId("asset_3"), "/path/img.png", MediaType::Image);
+    mm.addMediaAsset(a3);
+    size_t removed = mm.removeMediaAssets({ MediaId("asset_2"), MediaId("asset_3") });
+    TEST_ASSERT(removed == 2);
+    TEST_ASSERT(mm.getAssets().empty());
+
+    // Set assets & clear
+    mm.setAssets({ a1, a2, a3 });
+    TEST_ASSERT(mm.getAssets().size() == 3);
+    mm.clearAllAssets();
+    TEST_ASSERT(mm.getAssets().empty());
+
+    // Loading state
+    mm.setIsLoading(true);
+    TEST_ASSERT(mm.isLoadingMedia());
+    mm.setIsLoading(false);
+    TEST_ASSERT(!mm.isLoadingMedia());
+
+    std::cout << "[PASS] runMediaManagerTests" << std::endl;
+}
+
+void runAudioManagerTests() {
+    using namespace catchim::audio;
+    using namespace catchim::core;
+    using namespace catchim::editor;
+
+    AudioManager am;
+    TEST_ASSERT(am.masterVolume() == 1.0);
+    TEST_ASSERT(!am.isMuted());
+    TEST_ASSERT(!am.hasSoloTracks());
+
+    int notifyCount = 0;
+    am.subscribe([&]() { ++notifyCount; });
+
+    // Master volume & mute
+    am.setMasterVolume(0.75);
+    TEST_ASSERT(am.masterVolume() == 0.75);
+    TEST_ASSERT(notifyCount == 1);
+
+    am.setMuted(true);
+    TEST_ASSERT(am.isMuted());
+
+    am.setMuted(false);
+    TEST_ASSERT(!am.isMuted());
+
+    // Track mute and solo
+    TrackId t1("t1");
+    TrackId t2("t2");
+
+    am.setTrackMute(t1, true);
+    TEST_ASSERT(am.isTrackMuted(t1));
+    TEST_ASSERT(!am.isTrackMuted(t2));
+
+    am.setTrackMute(t1, false);
+    TEST_ASSERT(!am.isTrackMuted(t1));
+
+    am.setTrackSolo(t2, true);
+    TEST_ASSERT(am.isTrackSolo(t2));
+    TEST_ASSERT(am.hasSoloTracks());
+    TEST_ASSERT(!am.isTrackSolo(t1));
+
+    am.setTrackSolo(t2, false);
+    TEST_ASSERT(!am.hasSoloTracks());
+
+    // Collect active audio clips
+    Timeline timeline;
+    auto track1Id = timeline.addTrack(TrackType::Audio, "Track 1").id();
+    auto track2Id = timeline.addTrack(TrackType::Audio, "Track 2").id();
+
+    Clip c1(ClipId("c1"), ClipType::Audio, "Clip 1", TimelineTime(0), TimelineTime::fromSeconds(4.0));
+    Clip c2(ClipId("c2"), ClipType::Audio, "Clip 2", TimelineTime::fromSeconds(2.0), TimelineTime::fromSeconds(5.0));
+
+    timeline.addClip(track1Id, std::move(c1));
+    timeline.addClip(track2Id, std::move(c2));
+
+    // At time 1.0s, lookahead 2.0s: window is [1.0s, 3.0s]
+    // c1 is [0, 4.0] -> active
+    // c2 is [2.0, 7.0] -> active (starts at 2.0 <= 3.0)
+    auto activeClips = am.collectActiveAudioClips(timeline, TimelineTime::fromSeconds(1.0), TimelineTime::fromSeconds(2.0));
+    TEST_ASSERT(activeClips.size() == 2);
+
+    // Track 1 solo -> only track 1 allowed
+    am.setTrackSolo(track1Id, true);
+    auto soloClips = am.collectActiveAudioClips(timeline, TimelineTime::fromSeconds(1.0), TimelineTime::fromSeconds(2.0));
+    TEST_ASSERT(soloClips.size() == 2);
+    // clip on track 2 has effective gain 0 / muted because not soloed
+    for (const auto& info : soloClips) {
+        if (info.trackId == track1Id) {
+            TEST_ASSERT(info.effectiveGain > 0.0);
+            TEST_ASSERT(!info.isMuted);
+        } else {
+            TEST_ASSERT(info.effectiveGain == 0.0);
+            TEST_ASSERT(info.isMuted);
+        }
+    }
+
+    std::cout << "[PASS] runAudioManagerTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -10005,7 +10396,13 @@ int main() {
     runAnimationValueResolversTests();
     runTimelineTrackDefaultsTests();
     runTtsVoiceRegistryTests();
-    std::cout << ">>> ALL 163 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runPlaybackManagerTests();
+    runTimelineManagerTests();
+    runRendererManagerTests();
+    runSaveManagerTests();
+    runMediaManagerTests();
+    runAudioManagerTests();
+    std::cout << ">>> ALL 169 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
 

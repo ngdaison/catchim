@@ -273,6 +273,12 @@ add_library(catchim_editor STATIC
     src/editor/animation/AnimationValueResolvers.h
     src/editor/timeline/TimelineTrackDefaults.cpp
     src/editor/timeline/TimelineTrackDefaults.h
+    src/editor/playback/PlaybackManager.cpp
+    src/editor/playback/PlaybackManager.h
+    src/editor/timeline/TimelineManager.cpp
+    src/editor/timeline/TimelineManager.h
+    src/editor/project/SaveManager.cpp
+    src/editor/project/SaveManager.h
     src/editor/EditorEngine.cpp
     src/editor/EditorEngine.h
 )
@@ -320,6 +326,8 @@ add_library(catchim_media STATIC
     src/media/MediaAssetInspector.h
     src/media/TtsVoiceRegistry.cpp
     src/media/TtsVoiceRegistry.h
+    src/media/MediaManager.cpp
+    src/media/MediaManager.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 
@@ -418,6 +426,8 @@ add_library(catchim_render STATIC
     src/render/canvas/CanvasSizePresets.h
     src/render/RenderParamResolvers.cpp
     src/render/RenderParamResolvers.h
+    src/render/RendererManager.cpp
+    src/render/RendererManager.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 
@@ -445,6 +455,8 @@ add_library(catchim_audio STATIC
     src/audio/AudioDisplayMetrics.h
     src/audio/AudioStateEngine.cpp
     src/audio/AudioStateEngine.h
+    src/audio/AudioManager.cpp
+    src/audio/AudioManager.h
 )
 target_link_libraries(catchim_audio PUBLIC catchim_core catchim_editor)
 

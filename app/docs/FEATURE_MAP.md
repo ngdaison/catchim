@@ -1458,6 +1458,59 @@ Quy ước trạng thái:
 | Natural Vietnamese Voice Catalog (Hoài My, Nam Minh, GPT-SoVITS, Chị Google...) | `web/src/services/tts/voices.ts` | `catchim::media::TtsVoiceRegistry::getAllVoices`, `findVoiceById` | Verified |
 | Voice Filtering by Language, Category, and Gender | `web/src/services/tts/voices.ts`, `types.ts` | `catchim::media::TtsVoiceRegistry::getVoicesByLanguage`, `getVoicesByCategory`, `getVoicesByGender` | Verified |
 
+---
+
+## 152. Core Playback Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Playback Control (play, pause, toggle, seek, stepForward, stepBackward) | `web/src/core/managers/playback-manager.ts` | `catchim::editor::PlaybackManager::play`, `pause`, `toggle`, `seek`, `stepForward`, `stepBackward` | Verified |
+| Volume & Mute Management | `web/src/core/managers/playback-manager.ts` | `catchim::editor::PlaybackManager::setVolume`, `mute`, `unmute`, `toggleMute` | Verified |
+| Scrubbing State & Timeline Scope Reconciliation | `web/src/core/managers/playback-manager.ts` | `catchim::editor::PlaybackManager::setScrubbing`, `reconcileTimelineScope` | Verified |
+
+---
+
+## 153. Core Timeline Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Track Operations (addTrack, removeTrack, toggleMute, toggleVisibility) | `web/src/core/managers/timeline-manager.ts` | `catchim::editor::TimelineManager::addTrack`, `removeTrack`, `toggleTrackMute`, `toggleTrackVisibility` | Verified |
+| Element Operations (insertElement, deleteElements, duplicateElements, splitElements, moveElement) | `web/src/core/managers/timeline-manager.ts` | `catchim::editor::TimelineManager::insertElement`, `deleteElements`, `duplicateElements`, `splitElements`, `moveElement` | Verified |
+| Total Duration & Last Frame Time Calculation | `web/src/core/managers/timeline-manager.ts` | `catchim::editor::TimelineManager::getTotalDuration`, `getLastFrameTime` | Verified |
+
+---
+
+## 154. Core Renderer Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Snapshot Generation & File Naming | `web/src/core/managers/renderer-manager.ts` | `catchim::render::RendererManager::createSnapshot` | Verified |
+| Project Export Pipeline & Progress/Cancel Tracking | `web/src/core/managers/renderer-manager.ts` | `catchim::render::RendererManager::exportProject` | Verified |
+| Performance Degraded State Notification | `web/src/core/managers/renderer-manager.ts` | `catchim::render::RendererManager::isDegraded`, `setDegraded` | Verified |
+
+---
+
+## 155. Core Save Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Debounced Autosave Lifecycle (start, stop, pause, resume) | `web/src/core/managers/save-manager.ts` | `catchim::editor::SaveManager::start`, `stop`, `pause`, `resume` | Verified |
+| Dirty State & Immediate Flush | `web/src/core/managers/save-manager.ts` | `catchim::editor::SaveManager::markDirty`, `flush`, `isDirty` | Verified |
+
+---
+
+## 156. Core Media Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Media Asset Catalog & Lookup | `web/src/core/managers/media-manager.ts` | `catchim::media::MediaManager::getAssets`, `findAsset` | Verified |
+| Add, Remove & Clear Asset Operations | `web/src/core/managers/media-manager.ts` | `catchim::media::MediaManager::addMediaAsset`, `removeMediaAsset`, `removeMediaAssets`, `clearAllAssets` | Verified |
+| Loading State Tracking & Change Listeners | `web/src/core/managers/media-manager.ts` | `catchim::media::MediaManager::isLoadingMedia`, `setIsLoading`, `subscribe` | Verified |
+
+---
+
+## 157. Core Audio Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Master Volume & Mute State | `web/src/core/managers/audio-manager.ts` | `catchim::audio::AudioManager::setMasterVolume`, `setMuted` | Verified |
+| Track Mute & Track Solo Management | `web/src/core/managers/audio-manager.ts` | `catchim::audio::AudioManager::setTrackMute`, `isTrackMuted`, `setTrackSolo`, `isTrackSolo`, `hasSoloTracks` | Verified |
+| Active Audio Clips Collection & Effective Gain Calculation | `web/src/core/managers/audio-manager.ts` | `catchim::audio::AudioManager::collectActiveAudioClips` | Verified |
+
 
 
 

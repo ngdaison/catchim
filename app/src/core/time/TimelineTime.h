@@ -10,6 +10,8 @@ namespace catchim::core {
 constexpr int64_t TICKS_PER_SECOND = 120'000;
 constexpr double TICKS_PER_SECOND_F64 = 120'000.0;
 
+class TimelineTime;
+
 struct FrameRate {
     int32_t numerator{30};
     int32_t denominator{1};
@@ -17,6 +19,8 @@ struct FrameRate {
     constexpr double toFps() const noexcept {
         return denominator > 0 ? static_cast<double>(numerator) / denominator : 30.0;
     }
+
+    TimelineTime frameDuration() const noexcept;
 
     constexpr bool operator==(const FrameRate& other) const noexcept = default;
 };
@@ -95,5 +99,11 @@ public:
 private:
     int64_t ticks_{0};
 };
+
+inline TimelineTime FrameRate::frameDuration() const noexcept {
+    int64_t den = denominator > 0 ? static_cast<int64_t>(denominator) : 1;
+    int64_t num = numerator > 0 ? static_cast<int64_t>(numerator) : 30;
+    return TimelineTime((TICKS_PER_SECOND * den) / num);
+}
 
 } // namespace catchim::core

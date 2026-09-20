@@ -73,6 +73,7 @@ public:
     );
 
     const core::ClipId& id() const noexcept { return id_; }
+    void setId(core::ClipId id) noexcept { id_ = std::move(id); }
     ClipType type() const noexcept { return type_; }
     const std::string& name() const noexcept { return name_; }
     void setName(std::string name) { name_ = std::move(name); }
