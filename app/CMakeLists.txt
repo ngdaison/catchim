@@ -281,6 +281,8 @@ add_library(catchim_editor STATIC
     src/editor/project/SaveManager.h
     src/editor/EditorEngine.cpp
     src/editor/EditorEngine.h
+    src/editor/core/EditorCore.cpp
+    src/editor/core/EditorCore.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -293,6 +295,8 @@ add_library(catchim_subtitles STATIC
     src/subtitles/SrtSerializer.h
     src/subtitles/TranscriptionEngine.cpp
     src/subtitles/TranscriptionEngine.h
+    src/subtitles/TranscriptionCatalog.cpp
+    src/subtitles/TranscriptionCatalog.h
 )
 target_link_libraries(catchim_subtitles PUBLIC catchim_core)
 
@@ -328,6 +332,10 @@ add_library(catchim_media STATIC
     src/media/TtsVoiceRegistry.h
     src/media/MediaManager.cpp
     src/media/MediaManager.h
+    src/media/StickerIdUtils.cpp
+    src/media/StickerIdUtils.h
+    src/media/SavedSoundsStore.cpp
+    src/media/SavedSoundsStore.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 
@@ -428,6 +436,10 @@ add_library(catchim_render STATIC
     src/render/RenderParamResolvers.h
     src/render/RendererManager.cpp
     src/render/RendererManager.h
+    src/render/masks/MaskGeometryUtils.cpp
+    src/render/masks/MaskGeometryUtils.h
+    src/render/canvas/CanvasSnapMath.cpp
+    src/render/canvas/CanvasSnapMath.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 

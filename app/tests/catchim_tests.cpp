@@ -184,6 +184,12 @@
 #include "editor/project/SaveManager.h"
 #include "media/MediaManager.h"
 #include "audio/AudioManager.h"
+#include "subtitles/TranscriptionCatalog.h"
+#include "render/masks/MaskGeometryUtils.h"
+#include "media/StickerIdUtils.h"
+#include "editor/core/EditorCore.h"
+#include "media/SavedSoundsStore.h"
+#include "render/canvas/CanvasSnapMath.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -10231,6 +10237,284 @@ void runAudioManagerTests() {
     std::cout << "[PASS] runAudioManagerTests" << std::endl;
 }
 
+void runTranscriptionCatalogTests() {
+    using namespace catchim::subtitles;
+
+    const auto& languages = TranscriptionCatalog::getSupportedLanguages();
+    TEST_ASSERT(languages.size() == 10);
+
+    const auto* vi = TranscriptionCatalog::findLanguageByCode("vi");
+    TEST_ASSERT(vi != nullptr);
+    TEST_ASSERT(vi->name == "Vietnamese");
+    TEST_ASSERT(vi->nameVi == "Tiếng Việt");
+
+    const auto* en = TranscriptionCatalog::findLanguageByCode("en");
+    TEST_ASSERT(en != nullptr);
+    TEST_ASSERT(en->name == "English");
+    TEST_ASSERT(en->nameVi == "Tiếng Anh");
+
+    const auto* invalid = TranscriptionCatalog::findLanguageByCode("xx");
+    TEST_ASSERT(invalid == nullptr);
+
+    const auto& models = TranscriptionCatalog::getAvailableModels();
+    TEST_ASSERT(models.size() == 4);
+
+    const auto* smallModel = TranscriptionCatalog::findModelById("whisper-small");
+    TEST_ASSERT(smallModel != nullptr);
+    TEST_ASSERT(smallModel->name == "Small");
+    TEST_ASSERT(smallModel->huggingFaceId == "onnx-community/whisper-small");
+
+    const auto* turboModel = TranscriptionCatalog::findModelById("whisper-large-v3-turbo");
+    TEST_ASSERT(turboModel != nullptr);
+    TEST_ASSERT(turboModel->name == "Large v3 Turbo");
+
+    std::string defModel = TranscriptionCatalog::DEFAULT_TRANSCRIPTION_MODEL;
+    TEST_ASSERT(defModel == "whisper-small");
+    size_t defWords = TranscriptionCatalog::DEFAULT_WORDS_PER_CAPTION;
+    TEST_ASSERT(defWords == 3);
+    double minDur = TranscriptionCatalog::MIN_CAPTION_DURATION_SECONDS;
+    TEST_ASSERT(minDur == 0.8);
+
+    std::cout << "[PASS] runTranscriptionCatalogTests" << std::endl;
+}
+
+void runMaskGeometryUtilsTests() {
+    using namespace catchim::render;
+
+    // 1. Half-plane sign
+    double s1 = MaskGeometryUtils::halfPlaneSign(0.0, 0.0, 0.0, 1.0, 5.0, 10.0);
+    TEST_ASSERT(s1 == 10.0);
+
+    double s2 = MaskGeometryUtils::halfPlaneSign(0.0, 0.0, 0.0, 1.0, 5.0, -3.0);
+    TEST_ASSERT(s2 == -3.0);
+
+    // 2. Line-edge intersection
+    // Line: x = 5 (lineX = 5, lineY = 0, normalX = 1, normalY = 0)
+    // Segment from (0, 2) to (10, 2) -> intersects at (5, 2)
+    auto inter1 = MaskGeometryUtils::lineEdgeIntersection(5.0, 0.0, 1.0, 0.0, 0.0, 2.0, 10.0, 2.0);
+    TEST_ASSERT(inter1.has_value());
+    TEST_ASSERT(std::abs(inter1->x - 5.0) < 1e-6);
+    TEST_ASSERT(std::abs(inter1->y - 2.0) < 1e-6);
+
+    // Segment from (0, 2) to (4, 2) -> does not reach x = 5
+    auto inter2 = MaskGeometryUtils::lineEdgeIntersection(5.0, 0.0, 1.0, 0.0, 0.0, 2.0, 4.0, 2.0);
+    TEST_ASSERT(!inter2.has_value());
+
+    // Parallel segment from (0, 2) to (0, 8) with normal (1, 0) -> parallel, distance1 = distance2 = -5, denom = 0
+    auto interParallel = MaskGeometryUtils::lineEdgeIntersection(5.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 8.0);
+    TEST_ASSERT(!interParallel.has_value());
+
+    // 3. Feather update
+    // startFeather = 50, delta = (11, 0), dir = (1, 0) -> projection = 11 -> deltaFeather = 11 / 0.11 = 100 -> 150
+    double f1 = MaskGeometryUtils::computeFeatherUpdate(50.0, 11.0, 0.0, 1.0, 0.0);
+    TEST_ASSERT(f1 == 150.0);
+
+    // Clamping to [0, MAX_FEATHER]
+    double fMin = MaskGeometryUtils::computeFeatherUpdate(50.0, -110.0, 0.0, 1.0, 0.0);
+    TEST_ASSERT(fMin == 0.0);
+
+    double fMax = MaskGeometryUtils::computeFeatherUpdate(950.0, 55.0, 0.0, 1.0, 0.0);
+    TEST_ASSERT(fMax == MaskGeometryUtils::MAX_FEATHER);
+
+    std::cout << "[PASS] runMaskGeometryUtilsTests" << std::endl;
+}
+
+void runStickerIdUtilsTests() {
+    using namespace catchim::media;
+
+    // 1. Parsing valid sticker IDs
+    auto p1 = StickerIdUtils::parseStickerId("emoji:fire");
+    TEST_ASSERT(p1.providerId == "emoji");
+    TEST_ASSERT(p1.providerValue == "fire");
+
+    auto p2 = StickerIdUtils::parseStickerId("  flags  :  vn  ");
+    TEST_ASSERT(p2.providerId == "flags");
+    TEST_ASSERT(p2.providerValue == "vn");
+
+    // 2. Try parse with invalid formats
+    ParsedStickerId out;
+    TEST_ASSERT(!StickerIdUtils::tryParseStickerId("", out));
+    TEST_ASSERT(!StickerIdUtils::tryParseStickerId("invalid", out));
+    TEST_ASSERT(!StickerIdUtils::tryParseStickerId(":value", out));
+    TEST_ASSERT(!StickerIdUtils::tryParseStickerId("provider:", out));
+    TEST_ASSERT(StickerIdUtils::tryParseStickerId("custom:heart", out));
+    TEST_ASSERT(out.providerId == "custom");
+    TEST_ASSERT(out.providerValue == "heart");
+
+    // 3. Build sticker ID
+    std::string built = StickerIdUtils::buildStickerId("shapes", "star");
+    TEST_ASSERT(built == "shapes:star");
+
+    // 4. Categories and fallback size
+    const auto& categories = StickerIdUtils::getStickerCategories();
+    TEST_ASSERT(categories.size() == 3);
+    int fallbackSize = StickerIdUtils::STICKER_INTRINSIC_SIZE_FALLBACK;
+    TEST_ASSERT(fallbackSize == 200);
+
+    std::cout << "[PASS] runStickerIdUtilsTests" << std::endl;
+}
+
+void runEditorCoreTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    EditorCore::reset();
+    auto& core = EditorCore::getInstance();
+
+    // Verify all managers are instantiated and accessible
+    TEST_ASSERT(core.project().getActive() != nullptr);
+    TEST_ASSERT(!core.playback().isPlaying());
+    TEST_ASSERT(!core.renderer().isDegraded());
+    TEST_ASSERT(core.save().isDirty() == false);
+    TEST_ASSERT(core.media().getAssets().empty());
+    TEST_ASSERT(core.audio().masterVolume() == 1.0);
+    TEST_ASSERT(core.selection().getSelectedElements().empty());
+    TEST_ASSERT(core.clipboard().count() == 0);
+    TEST_ASSERT(!core.command().canUndo());
+
+    // Reactor registration and execution
+    int reactorRuns = 0;
+    core.registerReactor([&]() { ++reactorRuns; });
+    core.runReactors();
+    TEST_ASSERT(reactorRuns == 1);
+
+    // Adding element triggers timeline and reconciles playback scope
+    auto trackId = core.timeline().addTrack(TrackType::Video, "Video 1");
+    Clip clip(ClipId::generate(), ClipType::Video, "Test Clip", TimelineTime(0), TimelineTime::fromSeconds(4.0));
+    core.timeline().insertElement(trackId, std::move(clip));
+
+    TEST_ASSERT(core.timeline().getTotalDuration().toSeconds() == 4.0);
+
+    // Seek within scope and seek past scope
+    core.playback().seek(TimelineTime::fromSeconds(2.0), core.timeline().getTotalDuration());
+    TEST_ASSERT(core.playback().currentTime().toSeconds() == 2.0);
+
+    core.playback().seek(TimelineTime::fromSeconds(10.0), core.timeline().getTotalDuration());
+    TEST_ASSERT(core.playback().currentTime().toSeconds() == 4.0);
+
+    EditorCore::reset();
+    std::cout << "[PASS] runEditorCoreTests" << std::endl;
+}
+
+void runSavedSoundsStoreTests() {
+    using namespace catchim::media;
+
+    SavedSoundsStore store;
+    TEST_ASSERT(store.count() == 0);
+
+    int changeCount = 0;
+    store.subscribe([&]() { ++changeCount; });
+
+    SoundEffect s1;
+    s1.id = 1001;
+    s1.name = "Laser Blast";
+    s1.username = "sound_master";
+    s1.previewUrl = "https://example.com/laser.mp3";
+    s1.duration = 1.25;
+    s1.tags = {"sci-fi", "laser", "weapon"};
+    s1.license = "CC0";
+
+    SoundEffect s2;
+    s2.id = 1002;
+    s2.name = "Explosion";
+    s2.username = "boom_fx";
+    s2.previewUrl = "https://example.com/boom.mp3";
+    s2.duration = 3.5;
+    s2.tags = {"explosion", "heavy"};
+    s2.license = "CC-BY";
+
+    // Save sound
+    store.saveSoundEffect(s1);
+    TEST_ASSERT(store.count() == 1);
+    TEST_ASSERT(store.isSoundSaved(1001));
+    TEST_ASSERT(!store.isSoundSaved(1002));
+    TEST_ASSERT(changeCount == 1);
+
+    // Duplicate save -> no change
+    store.saveSoundEffect(s1);
+    TEST_ASSERT(store.count() == 1);
+    TEST_ASSERT(changeCount == 1);
+
+    // Toggle sound: toggle existing removes it, toggle new adds it
+    store.toggleSavedSound(s2);
+    TEST_ASSERT(store.count() == 2);
+    TEST_ASSERT(store.isSoundSaved(1002));
+
+    store.toggleSavedSound(s1);
+    TEST_ASSERT(store.count() == 1);
+    TEST_ASSERT(!store.isSoundSaved(1001));
+
+    // Remove sound
+    TEST_ASSERT(store.removeSavedSound(1002));
+    TEST_ASSERT(store.count() == 0);
+    TEST_ASSERT(!store.removeSavedSound(1002));
+
+    // Clear sounds
+    store.saveSoundEffect(s1);
+    store.saveSoundEffect(s2);
+    TEST_ASSERT(store.count() == 2);
+    store.clearSavedSounds();
+    TEST_ASSERT(store.count() == 0);
+
+    std::cout << "[PASS] runSavedSoundsStoreTests" << std::endl;
+}
+
+void runCanvasSnapMathTests() {
+    using namespace catchim::render;
+
+    // 1. Angle snapping
+    // Close to 0 deg
+    TEST_ASSERT(CanvasSnapMath::snapAngle(2.0, 5.0) == 0.0);
+    TEST_ASSERT(CanvasSnapMath::snapAngle(-3.0, 5.0) == 0.0);
+
+    // Close to 90 deg
+    TEST_ASSERT(CanvasSnapMath::snapAngle(88.0, 5.0) == 90.0);
+    TEST_ASSERT(CanvasSnapMath::snapAngle(93.0, 5.0) == 90.0);
+
+    // Close to 180 deg
+    TEST_ASSERT(CanvasSnapMath::snapAngle(177.0, 5.0) == 180.0);
+
+    // Close to 270 deg
+    TEST_ASSERT(CanvasSnapMath::snapAngle(272.0, 5.0) == 270.0);
+
+    // Close to 360 deg
+    TEST_ASSERT(CanvasSnapMath::snapAngle(358.0, 5.0) == 360.0);
+
+    // Far from 90 multiples -> untouched
+    TEST_ASSERT(CanvasSnapMath::snapAngle(45.0, 5.0) == 45.0);
+    TEST_ASSERT(CanvasSnapMath::snapAngle(130.0, 5.0) == 130.0);
+
+    // 2. Scalar axis snapping
+    TEST_ASSERT(CanvasSnapMath::snapScalar(103.0, 100.0, 5.0) == 100.0);
+    TEST_ASSERT(CanvasSnapMath::snapScalar(110.0, 100.0, 5.0) == 110.0);
+
+    // 3. Canvas bounds & center snapping
+    // Element 100x100 on canvas 1920x1080 (center is (960, 540))
+    // x = 907 -> elemCenter is 957 -> diff to 960 is 3 <= 8 -> snaps to 910
+    auto r1 = CanvasSnapMath::snapToCanvas(907.0, 200.0, 100.0, 100.0, 1920.0, 1080.0, 8.0);
+    TEST_ASSERT(r1.snappedX);
+    TEST_ASSERT(r1.x == 910.0);
+    TEST_ASSERT(!r1.snappedY);
+
+    // Left edge: x = 4 -> snaps to 0
+    auto r2 = CanvasSnapMath::snapToCanvas(4.0, 200.0, 100.0, 100.0, 1920.0, 1080.0, 8.0);
+    TEST_ASSERT(r2.snappedX);
+    TEST_ASSERT(r2.x == 0.0);
+
+    // Right edge: x = 1818 -> right is 1918 -> diff to 1920 is 2 <= 8 -> snaps to 1820
+    auto r3 = CanvasSnapMath::snapToCanvas(1818.0, 200.0, 100.0, 100.0, 1920.0, 1080.0, 8.0);
+    TEST_ASSERT(r3.snappedX);
+    TEST_ASSERT(r3.x == 1820.0);
+
+    // Center Y: y = 487 -> elemCenter is 537 -> diff to 540 is 3 <= 8 -> snaps to 490
+    auto r4 = CanvasSnapMath::snapToCanvas(200.0, 487.0, 100.0, 100.0, 1920.0, 1080.0, 8.0);
+    TEST_ASSERT(!r4.snappedX);
+    TEST_ASSERT(r4.snappedY);
+    TEST_ASSERT(r4.y == 490.0);
+
+    std::cout << "[PASS] runCanvasSnapMathTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -10402,7 +10686,13 @@ int main() {
     runSaveManagerTests();
     runMediaManagerTests();
     runAudioManagerTests();
-    std::cout << ">>> ALL 169 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTranscriptionCatalogTests();
+    runMaskGeometryUtilsTests();
+    runStickerIdUtilsTests();
+    runEditorCoreTests();
+    runSavedSoundsStoreTests();
+    runCanvasSnapMathTests();
+    std::cout << ">>> ALL 175 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
 

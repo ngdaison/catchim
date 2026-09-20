@@ -1511,6 +1511,61 @@ Quy ước trạng thái:
 | Track Mute & Track Solo Management | `web/src/core/managers/audio-manager.ts` | `catchim::audio::AudioManager::setTrackMute`, `isTrackMuted`, `setTrackSolo`, `isTrackSolo`, `hasSoloTracks` | Verified |
 | Active Audio Clips Collection & Effective Gain Calculation | `web/src/core/managers/audio-manager.ts` | `catchim::audio::AudioManager::collectActiveAudioClips` | Verified |
 
+---
+
+## 158. Transcription Catalog & Models Registry
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| 10 Languages Catalog (en, es, it, fr, de, pt, ru, ja, vi, zh) | `web/src/transcription/languages.ts` | `catchim::subtitles::TranscriptionCatalog::getSupportedLanguages`, `findLanguageByCode` | Verified |
+| 4 Whisper Models Registry (tiny, small, medium, large-v3-turbo) | `web/src/transcription/models.ts` | `catchim::subtitles::TranscriptionCatalog::getAvailableModels`, `findModelById`, `DEFAULT_TRANSCRIPTION_MODEL` | Verified |
+| Standard Caption Defaults | `web/src/transcription/caption-defaults.ts` | `catchim::subtitles::TranscriptionCatalog::DEFAULT_WORDS_PER_CAPTION`, `MIN_CAPTION_DURATION_SECONDS` | Verified |
+
+---
+
+## 159. Mask Geometry Math & Feather Updates
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Half-Plane Sign Calculation | `web/src/masks/utils.ts` | `catchim::render::MaskGeometryUtils::halfPlaneSign` | Verified |
+| Line-Edge Intersection Point Math | `web/src/masks/utils.ts` | `catchim::render::MaskGeometryUtils::lineEdgeIntersection` | Verified |
+| Feather Projection & Update Clamping | `web/src/masks/param-update.ts`, `feather.ts` | `catchim::render::MaskGeometryUtils::computeFeatherUpdate`, `MAX_FEATHER`, `FEATHER_HANDLE_SCALE` | Verified |
+| Mask Dimension Constraints | `web/src/masks/dimensions.ts` | `catchim::render::MaskGeometryUtils::DEFAULT_SHAPE_MASK_SHORT_SIDE_RATIO`, `MIN_MASK_DIMENSION` | Verified |
+
+---
+
+## 160. Sticker ID Parser & Identifier Builder
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Sticker ID Parsing (provider:value) & Validation | `web/src/stickers/sticker-id.ts` | `catchim::media::StickerIdUtils::parseStickerId`, `tryParseStickerId` | Verified |
+| Sticker ID Construction | `web/src/stickers/sticker-id.ts` | `catchim::media::StickerIdUtils::buildStickerId` | Verified |
+| Sticker Categories & Fallback Intrinsic Size | `web/src/stickers/categories.ts`, `intrinsic-size.ts` | `catchim::media::StickerIdUtils::getStickerCategories`, `STICKER_INTRINSIC_SIZE_FALLBACK` | Verified |
+
+---
+
+## 161. Unified Editor Core Architecture
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Central Editor Core Singleton & Lifecycle | `web/src/core/index.ts` | `catchim::editor::EditorCore::getInstance`, `reset` | Verified |
+| All Core Managers Hub (Playback, Timeline, Renderer, Save, Media, Audio, Project, Selection, Clipboard, Diagnostics) | `web/src/core/index.ts` | `catchim::editor::EditorCore` | Verified |
+| Reactor Pipeline & Timeline Scope Binding | `web/src/core/index.ts` | `catchim::editor::EditorCore::registerReactor`, `runReactors`, `bindTimelineScope` | Verified |
+
+---
+
+## 162. Saved Sounds Store & Freesound Models
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| SoundEffect & SavedSound Data Structures | `web/src/sounds/types.ts` | `catchim::media::SoundEffect`, `catchim::media::SavedSound` | Verified |
+| Saved Sounds Store (save, remove, isSaved, toggle, clear) | `web/src/sounds/sounds-store.ts` | `catchim::media::SavedSoundsStore::saveSoundEffect`, `removeSavedSound`, `isSoundSaved`, `toggleSavedSound`, `clearSavedSounds` | Verified |
+
+---
+
+## 163. Canvas Snapping Helper Math
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| 90-Degree Increment Angle Snapping | `web/src/preview/preview-snap.ts` | `catchim::render::CanvasSnapMath::snapAngle` | Verified |
+| 1D Scalar Axis Snapping | `web/src/preview/preview-snap.ts` | `catchim::render::CanvasSnapMath::snapScalar` | Verified |
+| 2D Canvas Bounds & Center Snapping | `web/src/preview/preview-snap.ts` | `catchim::render::CanvasSnapMath::snapToCanvas` | Verified |
+
+
 
 
 
