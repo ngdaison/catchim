@@ -28,6 +28,9 @@ private slots:
     void onAddTextPreset(const QString& title, const QString& fontStyle);
     void onAddGraphicPreset(const QString& name, const QString& shapeType);
     void onApplyEffectPreset(const QString& effectName);
+    void onApplyTransitionPreset(const QString& name, double durationSec);
+    void onApplyAdjustment(double brightness, double contrast, double saturation, double temperature, double tint);
+    void onAddAdjustmentLayer();
     void onImportSrtClicked();
     void onAutoTranscribeClicked();
     void onCanvasAspectChanged(int width, int height);
@@ -40,7 +43,9 @@ private:
     QWidget* createTextView();
     QWidget* createStickersView();
     QWidget* createEffectsView();
+    QWidget* createTransitionsView();
     QWidget* createSubtitlesView();
+    QWidget* createAdjustmentView();
     QWidget* createSettingsView();
 
     editor::EditorEngine& engine_;

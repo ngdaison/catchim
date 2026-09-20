@@ -35,9 +35,24 @@ enum class UiIcon {
     Plus,
     Eye,
     EyeOff,
+    Search,
+    SplitLeft,
+    SplitRight,
+    Unlink,
+    Link,
+    Adjustment,
+    Fullscreen,
+    Target,
+    Chart,
+    ShapeRect,
+    ShapeCircle,
+    ShapeStar,
+    ShapeArrow,
+    Sun,
+    Contrast,
+    Sliders,
     Volume,
-    VolumeMute,
-    Search
+    VolumeMute
 };
 
 class UiIcons {

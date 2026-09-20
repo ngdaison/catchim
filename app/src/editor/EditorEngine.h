@@ -67,6 +67,7 @@ public:
     bool duplicateClip(const core::ClipId& clipId);
     bool rippleDelete(const core::ClipId& clipId);
     bool toggleBookmarkAtPlayhead();
+    bool toggleSourceAudioSeparation();
 
     // Toolbar settings
     bool isSnappingEnabled() const noexcept { return snappingEnabled_; }

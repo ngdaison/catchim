@@ -4,6 +4,16 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(HAVE_QT6)
+#include <QImage>
+#include <QPainter>
+#include <QFont>
+#include <QColor>
+#include <QRect>
+#include <QPolygon>
+#include <QPoint>
+#endif
+
 namespace catchim::render {
 
 RenderEngine::RenderEngine(int32_t width, int32_t height)
@@ -13,6 +23,50 @@ RenderEngine::RenderEngine(int32_t width, int32_t height)
 
 void RenderEngine::setCanvasSize(int32_t width, int32_t height) {
     compositor_.setCanvasSize(width, height);
+}
+
+static void applyAdjustmentToPixels(std::vector<uint8_t>& pixels, double brightness, double contrast, double saturation, double temperature, double tint) {
+    if (pixels.empty()) return;
+    if (std::abs(brightness) < 0.01 && std::abs(contrast) < 0.01 && std::abs(saturation) < 0.01 && std::abs(temperature) < 0.01 && std::abs(tint) < 0.01) return;
+
+    double bFactor = brightness * 1.28;
+    double cFactor = (contrast > 0) ? (1.0 + contrast / 100.0 * 2.0) : (1.0 + contrast / 100.0);
+    double sFactor = (saturation > 0) ? (1.0 + saturation / 100.0 * 2.0) : (1.0 + saturation / 100.0);
+    double tempFactor = temperature * 0.5;
+    double tintFactor = tint * 0.5;
+
+    for (size_t i = 0; i < pixels.size(); i += 4) {
+        if (pixels[i + 3] == 0) continue;
+
+        double r = pixels[i + 0];
+        double g = pixels[i + 1];
+        double b = pixels[i + 2];
+
+        // Brightness
+        r += bFactor;
+        g += bFactor;
+        b += bFactor;
+
+        // Contrast
+        r = (r - 128.0) * cFactor + 128.0;
+        g = (g - 128.0) * cFactor + 128.0;
+        b = (b - 128.0) * cFactor + 128.0;
+
+        // Temperature & Tint
+        r += tempFactor;
+        b -= tempFactor;
+        g += tintFactor;
+
+        // Saturation
+        double gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        r = gray + (r - gray) * sFactor;
+        g = gray + (g - gray) * sFactor;
+        b = gray + (b - gray) * sFactor;
+
+        pixels[i + 0] = static_cast<uint8_t>(std::clamp(r, 0.0, 255.0));
+        pixels[i + 1] = static_cast<uint8_t>(std::clamp(g, 0.0, 255.0));
+        pixels[i + 2] = static_cast<uint8_t>(std::clamp(b, 0.0, 255.0));
+    }
 }
 
 static void applyEffectToPixels(std::vector<uint8_t>& pixels, int w, int h, const std::string& effectName, double intensity) {
@@ -117,20 +171,104 @@ const CompositorOutput& RenderEngine::renderFrame(
             }
         }
 
-        if (!decoded) {
-            // Placeholder fallback
-            layer.rgbaPixels.resize(layer.sourceWidth * layer.sourceHeight * 4);
-            uint8_t pr = 35, pg = 45, pb = 65;
-            if (clip.type() == editor::ClipType::Text || clip.type() == editor::ClipType::Graphic) {
-                pr = 56; pg = 189; pb = 248;
+        if (clip.type() == editor::ClipType::Text) {
+            layer.rgbaPixels.assign(layer.sourceWidth * layer.sourceHeight * 4, 0);
+#if defined(HAVE_QT6)
+            std::string textContent = clip.getParam<std::string>("text.content", clip.name());
+            if (textContent.empty()) textContent = clip.name();
+            double fontSize = clip.getParam<double>("text.fontSize", 44.0);
+            std::string colorStr = clip.getParam<std::string>("text.color", "#FFFFFF");
+            std::string style = clip.getParam<std::string>("text.style", "regular");
+
+            QImage img(layer.rgbaPixels.data(), layer.sourceWidth, layer.sourceHeight, layer.sourceWidth * 4, QImage::Format_RGBA8888);
+            {
+                QPainter painter(&img);
+                painter.setRenderHint(QPainter::Antialiasing);
+                painter.setRenderHint(QPainter::TextAntialiasing);
+
+                QFont font("Segoe UI", static_cast<int>(fontSize));
+                if (style == "bold" || style == "cyber") {
+                    font.setBold(true);
+                }
+                painter.setFont(font);
+
+                QColor textColor(QString::fromStdString(colorStr));
+                if (!textColor.isValid()) textColor = Qt::white;
+
+                QRect rect(40, 0, layer.sourceWidth - 80, layer.sourceHeight);
+                int flags = Qt::AlignHCenter | Qt::AlignVCenter | Qt::TextWordWrap;
+                if (style == "lower_third") {
+                    rect = QRect(60, layer.sourceHeight - 160, layer.sourceWidth - 120, 100);
+                    painter.fillRect(rect, QColor(15, 15, 20, 180));
+                    flags = Qt::AlignLeft | Qt::AlignVCenter;
+                } else if (style == "regular") {
+                    rect = QRect(60, layer.sourceHeight - 220, layer.sourceWidth - 120, 180);
+                    flags = Qt::AlignHCenter | Qt::AlignBottom | Qt::TextWordWrap;
+                }
+
+                // Drop shadow
+                painter.setPen(QColor(0, 0, 0, 220));
+                painter.drawText(rect.translated(2, 2), flags, QString::fromStdString(textContent));
+
+                painter.setPen(textColor);
+                painter.drawText(rect, flags, QString::fromStdString(textContent));
             }
-            for (size_t i = 0; i < layer.rgbaPixels.size(); i += 4) {
-                layer.rgbaPixels[i + 0] = pr;
-                layer.rgbaPixels[i + 1] = pg;
-                layer.rgbaPixels[i + 2] = pb;
-                layer.rgbaPixels[i + 3] = 255;
+#endif
+            decoded = true;
+        } else if (clip.type() == editor::ClipType::Graphic) {
+            layer.rgbaPixels.assign(layer.sourceWidth * layer.sourceHeight * 4, 0);
+#if defined(HAVE_QT6)
+            std::string shape = clip.getParam<std::string>("graphic.shape", "rectangle");
+            std::string colorStr = clip.getParam<std::string>("graphic.color", "#38bdf8");
+            bool isAdjustment = clip.getParam<bool>("isAdjustmentLayer", false);
+
+            if (!isAdjustment) {
+                QImage img(layer.rgbaPixels.data(), layer.sourceWidth, layer.sourceHeight, layer.sourceWidth * 4, QImage::Format_RGBA8888);
+                {
+                    QPainter painter(&img);
+                    painter.setRenderHint(QPainter::Antialiasing);
+
+                    QColor fillColor(QString::fromStdString(colorStr));
+                    if (!fillColor.isValid()) fillColor = QColor("#38bdf8");
+
+                    painter.setBrush(fillColor);
+                    painter.setPen(Qt::NoPen);
+
+                    int cx = layer.sourceWidth / 2;
+                    int cy = layer.sourceHeight / 2;
+                    int size = std::min(layer.sourceWidth, layer.sourceHeight) / 4;
+
+                    if (shape == "circle") {
+                        painter.drawEllipse(QPoint(cx, cy), size / 2, size / 2);
+                    } else if (shape == "star") {
+                        QPolygon star;
+                        for (int i = 0; i < 5; ++i) {
+                            double a1 = i * 4.0 * 3.14159265358979323846 / 5.0 - 3.14159265358979323846 / 2.0;
+                            star << QPoint(cx + static_cast<int>(std::cos(a1) * size / 2),
+                                           cy + static_cast<int>(std::sin(a1) * size / 2));
+                        }
+                        painter.drawPolygon(star);
+                    } else {
+                        // Rectangle
+                        painter.drawRoundedRect(QRect(cx - size, cy - size / 2, size * 2, size), 8, 8);
+                    }
+                }
             }
+#endif
+            decoded = true;
         }
+
+        if (!decoded) {
+            layer.rgbaPixels.assign(layer.sourceWidth * layer.sourceHeight * 4, 0);
+        }
+
+        // Apply visual adjustments
+        double adjBright = clip.getParam<double>("adjustment.brightness", 0.0);
+        double adjContrast = clip.getParam<double>("adjustment.contrast", 0.0);
+        double adjSat = clip.getParam<double>("adjustment.saturation", 0.0);
+        double adjTemp = clip.getParam<double>("adjustment.temperature", 0.0);
+        double adjTint = clip.getParam<double>("adjustment.tint", 0.0);
+        applyAdjustmentToPixels(layer.rgbaPixels, adjBright, adjContrast, adjSat, adjTemp, adjTint);
 
         // Apply real visual effects if configured
         std::string effName = clip.getParam<std::string>("effect.name", "");

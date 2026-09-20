@@ -1,6 +1,7 @@
 #include "TimelineTracksWidget.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include "ui/theme/Theme.h"
 #include "media/waveform/WaveformGenerator.h"
 #include "media/probe/MediaProbe.h"
@@ -198,22 +199,25 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
         // Track Icon & Name
         painter.setFont(QFont("Inter", 8, QFont::DemiBold));
         painter.setPen(QColor("#f4f4f5"));
-        QString typeIcon = "📹";
-        if (track->type() == editor::TrackType::Audio) typeIcon = "🎵";
-        else if (track->type() == editor::TrackType::Text) typeIcon = "🆃";
-        else if (track->type() == editor::TrackType::Graphic) typeIcon = "◨";
-        else if (track->type() == editor::TrackType::Effect) typeIcon = "✨";
 
-        painter.drawText(8, yOffset + 18, typeIcon);
-        painter.drawText(26, yOffset + 18, QString::fromStdString(track->name()));
+        UiIcon tIcon = UiIcon::Media;
+        if (track->type() == editor::TrackType::Audio) tIcon = UiIcon::Audio;
+        else if (track->type() == editor::TrackType::Text) tIcon = UiIcon::Text;
+        else if (track->type() == editor::TrackType::Graphic) tIcon = UiIcon::Stickers;
+        else if (track->type() == editor::TrackType::Effect) tIcon = UiIcon::Effects;
 
-        // Mute / Visibility indicators
-        painter.setFont(QFont("Inter", 9));
-        painter.setPen(track->isMuted() ? palette.destructive : QColor("#71717a"));
-        painter.drawText(Metrics::trackLabelsWidth - 36, yOffset + 18, track->isMuted() ? "🔇" : "🔊");
+        int iconY = yOffset + (trackHeight - 14) / 2;
+        painter.drawPixmap(8, iconY, UiIcons::getPixmap(tIcon, QColor("#a1a1aa"), 14));
+        painter.drawText(26, yOffset + (trackHeight + 8) / 2, QString::fromStdString(track->name()));
 
-        painter.setPen(track->isHidden() ? palette.destructive : QColor("#71717a"));
-        painter.drawText(Metrics::trackLabelsWidth - 18, yOffset + 18, track->isHidden() ? "🚫" : "👁");
+        // Mute / Visibility indicators (Vector SVG)
+        UiIcon muteIcon = track->isMuted() ? UiIcon::VolumeMute : UiIcon::Volume;
+        QColor muteCol = track->isMuted() ? palette.destructive : QColor("#71717a");
+        painter.drawPixmap(Metrics::trackLabelsWidth - 38, iconY, UiIcons::getPixmap(muteIcon, muteCol, 14));
+
+        UiIcon eyeIcon = track->isHidden() ? UiIcon::EyeOff : UiIcon::Eye;
+        QColor eyeCol = track->isHidden() ? palette.destructive : QColor("#71717a");
+        painter.drawPixmap(Metrics::trackLabelsWidth - 20, iconY, UiIcons::getPixmap(eyeIcon, eyeCol, 14));
 
         yOffset += trackHeight + Metrics::trackGap;
     }

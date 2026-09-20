@@ -1,6 +1,7 @@
 #include "PropertiesPanel.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include "core/time/Timecode.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -28,9 +29,9 @@ void PropertiesPanel::setupUi() {
     // 1. Empty View
     emptyView_ = new QWidget(this);
     auto* evLayout = new QVBoxLayout(emptyView_);
-    auto* evIcon = new QLabel("🎯", emptyView_);
+    auto* evIcon = new QLabel(emptyView_);
+    evIcon->setPixmap(UiIcons::getPixmap(UiIcon::Target, QColor("#52525b"), 36));
     evIcon->setAlignment(Qt::AlignCenter);
-    evIcon->setStyleSheet("font-size: 32px; color: #52525b;");
     auto* evLabel = new QLabel("Chưa chọn phần tử nào\nHãy nhấp vào một clip trên timeline để xem và chỉnh sửa thuộc tính", emptyView_);
     evLabel->setAlignment(Qt::AlignCenter);
     evLabel->setStyleSheet("color: #71717a; font-size: 12px; line-height: 1.4;");

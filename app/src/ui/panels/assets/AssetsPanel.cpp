@@ -16,6 +16,7 @@
 #include <QGroupBox>
 #include <QPushButton>
 #include <QComboBox>
+#include <QSlider>
 #include <fstream>
 #include <sstream>
 
@@ -77,7 +78,9 @@ void AssetsPanel::setupUi() {
     addTab("Text", UiIcon::Text);
     addTab("Sticker", UiIcon::Stickers);
     addTab("Effects", UiIcon::Effects);
+    addTab("Chuyển", UiIcon::Transitions);
     addTab("Phụ đề", UiIcon::Captions);
+    addTab("Chỉnh", UiIcon::Adjustment);
     addTab("Canvas", UiIcon::Settings);
     tabList_->setCurrentRow(0);
 
@@ -87,7 +90,9 @@ void AssetsPanel::setupUi() {
     viewsStack_->addWidget(createTextView());
     viewsStack_->addWidget(createStickersView());
     viewsStack_->addWidget(createEffectsView());
+    viewsStack_->addWidget(createTransitionsView());
     viewsStack_->addWidget(createSubtitlesView());
+    viewsStack_->addWidget(createAdjustmentView());
     viewsStack_->addWidget(createSettingsView());
 
     connect(tabList_, &QListWidget::currentRowChanged, viewsStack_, &QStackedWidget::setCurrentIndex);
@@ -129,7 +134,7 @@ QWidget* AssetsPanel::createMediaView() {
 
     // Search bar
     mediaSearchInput_ = new QLineEdit(view);
-    mediaSearchInput_->setPlaceholderText("🔍 Tìm kiếm tệp trong dự án...");
+    mediaSearchInput_->setPlaceholderText("Tìm kiếm tệp trong dự án...");
     connect(mediaSearchInput_, &QLineEdit::textChanged, [this](const QString& q) {
         for (int i = 0; i < mediaListWidget_->count(); ++i) {
             auto* item = mediaListWidget_->item(i);
@@ -166,7 +171,7 @@ QWidget* AssetsPanel::createMediaView() {
     connect(mediaListWidget_, &QListWidget::itemDoubleClicked, this, &AssetsPanel::onMediaItemDoubleClicked);
     layout->addWidget(mediaListWidget_, 1);
 
-    auto* hintLabel = new QLabel("💡 Nhấp đúp vào tệp để thêm vào Timeline", view);
+    auto* hintLabel = new QLabel("Nhấp đúp vào tệp để thêm vào Timeline", view);
     hintLabel->setStyleSheet("color: #71717a; font-size: 11px;");
     layout->addWidget(hintLabel);
 
@@ -214,7 +219,12 @@ QWidget* AssetsPanel::createAudioView() {
         auto* rLayout = new QHBoxLayout(row);
         rLayout->setContentsMargins(8, 6, 8, 6);
 
-        auto* nameLabel = new QLabel(QString("🎵 %1\n<span style='color:#71717a;'>%2 • %3s</span>")
+        auto* ic = new QLabel(row);
+        ic->setPixmap(UiIcons::getPixmap(UiIcon::Audio, QColor("#38bdf8"), 16));
+        ic->setFixedSize(20, 20);
+        rLayout->addWidget(ic);
+
+        auto* nameLabel = new QLabel(QString("<b>%1</b><br><span style='color:#71717a;'>%2 • %3s</span>")
             .arg(sfx.name).arg(sfx.category).arg(sfx.duration, 0, 'f', 1), row);
         nameLabel->setTextFormat(Qt::RichText);
         rLayout->addWidget(nameLabel, 1);
@@ -303,28 +313,31 @@ QWidget* AssetsPanel::createStickersView() {
     struct GraphicItem {
         QString name;
         QString shape;
-        QString icon;
+        UiIcon icon;
     };
 
     std::vector<GraphicItem> items = {
-        {"Hình chữ nhật", "rectangle", "⬛"},
-        {"Hình tròn", "circle", "⚪"},
-        {"Ngôi sao", "star", "⭐"},
-        {"Mũi tên", "arrow", "➡"},
-        {"Huy hiệu", "badge", "🛡"},
-        {"Khung viền", "frame", "🔲"},
-        {"Lửa", "emoji_fire", "🔥"},
-        {"Trái tim", "emoji_heart", "❤️"},
-        {"Thích", "emoji_like", "👍"},
-        {"Tia chớp", "emoji_bolt", "⚡"},
-        {"Lấp lánh", "emoji_sparkle", "✨"},
-        {"Mục tiêu", "emoji_target", "🎯"}
+        {"Hình chữ nhật", "rectangle", UiIcon::ShapeRect},
+        {"Hình tròn", "circle", UiIcon::ShapeCircle},
+        {"Ngôi sao", "star", UiIcon::ShapeStar},
+        {"Mũi tên", "arrow", UiIcon::ShapeArrow},
+        {"Huy hiệu", "badge", UiIcon::Target},
+        {"Khung viền", "frame", UiIcon::ShapeRect},
+        {"Biểu đồ", "chart", UiIcon::Chart},
+        {"Toàn màn", "fullscreen", UiIcon::Fullscreen},
+        {"Hiệu ứng", "effect", UiIcon::Effects},
+        {"Âm thanh", "audio", UiIcon::Audio},
+        {"Văn bản", "text", UiIcon::Text},
+        {"Cài đặt", "settings", UiIcon::Settings}
     };
 
     int row = 0, col = 0;
     for (const auto& it : items) {
-        auto* btn = new QPushButton(QString("%1\n%2").arg(it.icon).arg(it.name), gridContainer);
-        btn->setFixedHeight(54);
+        auto* btn = new QPushButton(gridContainer);
+        btn->setIcon(UiIcons::get(it.icon, QColor("#38bdf8"), 20));
+        btn->setIconSize(QSize(20, 20));
+        btn->setText(it.name);
+        btn->setFixedHeight(50);
         btn->setStyleSheet(R"(
             QPushButton {
                 background-color: #141417;
@@ -332,6 +345,8 @@ QWidget* AssetsPanel::createStickersView() {
                 border-radius: 6px;
                 font-size: 11px;
                 color: #f4f4f5;
+                text-align: center;
+                padding-left: 4px;
             }
             QPushButton:hover {
                 background-color: #1e1e24;
@@ -361,25 +376,25 @@ QWidget* AssetsPanel::createEffectsView() {
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
 
-    auto* titleLabel = new QLabel("Hiệu ứng Video & Chuyển cảnh", view);
+    auto* titleLabel = new QLabel("Hiệu ứng Video (Video Effects)", view);
     titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
     layout->addWidget(titleLabel);
 
     struct EffectItem {
         QString name;
         QString category;
-        QString icon;
+        UiIcon icon;
     };
 
     std::vector<EffectItem> effects = {
-        {"Làm mờ (Gaussian Blur)", "Filter", "🌫"},
-        {"Chỉnh màu (Color Grading)", "Color", "🎨"},
-        {"Tối góc (Vignette)", "Lens", "🔘"},
-        {"Đen trắng (Monochrome)", "Color", "🌓"},
-        {"Đảo màu (Invert)", "Stylize", "🔄"},
-        {"Hòa tan (Cross Dissolve)", "Transition", "✨"},
-        {"Trượt mượt (Slide Left)", "Transition", "⏩"},
-        {"Phóng to (Zoom In)", "Transition", "🔍"}
+        {"Làm mờ (Gaussian Blur)", "Bộ lọc Filter", UiIcon::Contrast},
+        {"Chỉnh màu (Color Grading)", "Chỉnh màu", UiIcon::Adjustment},
+        {"Tối góc (Vignette)", "Ống kính", UiIcon::Sun},
+        {"Đen trắng (Monochrome)", "Chỉnh màu", UiIcon::Contrast},
+        {"Đảo màu (Invert)", "Phong cách", UiIcon::Effects},
+        {"Phóng to (Zoom In)", "Biến đổi", UiIcon::ZoomIn},
+        {"Thu nhỏ (Zoom Out)", "Biến đổi", UiIcon::ZoomOut},
+        {"Độ nét (Sharpen)", "Bộ lọc Filter", UiIcon::Sliders}
     };
 
     for (const auto& eff : effects) {
@@ -387,8 +402,13 @@ QWidget* AssetsPanel::createEffectsView() {
         auto* cLayout = new QHBoxLayout(card);
         cLayout->setContentsMargins(10, 8, 10, 8);
 
-        auto* lbl = new QLabel(QString("<b>%1 %2</b><br><span style='color:#71717a; font-size:11px;'>Phân loại: %3</span>")
-            .arg(eff.icon).arg(eff.name).arg(eff.category), card);
+        auto* ic = new QLabel(card);
+        ic->setPixmap(UiIcons::getPixmap(eff.icon, QColor("#38bdf8"), 18));
+        ic->setFixedSize(22, 22);
+        cLayout->addWidget(ic);
+
+        auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
+            .arg(eff.name).arg(eff.category), card);
         lbl->setTextFormat(Qt::RichText);
         cLayout->addWidget(lbl, 1);
 
@@ -403,6 +423,88 @@ QWidget* AssetsPanel::createEffectsView() {
         layout->addWidget(card);
     }
     layout->addStretch();
+
+    return view;
+}
+
+QWidget* AssetsPanel::createTransitionsView() {
+    auto* view = new QWidget(this);
+    auto* layout = new QVBoxLayout(view);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto* titleLabel = new QLabel("Hiệu ứng chuyển cảnh (Transitions)", view);
+    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    layout->addWidget(titleLabel);
+
+    auto* durBox = new QGroupBox("Thời lượng chuyển cảnh", view);
+    auto* durLayout = new QHBoxLayout(durBox);
+    auto* durLabel = new QLabel("0.5s", durBox);
+    durLabel->setStyleSheet("color: #38bdf8; font-weight: 600; min-width: 36px;");
+    auto* durSlider = new QSlider(Qt::Horizontal, durBox);
+    durSlider->setRange(2, 20); // 0.2s to 2.0s
+    durSlider->setValue(5);
+    connect(durSlider, &QSlider::valueChanged, [durLabel](int v) {
+        durLabel->setText(QString("%1s").arg(v / 10.0, 0, 'f', 1));
+    });
+    durLayout->addWidget(durSlider);
+    durLayout->addWidget(durLabel);
+    layout->addWidget(durBox);
+
+    auto* scroll = new QScrollArea(view);
+    scroll->setWidgetResizable(true);
+    auto* container = new QWidget(scroll);
+    auto* cLayout = new QVBoxLayout(container);
+    cLayout->setContentsMargins(0, 0, 0, 0);
+    cLayout->setSpacing(6);
+
+    struct TransitionItem {
+        QString name;
+        QString desc;
+        UiIcon icon;
+    };
+
+    std::vector<TransitionItem> transList = {
+        {"Cross Dissolve", "Hòa tan mờ dần giữa 2 cảnh", UiIcon::Transitions},
+        {"Fade to Black", "Mờ dần sang nền đen rồi chuyển cảnh", UiIcon::Contrast},
+        {"Fade to White", "Mờ lóa sáng sang trắng rồi hiện cảnh mới", UiIcon::Sun},
+        {"Slide Left", "Trượt mượt mà sang bên trái", UiIcon::StepForward},
+        {"Slide Right", "Trượt mượt mà sang bên phải", UiIcon::StepBack},
+        {"Slide Up", "Trượt cảnh mới từ dưới lên trên", UiIcon::Transitions},
+        {"Slide Down", "Trượt cảnh mới từ trên xuống dưới", UiIcon::Transitions},
+        {"Zoom In", "Phóng to đột phá vào cảnh tiếp theo", UiIcon::ZoomIn},
+        {"Zoom Out", "Thu nhỏ lùi dần chuyển cảnh", UiIcon::ZoomOut},
+        {"Wipe", "Quét chuyển cảnh ngang sắc nét", UiIcon::Sliders}
+    };
+
+    for (const auto& tr : transList) {
+        auto* card = new QWidget(container);
+        auto* rowLayout = new QHBoxLayout(card);
+        rowLayout->setContentsMargins(8, 8, 8, 8);
+
+        auto* icLabel = new QLabel(card);
+        icLabel->setPixmap(UiIcons::getPixmap(tr.icon, QColor("#38bdf8"), 20));
+        rowLayout->addWidget(icLabel);
+
+        auto* infoLabel = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
+            .arg(tr.name).arg(tr.desc), card);
+        infoLabel->setTextFormat(Qt::RichText);
+        rowLayout->addWidget(infoLabel, 1);
+
+        auto* applyBtn = new QPushButton("Áp dụng", card);
+        applyBtn->setFixedSize(68, 28);
+        connect(applyBtn, &QPushButton::clicked, [this, tr, durSlider]() {
+            double dur = durSlider->value() / 10.0;
+            onApplyTransitionPreset(tr.name, dur);
+        });
+        rowLayout->addWidget(applyBtn);
+
+        card->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
+        cLayout->addWidget(card);
+    }
+    cLayout->addStretch();
+    scroll->setWidget(container);
+    layout->addWidget(scroll, 1);
 
     return view;
 }
@@ -427,7 +529,8 @@ QWidget* AssetsPanel::createSubtitlesView() {
     langLayout->addWidget(langCombo);
     layout->addWidget(langBox);
 
-    auto* autoBtn = new QPushButton("⚡ Tạo phụ đề tự động (AI Auto-Caption)", view);
+    auto* autoBtn = new QPushButton("Tạo phụ đề tự động (AI Auto-Caption)", view);
+    autoBtn->setIcon(UiIcons::get(UiIcon::Captions, QColor("#ffffff"), 18));
     autoBtn->setFixedHeight(36);
     autoBtn->setStyleSheet(R"(
         QPushButton {
@@ -443,12 +546,115 @@ QWidget* AssetsPanel::createSubtitlesView() {
     connect(autoBtn, &QPushButton::clicked, this, &AssetsPanel::onAutoTranscribeClicked);
     layout->addWidget(autoBtn);
 
-    auto* importSrtBtn = new QPushButton("📁 Nhập tệp phụ đề .SRT / .VTT", view);
+    auto* importSrtBtn = new QPushButton("Nhập tệp phụ đề .SRT / .VTT", view);
+    importSrtBtn->setIcon(UiIcons::get(UiIcon::Text, QColor("#f4f4f5"), 16));
     importSrtBtn->setFixedHeight(34);
     connect(importSrtBtn, &QPushButton::clicked, this, &AssetsPanel::onImportSrtClicked);
     layout->addWidget(importSrtBtn);
 
     layout->addStretch();
+
+    return view;
+}
+
+QWidget* AssetsPanel::createAdjustmentView() {
+    auto* view = new QWidget(this);
+    auto* layout = new QVBoxLayout(view);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+
+    auto* titleLabel = new QLabel("Lớp điều chỉnh & Chỉnh màu (Adjustment)", view);
+    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    layout->addWidget(titleLabel);
+
+    auto* scroll = new QScrollArea(view);
+    scroll->setWidgetResizable(true);
+    auto* container = new QWidget(scroll);
+    auto* cLayout = new QVBoxLayout(container);
+    cLayout->setContentsMargins(0, 0, 0, 0);
+    cLayout->setSpacing(8);
+
+    auto makeSliderRow = [container](const QString& title, int min, int max, int def) -> std::pair<QSlider*, QLabel*> {
+        auto* box = new QWidget(container);
+        auto* bLayout = new QVBoxLayout(box);
+        bLayout->setContentsMargins(8, 6, 8, 6);
+
+        auto* topRow = new QHBoxLayout();
+        auto* lbl = new QLabel(title, box);
+        lbl->setStyleSheet("color: #f4f4f5; font-size: 12px; font-weight: 500;");
+        auto* valLbl = new QLabel(QString::number(def), box);
+        valLbl->setStyleSheet("color: #38bdf8; font-weight: 600; font-size: 12px;");
+        topRow->addWidget(lbl);
+        topRow->addStretch();
+        topRow->addWidget(valLbl);
+        bLayout->addLayout(topRow);
+
+        auto* slider = new QSlider(Qt::Horizontal, box);
+        slider->setRange(min, max);
+        slider->setValue(def);
+        QObject::connect(slider, &QSlider::valueChanged, [valLbl](int v) {
+            valLbl->setText(QString::number(v));
+        });
+        bLayout->addWidget(slider);
+        box->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
+        return {slider, valLbl};
+    };
+
+    auto [brightSlider, brightLbl] = makeSliderRow("Độ sáng (Brightness)", -100, 100, 0);
+    auto [contrastSlider, contrastLbl] = makeSliderRow("Độ tương phản (Contrast)", -100, 100, 0);
+    auto [satSlider, satLbl] = makeSliderRow("Độ bão hòa màu (Saturation)", -100, 100, 0);
+    auto [tempSlider, tempLbl] = makeSliderRow("Nhiệt độ màu (Temperature)", -100, 100, 0);
+    auto [tintSlider, tintLbl] = makeSliderRow("Sắc thái màu (Tint)", -100, 100, 0);
+
+    cLayout->addWidget(brightSlider->parentWidget());
+    cLayout->addWidget(contrastSlider->parentWidget());
+    cLayout->addWidget(satSlider->parentWidget());
+    cLayout->addWidget(tempSlider->parentWidget());
+    cLayout->addWidget(tintSlider->parentWidget());
+
+    auto* applyBtn = new QPushButton("Áp dụng cho Clip đang chọn", container);
+    applyBtn->setFixedHeight(36);
+    applyBtn->setStyleSheet(R"(
+        QPushButton {
+            background-color: #0284c7;
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 6px;
+        }
+        QPushButton:hover {
+            background-color: #0369a1;
+        }
+    )");
+    connect(applyBtn, &QPushButton::clicked, [this, brightSlider, contrastSlider, satSlider, tempSlider, tintSlider]() {
+        onApplyAdjustment(
+            brightSlider->value(),
+            contrastSlider->value(),
+            satSlider->value(),
+            tempSlider->value(),
+            tintSlider->value()
+        );
+    });
+    cLayout->addWidget(applyBtn);
+
+    auto* resetBtn = new QPushButton("Đặt lại tất cả về 0", container);
+    resetBtn->setFixedHeight(30);
+    connect(resetBtn, &QPushButton::clicked, [=]() {
+        brightSlider->setValue(0);
+        contrastSlider->setValue(0);
+        satSlider->setValue(0);
+        tempSlider->setValue(0);
+        tintSlider->setValue(0);
+    });
+    cLayout->addWidget(resetBtn);
+
+    auto* addLayerBtn = new QPushButton("＋ Thêm lớp Điều chỉnh vào Timeline", container);
+    addLayerBtn->setFixedHeight(34);
+    connect(addLayerBtn, &QPushButton::clicked, this, &AssetsPanel::onAddAdjustmentLayer);
+    cLayout->addWidget(addLayerBtn);
+
+    cLayout->addStretch();
+    scroll->setWidget(container);
+    layout->addWidget(scroll, 1);
 
     return view;
 }
@@ -529,11 +735,11 @@ void AssetsPanel::refresh() {
         auto* item = new QListWidgetItem(mediaListWidget_);
 
         std::string durStr = core::Timecode::format(asset->duration(), core::TimecodeFormat::MM_SS);
-        QString typeIcon = (asset->type() == media::MediaType::Video) ? "📹" :
-                           (asset->type() == media::MediaType::Audio) ? "🎵" : "🖼";
+        UiIcon iconType = (asset->type() == media::MediaType::Video) ? UiIcon::Media :
+                          (asset->type() == media::MediaType::Audio) ? UiIcon::Audio : UiIcon::Media;
+        item->setIcon(UiIcons::get(iconType, QColor("#38bdf8"), 24));
 
-        QString label = QString("%1 %2\n<span style='color:#71717a;'>%3x%4 • %5</span>")
-            .arg(typeIcon)
+        QString label = QString("%1\n<span style='color:#71717a;'>%2x%3 • %4</span>")
             .arg(QString::fromStdString(asset->fileName()))
             .arg(asset->width())
             .arg(asset->height())
@@ -697,6 +903,65 @@ void AssetsPanel::onApplyEffectPreset(const QString& effectName) {
     }
     engine_.project().setDirty(true);
     engine_.notifyProjectChanged();
+}
+
+void AssetsPanel::onApplyTransitionPreset(const QString& name, double durationSec) {
+    const auto& sel = engine_.selectedClips();
+    if (sel.empty()) return;
+
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+
+    for (const auto& cid : sel) {
+        auto* clip = tl->findClip(cid);
+        if (clip) {
+            clip->setParam("transition.type", name.toStdString());
+            clip->setParam("transition.duration", durationSec);
+        }
+    }
+    engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
+}
+
+void AssetsPanel::onApplyAdjustment(double brightness, double contrast, double saturation, double temperature, double tint) {
+    const auto& sel = engine_.selectedClips();
+    if (sel.empty()) return;
+
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+
+    for (const auto& cid : sel) {
+        auto* clip = tl->findClip(cid);
+        if (clip) {
+            clip->setParam("adjustment.brightness", brightness);
+            clip->setParam("adjustment.contrast", contrast);
+            clip->setParam("adjustment.saturation", saturation);
+            clip->setParam("adjustment.temperature", temperature);
+            clip->setParam("adjustment.tint", tint);
+        }
+    }
+    engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
+}
+
+void AssetsPanel::onAddAdjustmentLayer() {
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+
+    core::TimelineTime insertTime = engine_.playback().currentTime();
+    editor::Clip clip(
+        core::ClipId::generate(),
+        editor::ClipType::Graphic,
+        "Lớp điều chỉnh (Adjustment)",
+        insertTime,
+        core::TimelineTime::fromSeconds(5.0)
+    );
+    clip.setParam("isAdjustmentLayer", true);
+    clip.setParam("adjustment.brightness", 0.0);
+    clip.setParam("adjustment.contrast", 0.0);
+    clip.setParam("adjustment.saturation", 0.0);
+
+    engine_.addClip(tl->mainTrack().id(), std::move(clip));
 }
 
 void AssetsPanel::onImportSrtClicked() {

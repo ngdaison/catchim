@@ -32,7 +32,10 @@ private:
 
     editor::EditorEngine& engine_;
 
+    QPushButton* splitLeftBtn_{nullptr};
     QPushButton* splitBtn_{nullptr};
+    QPushButton* splitRightBtn_{nullptr};
+    QPushButton* unlinkBtn_{nullptr};
     QPushButton* deleteBtn_{nullptr};
     QPushButton* dupBtn_{nullptr};
     QPushButton* bookmarkBtn_{nullptr};

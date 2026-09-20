@@ -49,8 +49,23 @@ void TimelineToolbar::setupUi() {
     };
 
     // Left tools
-    splitBtn_ = makeIconBtn(UiIcon::Split, "Cắt phần tử tại con trỏ (S)");
+    splitLeftBtn_ = makeIconBtn(UiIcon::SplitLeft, "Cắt bỏ đoạn bên trái tại đầu đọc (Q)");
+    connect(splitLeftBtn_, &QPushButton::clicked, [this]() {
+        engine_.splitLeftAtPlayhead();
+    });
+
+    splitBtn_ = makeIconBtn(UiIcon::Split, "Cắt phần tử tại đầu đọc (S)");
     connect(splitBtn_, &QPushButton::clicked, this, &TimelineToolbar::onSplitClicked);
+
+    splitRightBtn_ = makeIconBtn(UiIcon::SplitRight, "Cắt bỏ đoạn bên phải tại đầu đọc (W)");
+    connect(splitRightBtn_, &QPushButton::clicked, [this]() {
+        engine_.splitRightAtPlayhead();
+    });
+
+    unlinkBtn_ = makeIconBtn(UiIcon::Unlink, "Tách âm thanh khỏi video (Extract Audio)");
+    connect(unlinkBtn_, &QPushButton::clicked, [this]() {
+        engine_.toggleSourceAudioSeparation();
+    });
 
     dupBtn_ = makeIconBtn(UiIcon::Duplicate, "Nhân bản phần tử (Ctrl+D)");
     connect(dupBtn_, &QPushButton::clicked, this, &TimelineToolbar::onDuplicateClicked);
@@ -88,21 +103,21 @@ void TimelineToolbar::setupUi() {
     )");
 
     auto* trackMenu = new QMenu(addTrackBtn);
-    trackMenu->addAction("📹 Thêm Video Track", [this]() {
+    trackMenu->addAction(UiIcons::get(UiIcon::Media), "Thêm Video Track", [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
             tl->addTrack(editor::TrackType::Video, "Video " + std::to_string(tl->allTracks().size() + 1));
             engine_.project().setDirty(true);
         }
     });
-    trackMenu->addAction("🎵 Thêm Audio Track", [this]() {
+    trackMenu->addAction(UiIcons::get(UiIcon::Audio), "Thêm Audio Track", [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
             tl->addTrack(editor::TrackType::Audio, "Audio " + std::to_string(tl->allTracks().size() + 1));
             engine_.project().setDirty(true);
         }
     });
-    trackMenu->addAction("🆃 Thêm Text Track", [this]() {
+    trackMenu->addAction(UiIcons::get(UiIcon::Text), "Thêm Text Track", [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
             tl->addTrack(editor::TrackType::Text, "Text " + std::to_string(tl->allTracks().size() + 1));
@@ -111,7 +126,10 @@ void TimelineToolbar::setupUi() {
     });
     addTrackBtn->setMenu(trackMenu);
 
+    layout->addWidget(splitLeftBtn_);
     layout->addWidget(splitBtn_);
+    layout->addWidget(splitRightBtn_);
+    layout->addWidget(unlinkBtn_);
     layout->addWidget(dupBtn_);
     layout->addWidget(deleteBtn_);
     layout->addWidget(bookmarkBtn_);

@@ -569,6 +569,9 @@ add_library(catchim_render STATIC
     src/render/canvas/PatternCraftGradients.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
+if(HAVE_QT6)
+    target_link_libraries(catchim_render PUBLIC Qt6::Core Qt6::Gui)
+endif()
 
 add_library(catchim_audio STATIC
     src/audio/AudioBuffer.h
@@ -673,6 +676,8 @@ if(HAVE_QT6)
         src/ui/timeline/TimelineTracksWidget.h
         src/ui/timeline/TimelinePanel.cpp
         src/ui/timeline/TimelinePanel.h
+        src/ui/export/ExportDialog.cpp
+        src/ui/export/ExportDialog.h
     )
     target_link_libraries(catchim_ui PUBLIC
         catchim_editor

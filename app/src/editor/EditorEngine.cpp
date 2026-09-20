@@ -2,6 +2,7 @@
 #include "project/ProjectSerializer.h"
 #include "history/commands/TimelineCommands.h"
 #include "history/commands/AdvancedTimelineCommands.h"
+#include "history/commands/ToggleSourceAudioSeparationCommand.h"
 #include <algorithm>
 
 namespace catchim::editor {
@@ -294,6 +295,54 @@ bool EditorEngine::duplicateSelectedClips() {
         selectClips(newSelected);
     }
     return true;
+}
+
+bool EditorEngine::toggleSourceAudioSeparation() {
+    Timeline* tl = activeTimeline();
+    if (!tl) return false;
+
+    // Find target clip: either selected clip or clip under playhead
+    const Clip* targetClip = nullptr;
+    core::TrackId targetTrackId;
+
+    if (!selectedClipIds_.empty()) {
+        for (const auto& cid : selectedClipIds_) {
+            for (auto* track : tl->allTracks()) {
+                if (const auto* c = track->findClip(cid)) {
+                    if (c->type() == ClipType::Video) {
+                        targetClip = c;
+                        targetTrackId = track->id();
+                        break;
+                    }
+                }
+            }
+            if (targetClip) break;
+        }
+    }
+
+    if (!targetClip) {
+        core::TimelineTime curTime = playback_.currentTime();
+        for (auto* track : tl->allTracks()) {
+            for (const auto& c : track->clips()) {
+                if (c.type() == ClipType::Video && curTime >= c.startTime() && curTime <= c.endTime()) {
+                    targetClip = &c;
+                    targetTrackId = track->id();
+                    break;
+                }
+            }
+            if (targetClip) break;
+        }
+    }
+
+    if (!targetClip) return false;
+
+    auto cmd = std::make_unique<ToggleSourceAudioSeparationCommand>(*tl, targetTrackId, targetClip->id());
+    if (history_.execute(std::move(cmd))) {
+        project_.setDirty(true);
+        notifyTimelineChanged();
+        return true;
+    }
+    return false;
 }
 
 void EditorEngine::notifyProjectChanged() {
