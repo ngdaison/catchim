@@ -17,6 +17,8 @@ constexpr double MAX_RETIME_RATE = 5.0;
 struct RetimeConfig {
     double rate = DEFAULT_RETIME_RATE;
     bool maintainPitch = true;
+
+    bool operator==(const RetimeConfig& other) const = default;
 };
 
 class RetimeEngine {

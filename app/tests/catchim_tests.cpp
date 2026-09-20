@@ -220,6 +220,12 @@
 #include "editor/timeline/TrackLayoutMetrics.h"
 #include "editor/timeline/SelectionHitTesting.h"
 #include "editor/export/ExportMimeTypesAndLayers.h"
+#include "editor/timeline/TimelineTheme.h"
+#include "editor/preview/PreviewSettingsStore.h"
+#include "editor/retime/RetimeRateEngine.h"
+#include "editor/preview/controllers/TransformHandleController.h"
+#include "editor/preview/controllers/PreviewInteractionGestureController.h"
+#include "render/effects/MaskFeatherEngine.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -11700,6 +11706,206 @@ void runExportMimeTypesAndLayersTests() {
     std::cout << "[PASS] runExportMimeTypesAndLayersTests" << std::endl;
 }
 
+void runTimelineThemeTests() {
+    using namespace catchim::editor;
+
+    auto themeText = TimelineTheme::getTrackTheme(TrackType::Text);
+    TEST_ASSERT(themeText.hexColor == "#5DBAA0");
+    TEST_ASSERT(!themeText.waveformColor.has_value());
+
+    auto themeAudio = TimelineTheme::getTrackTheme(TrackType::Audio);
+    TEST_ASSERT(themeAudio.hexColor == "#8F5DBA");
+    TEST_ASSERT(themeAudio.waveformColor.has_value());
+
+    TEST_ASSERT(TimelineTheme::getTimelineElementClassName(TrackType::Graphic) == "bg-[#BA5D7A]");
+    TEST_ASSERT(TimelineTheme::getTrackHexColor(TrackType::Effect) == "#5d93ba");
+    TEST_ASSERT(TimelineTheme::DEFAULT_TIMELINE_BOOKMARK_COLOR == "#009dff");
+
+    std::cout << "[PASS] runTimelineThemeTests" << std::endl;
+}
+
+void runPreviewSettingsStoreTests() {
+    using namespace catchim::editor;
+
+    PreviewSettingsStore store;
+    TEST_ASSERT(!store.activeGuide().has_value());
+    TEST_ASSERT(store.gridConfig().rows == 3);
+    TEST_ASSERT(store.gridConfig().cols == 3);
+
+    // Guide toggling
+    store.toggleGuide("rule-of-thirds");
+    TEST_ASSERT(store.activeGuide().has_value());
+    TEST_ASSERT(*store.activeGuide() == "rule-of-thirds");
+
+    store.toggleGuide("rule-of-thirds");
+    TEST_ASSERT(!store.activeGuide().has_value());
+
+    // Overlay visibility
+    TEST_ASSERT(store.isOverlayVisible("safe-zone", true));
+    store.setOverlayVisibility("safe-zone", false);
+    TEST_ASSERT(!store.isOverlayVisible("safe-zone", true));
+    store.toggleOverlayVisibility("safe-zone");
+    TEST_ASSERT(store.isOverlayVisible("safe-zone", true));
+
+    // Serialization
+    auto j = store.toJson();
+    auto loaded = PreviewSettingsStore::fromJson(j);
+    TEST_ASSERT(loaded.isOverlayVisible("safe-zone", true));
+    TEST_ASSERT(loaded.gridConfig().rows == 3);
+
+    size_t presetCount = PreviewSettingsStore::PREVIEW_ZOOM_PRESETS.size();
+    TEST_ASSERT(presetCount == 6);
+
+    std::cout << "[PASS] runPreviewSettingsStoreTests" << std::endl;
+}
+
+void runRetimeRateEngineTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    TEST_ASSERT(RetimeRateEngine::clampRetimeRate(0.0) == 1.0);
+    TEST_ASSERT(RetimeRateEngine::clampRetimeRate(10.0) == 5.0);
+    TEST_ASSERT(RetimeRateEngine::clampRetimeRate(0.001) == 0.01);
+
+    TEST_ASSERT(RetimeRateEngine::canMaintainPitch(2.0));
+    TEST_ASSERT(!RetimeRateEngine::canMaintainPitch(-1.0));
+    TEST_ASSERT(RetimeRateEngine::shouldMaintainPitch(2.0, true));
+    TEST_ASSERT(!RetimeRateEngine::shouldMaintainPitch(2.0, false));
+
+    auto cfg = RetimeRateEngine::buildConstantRetime(2.0, true);
+    TEST_ASSERT(cfg.rate == 2.0);
+    TEST_ASSERT(cfg.maintainPitch);
+
+    // 2.0x speed: 3.0s in clip = 6.0s in source
+    TEST_ASSERT(RetimeRateEngine::getSourceTimeAtClipTime(3.0, 2.0) == 6.0);
+    TEST_ASSERT(RetimeRateEngine::getClipTimeAtSourceTime(6.0, 2.0) == 3.0);
+    TEST_ASSERT(RetimeRateEngine::getTimelineDurationForSourceSpan(6.0, 2.0) == 3.0);
+
+    auto split = RetimeRateEngine::splitRetimeAtClipTime(cfg, 1.5);
+    TEST_ASSERT(split.first.rate == 2.0);
+    TEST_ASSERT(split.second.rate == 2.0);
+
+    std::cout << "[PASS] runRetimeRateEngineTests" << std::endl;
+}
+
+void runTransformHandleControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    TEST_ASSERT(TransformHandleController::clampScaleNonZero(0.0001) == 0.001);
+    TEST_ASSERT(TransformHandleController::clampScaleNonZero(-0.0001) == -0.001);
+    TEST_ASSERT(TransformHandleController::clampScaleNonZero(2.5) == 2.5);
+
+    double dist = TransformHandleController::getCornerDistance(100.0, 100.0, 0.0, HandleCorner::TopLeft);
+    TEST_ASSERT(dist > 0.0);
+
+    TransformHandleController controller;
+    TEST_ASSERT(controller.isIdle());
+
+    controller.startCornerScale(TrackId("t-1"), ClipId("c-1"), HandleCorner::BottomRight, 200.0, 100.0, 0.0);
+    TEST_ASSERT(controller.sessionKind() == TransformSessionKind::CornerScale);
+    TEST_ASSERT(controller.cornerSession().has_value());
+    TEST_ASSERT(controller.cornerSession()->corner == HandleCorner::BottomRight);
+
+    controller.startEdgeScale(TrackId("t-1"), ClipId("c-1"), HandleEdge::Right, 200.0, 100.0, 0.0);
+    TEST_ASSERT(controller.sessionKind() == TransformSessionKind::EdgeScale);
+
+    controller.startRotation(TrackId("t-1"), ClipId("c-1"), 0.5, 45.0);
+    TEST_ASSERT(controller.sessionKind() == TransformSessionKind::Rotation);
+
+    controller.endSession();
+    TEST_ASSERT(controller.isIdle());
+
+    // Scale animation reset
+    Clip clip(ClipId("c-test"), ClipType::Video, "Test", TimelineTime(0), TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(!TransformHandleController::shouldClearScaleAnimation(clip));
+    clip.getOrCreateAnimationChannel("transform.scaleX", 1.0);
+    TEST_ASSERT(TransformHandleController::shouldClearScaleAnimation(clip));
+    TransformHandleController::clearScaleAnimationChannels(clip);
+    TEST_ASSERT(!TransformHandleController::shouldClearScaleAnimation(clip));
+
+    std::cout << "[PASS] runTransformHandleControllerTests" << std::endl;
+}
+
+void runPreviewInteractionGestureControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    TEST_ASSERT(!PreviewInteractionGestureController::movedPastDragThreshold({0.0, 0.0}, {0.2, 0.2}));
+    TEST_ASSERT(PreviewInteractionGestureController::movedPastDragThreshold({0.0, 0.0}, {0.6, 0.0}));
+
+    ElementRef el1{TrackId("t1"), ClipId("c1")};
+    ElementRef el2{TrackId("t1"), ClipId("c2")};
+
+    // Target not in selection -> [dragTarget]
+    auto sel1 = PreviewInteractionGestureController::buildDragSelection({el1}, el2);
+    TEST_ASSERT(sel1.size() == 1);
+    TEST_ASSERT(sel1[0] == el2);
+
+    // Target already in selection -> reordered with target first
+    auto sel2 = PreviewInteractionGestureController::buildDragSelection({el1, el2}, el2);
+    TEST_ASSERT(sel2.size() == 2);
+    TEST_ASSERT(sel2[0] == el2);
+    TEST_ASSERT(sel2[1] == el1);
+
+    PreviewInteractionGestureController controller;
+    TEST_ASSERT(controller.isIdle());
+
+    controller.startPending({100.0, 100.0}, {el1});
+    TEST_ASSERT(controller.isPending());
+
+    // Move below threshold (0.2px)
+    controller.handleMove({100.2, 100.2});
+    TEST_ASSERT(controller.isPending());
+
+    // Move above threshold (1.0px)
+    controller.handleMove({101.0, 100.0});
+    TEST_ASSERT(controller.isDragging());
+
+    controller.endGesture();
+    TEST_ASSERT(controller.isIdle());
+
+    // Text editing
+    TEST_ASSERT(!controller.isEditingText());
+    controller.startTextEdit(TrackId("t1"), ClipId("c1"), "Hello");
+    TEST_ASSERT(controller.isEditingText());
+    TEST_ASSERT(controller.editingTextState()->text == "Hello");
+
+    controller.commitTextEdit("Hello World");
+    TEST_ASSERT(!controller.isEditingText());
+
+    std::cout << "[PASS] runPreviewInteractionGestureControllerTests" << std::endl;
+}
+
+void runMaskFeatherEngineTests() {
+    using namespace catchim::render;
+
+    auto surface = MaskFeatherEngine::createSurface(50, 50);
+    TEST_ASSERT(surface.isValid());
+    TEST_ASSERT(surface.pixels.size() == 50 * 50 * 4);
+
+    double clamped = MaskFeatherEngine::clampFeather(100.0, 50, 50);
+    TEST_ASSERT(clamped == 25.0);
+
+    // Set center block to alpha 255
+    for (int y = 20; y < 30; ++y) {
+        for (int x = 20; x < 30; ++x) {
+            surface.pixels[static_cast<size_t>((y * 50 + x) * 4 + 3)] = 255;
+        }
+    }
+
+    uint8_t alphaBefore = surface.pixels[static_cast<size_t>((25 * 50 + 25) * 4 + 3)];
+    TEST_ASSERT(alphaBefore == 255);
+
+    MaskFeatherEngine::applyMaskFeather(surface, 5.0);
+
+    // Adjacent pixel that was 0 should now have feathered alpha > 0
+    uint8_t alphaNeighbor = surface.pixels[static_cast<size_t>((19 * 50 + 20) * 4 + 3)];
+    TEST_ASSERT(alphaNeighbor > 0);
+
+    std::cout << "[PASS] runMaskFeatherEngineTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -11907,6 +12113,12 @@ int main() {
     runTrackLayoutMetricsTests();
     runSelectionHitTestingTests();
     runExportMimeTypesAndLayersTests();
-    std::cout << ">>> ALL 205 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTimelineThemeTests();
+    runPreviewSettingsStoreTests();
+    runRetimeRateEngineTests();
+    runTransformHandleControllerTests();
+    runPreviewInteractionGestureControllerTests();
+    runMaskFeatherEngineTests();
+    std::cout << ">>> ALL 211 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

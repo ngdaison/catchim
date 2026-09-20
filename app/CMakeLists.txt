@@ -325,6 +325,16 @@ add_library(catchim_editor STATIC
     src/editor/timeline/SelectionHitTesting.h
     src/editor/export/ExportMimeTypesAndLayers.cpp
     src/editor/export/ExportMimeTypesAndLayers.h
+    src/editor/timeline/TimelineTheme.cpp
+    src/editor/timeline/TimelineTheme.h
+    src/editor/preview/PreviewSettingsStore.cpp
+    src/editor/preview/PreviewSettingsStore.h
+    src/editor/retime/RetimeRateEngine.cpp
+    src/editor/retime/RetimeRateEngine.h
+    src/editor/preview/controllers/TransformHandleController.cpp
+    src/editor/preview/controllers/TransformHandleController.h
+    src/editor/preview/controllers/PreviewInteractionGestureController.cpp
+    src/editor/preview/controllers/PreviewInteractionGestureController.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -418,6 +428,8 @@ add_library(catchim_render STATIC
     src/render/FontRegistry.h
     src/render/effects/BlurEffect.cpp
     src/render/effects/BlurEffect.h
+    src/render/effects/MaskFeatherEngine.cpp
+    src/render/effects/MaskFeatherEngine.h
     src/render/graphics/GraphicGeometry.cpp
     src/render/graphics/GraphicGeometry.h
     src/render/text/TextLayoutEngine.cpp

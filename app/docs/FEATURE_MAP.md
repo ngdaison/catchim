@@ -1832,6 +1832,61 @@ Quy ước trạng thái:
 | Timeline Z-Index Layer Constants | `web/src/timeline/components/layers.ts` | `catchim::editor::TimelineLayers::TRACK_CONTENT`, `DRAG_LINE`, `PLAYHEAD`, `SNAP_INDICATOR` | Verified |
 | Pen Tool SVG Cursor with Nib Tip Hotspot (1, 1) | `web/src/preview/components/cursors.ts` | `catchim::editor::PreviewPenCursor::getSvgContent`, `HOTSPOT_X`, `HOTSPOT_Y` | Verified |
 
+---
+
+## 194. Timeline Track Theme & Color Styling
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Track Color Palette & Waveform Styling | `web/src/timeline/components/theme.ts` | `catchim::editor::TimelineTheme::getTrackTheme`, `getTrackHexColor` | Verified |
+| CSS Class Name Mapping for Elements | `web/src/timeline/components/theme.ts` | `catchim::editor::TimelineTheme::getTimelineElementClassName` | Verified |
+| Default Bookmark & Waveform Color Constants | `web/src/timeline/components/theme.ts` | `catchim::editor::TimelineTheme::TIMELINE_AUDIO_WAVEFORM_COLOR`, `DEFAULT_TIMELINE_BOOKMARK_COLOR` | Verified |
+
+---
+
+## 195. Preview Settings & Guide State Store
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Active Guide Toggle & Tracking | `web/src/preview/preview-store.ts` | `catchim::editor::PreviewSettingsStore::toggleGuide`, `activeGuide` | Verified |
+| Multi-Overlay Visibility Toggle State | `web/src/preview/preview-store.ts` | `catchim::editor::PreviewSettingsStore::setOverlayVisibility`, `toggleOverlayVisibility` | Verified |
+| Grid Configuration (3x3 Rule of Thirds) & Presets | `web/src/preview/preview-store.ts`, `zoom.ts` | `catchim::editor::PreviewSettingsStore::gridConfig`, `PREVIEW_ZOOM_PRESETS` | Verified |
+
+---
+
+## 196. Retime Rate & Pitch Preservation Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Speed Rate Clamping (0.01x - 5.0x) & Defaults | `web/src/retime/rate.ts` | `catchim::editor::RetimeRateEngine::clampRetimeRate`, `buildConstantRetime` | Verified |
+| Pitch Preservation Validation Conditions | `web/src/retime/rate.ts` | `catchim::editor::RetimeRateEngine::canMaintainPitch`, `shouldMaintainPitch` | Verified |
+| Clip and Source Time Conversion with Retime | `web/src/retime/resolve.ts`, `split.ts` | `catchim::editor::RetimeRateEngine::getSourceTimeAtClipTime`, `getClipTimeAtSourceTime`, `splitRetimeAtClipTime` | Verified |
+
+---
+
+## 197. Transform Handle Interaction Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Corner Scale Session & Distance Calculation | `web/src/preview/controllers/transform-handle-controller.ts` | `catchim::editor::TransformHandleController::startCornerScale`, `getCornerDistance` | Verified |
+| Edge Scale Session & Axis Alignment | `web/src/preview/controllers/transform-handle-controller.ts` | `catchim::editor::TransformHandleController::startEdgeScale` | Verified |
+| Rotation Session & Scale Non-Zero Clamping | `web/src/preview/controllers/transform-handle-controller.ts` | `catchim::editor::TransformHandleController::startRotation`, `clampScaleNonZero`, `clearScaleAnimationChannels` | Verified |
+
+---
+
+## 198. Preview Interaction Gesture Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Gesture State Machine (Idle, Pending, Dragging) | `web/src/preview/controllers/preview-interaction-controller.ts` | `catchim::editor::PreviewInteractionGestureController`, `PreviewGestureKind` | Verified |
+| Minimum Drag Distance Threshold (0.5px) | `web/src/preview/controllers/preview-interaction-controller.ts` | `catchim::editor::PreviewInteractionGestureController::movedPastDragThreshold`, `handleMove` | Verified |
+| Drag Selection Building & Direct Text Editing | `web/src/preview/controllers/preview-interaction-controller.ts` | `catchim::editor::PreviewInteractionGestureController::buildDragSelection`, `startTextEdit`, `commitTextEdit` | Verified |
+
+---
+
+## 199. Mask Feather & Canvas Surface Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| 2-Pass Separable Alpha Mask Feather Filter | `web/src/services/renderer/mask-feather.ts` | `catchim::render::MaskFeatherEngine::applyMaskFeather` | Verified |
+| Offscreen 2D Canvas Surface Allocation | `web/src/services/renderer/canvas-utils.ts` | `catchim::render::MaskFeatherEngine::createSurface` | Verified |
+| Feather Radius Geometry Clamping | `web/src/services/renderer/mask-feather.ts` | `catchim::render::MaskFeatherEngine::clampFeather` | Verified |
+
+
 
 
 
