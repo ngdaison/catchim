@@ -190,6 +190,12 @@
 #include "editor/core/EditorCore.h"
 #include "media/SavedSoundsStore.h"
 #include "render/canvas/CanvasSnapMath.h"
+#include "subtitles/TranscriptionCaptionBuilder.h"
+#include "editor/diagnostics/DiagnosticsManager.h"
+#include "render/graphics/GraphicsDefinitions.h"
+#include "editor/commands/CommandManager.h"
+#include "media/WaveformCache.h"
+#include "render/canvas/BackgroundBlurPresets.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -10515,6 +10521,256 @@ void runCanvasSnapMathTests() {
     std::cout << "[PASS] runCanvasSnapMathTests" << std::endl;
 }
 
+
+void runTranscriptionCaptionBuilderTests() {
+    using namespace catchim::subtitles;
+
+    std::vector<TranscriptionSegment> segments = {
+        {"Hello world this is a test segment for captions", 0.0, 3.5},
+        {"Second short chunk", 4.0, 5.0}
+    };
+
+    auto chunks = TranscriptionCaptionBuilder::buildCaptionChunks(segments, 3, 0.8);
+    TEST_ASSERT(chunks.size() == 4);
+    TEST_ASSERT(chunks[0].text == "Hello world this");
+    TEST_ASSERT(chunks[0].startTime >= 0.0);
+    TEST_ASSERT(chunks[0].duration >= 0.8);
+    TEST_ASSERT(chunks[1].text == "is a test");
+    TEST_ASSERT(chunks[2].text == "segment for captions");
+    TEST_ASSERT(chunks[3].text == "Second short chunk");
+
+    // Empty segments handling
+    std::vector<TranscriptionSegment> emptySegments = {
+        {"   ", 0.0, 1.0},
+        {"", 1.0, 2.0}
+    };
+    auto emptyChunks = TranscriptionCaptionBuilder::buildCaptionChunks(emptySegments);
+    TEST_ASSERT(emptyChunks.empty());
+
+    // Single word minimum duration clamping
+    std::vector<TranscriptionSegment> fastSegments = {
+        {"Quick", 0.0, 0.1}
+    };
+    auto fastChunks = TranscriptionCaptionBuilder::buildCaptionChunks(fastSegments, 3, 0.8);
+    TEST_ASSERT(fastChunks.size() == 1);
+    TEST_ASSERT(fastChunks[0].duration >= 0.8);
+
+    std::cout << "[PASS] runTranscriptionCaptionBuilderTests" << std::endl;
+}
+
+void runDiagnosticsManagerTests() {
+    using namespace catchim::editor;
+
+    EditorCore::reset();
+    auto& core = EditorCore::getInstance();
+    DiagnosticsManager diagnostics(core);
+
+    TEST_ASSERT(diagnostics.registrationCount() == 0);
+
+    DiagnosticRegistration reg1;
+    reg1.id = "test.error";
+    reg1.scope = "test";
+    reg1.severity = DiagnosticSeverity::Error;
+    reg1.message = "Test error message";
+    bool triggerError = false;
+    reg1.check = [&](EditorCore&) { return triggerError; };
+    diagnostics.registerDiagnostic(std::move(reg1));
+
+    TEST_ASSERT(diagnostics.registrationCount() == 1);
+    TEST_ASSERT(diagnostics.getActive().empty());
+
+    triggerError = true;
+    auto active = diagnostics.getActive();
+    TEST_ASSERT(active.size() == 1);
+    TEST_ASSERT(active[0].id == "test.error");
+    TEST_ASSERT(active[0].severity == DiagnosticSeverity::Error);
+
+    auto activeTest = diagnostics.getActive(std::string("test"));
+    TEST_ASSERT(activeTest.size() == 1);
+    auto activeOther = diagnostics.getActive(std::string("other"));
+    TEST_ASSERT(activeOther.empty());
+
+    registerTranscriptionDiagnostics(diagnostics);
+    TEST_ASSERT(diagnostics.registrationCount() == 2);
+
+    auto transActive = diagnostics.getActive(std::string(TRANSCRIPTION_DIAGNOSTICS_SCOPE));
+    TEST_ASSERT(transActive.size() == 1);
+    TEST_ASSERT(transActive[0].id == "transcription.no_audio");
+
+    auto audioTrackId = core.timeline().addTrack(TrackType::Audio, "Audio Track");
+    Clip audioClip(ClipId::generate(), ClipType::Audio, "Voice", TimelineTime(0), TimelineTime::fromSeconds(2.0));
+    core.timeline().insertElement(audioTrackId, std::move(audioClip));
+
+    auto transActiveAfter = diagnostics.getActive(std::string(TRANSCRIPTION_DIAGNOSTICS_SCOPE));
+    TEST_ASSERT(transActiveAfter.empty());
+
+    int notifyCount = 0;
+    size_t subId = diagnostics.subscribe([&]() { ++notifyCount; });
+    diagnostics.notify();
+    TEST_ASSERT(notifyCount == 1);
+    diagnostics.unsubscribe(subId);
+    diagnostics.notify();
+    TEST_ASSERT(notifyCount == 1);
+
+    EditorCore::reset();
+    std::cout << "[PASS] runDiagnosticsManagerTests" << std::endl;
+}
+
+void runGraphicsDefinitionsTests() {
+    using namespace catchim::render;
+
+    TEST_ASSERT(GraphicsDefinitions::calculateStrokeInset(GraphicStrokeAlign::Center, 10.0) == 5.0);
+    TEST_ASSERT(GraphicsDefinitions::calculateStrokeInset(GraphicStrokeAlign::Inside, 10.0) == 10.0);
+    TEST_ASSERT(GraphicsDefinitions::calculateStrokeInset(GraphicStrokeAlign::Outside, 10.0) == 0.0);
+
+    auto rect = GraphicsDefinitions::calculateRectangleBounds(200.0, 100.0, 4.0, GraphicStrokeAlign::Center, 25.0);
+    TEST_ASSERT(rect.x == 2.0);
+    TEST_ASSERT(rect.y == 2.0);
+    TEST_ASSERT(rect.width == 196.0);
+    TEST_ASSERT(rect.height == 96.0);
+    TEST_ASSERT(rect.cornerRadius > 0.0);
+
+    auto ellipse = GraphicsDefinitions::calculateEllipseBounds(300.0, 150.0, 6.0, GraphicStrokeAlign::Inside);
+    TEST_ASSERT(ellipse.centerX == 150.0);
+    TEST_ASSERT(ellipse.centerY == 75.0);
+    TEST_ASSERT(ellipse.radiusX == 144.0);
+    TEST_ASSERT(ellipse.radiusY == 69.0);
+
+    auto pentagon = GraphicsDefinitions::buildPolygonVertices(100.0, 100.0, 50.0, 5);
+    TEST_ASSERT(pentagon.size() == 5);
+    TEST_ASSERT(std::abs(pentagon[0].x - 100.0) < 1e-4);
+    TEST_ASSERT(std::abs(pentagon[0].y - 50.0) < 1e-4);
+
+    auto star = GraphicsDefinitions::buildStarVertices(100.0, 100.0, 5, 50.0, 25.0);
+    TEST_ASSERT(star.size() == 10);
+    TEST_ASSERT(std::abs(star[0].x - 100.0) < 1e-4);
+    TEST_ASSERT(std::abs(star[0].y - 50.0) < 1e-4);
+
+    auto starDepth = GraphicsDefinitions::buildStarVerticesWithDepth(100.0, 100.0, 5, 50.0, 50.0);
+    TEST_ASSERT(starDepth.size() == 10);
+
+    std::cout << "[PASS] runGraphicsDefinitionsTests" << std::endl;
+}
+
+void runCommandManagerTests() {
+    using namespace catchim::editor;
+
+    EditorCore::reset();
+    auto& core = EditorCore::getInstance();
+    CommandManager cmdManager(core);
+
+    TEST_ASSERT(!cmdManager.canUndo());
+    TEST_ASSERT(!cmdManager.canRedo());
+
+    class TestCommand : public EditorCommand {
+    public:
+        TestCommand(int& val) : val_(val) {}
+        bool execute() override { ++val_; return true; }
+        bool undo() override { --val_; return true; }
+        std::string name() const override { return "TestCommand"; }
+    private:
+        int& val_;
+    };
+
+    int value = 10;
+    int reactorRuns = 0;
+    cmdManager.registerReactor([&]() { ++reactorRuns; });
+
+    cmdManager.execute(std::make_shared<TestCommand>(value));
+    TEST_ASSERT(value == 11);
+    TEST_ASSERT(cmdManager.canUndo());
+    TEST_ASSERT(!cmdManager.canRedo());
+    TEST_ASSERT(reactorRuns == 1);
+
+    cmdManager.undo();
+    TEST_ASSERT(value == 10);
+    TEST_ASSERT(!cmdManager.canUndo());
+    TEST_ASSERT(cmdManager.canRedo());
+    TEST_ASSERT(reactorRuns == 2);
+
+    cmdManager.redo();
+    TEST_ASSERT(value == 11);
+    TEST_ASSERT(cmdManager.canUndo());
+    TEST_ASSERT(!cmdManager.canRedo());
+    TEST_ASSERT(reactorRuns == 3);
+
+    cmdManager.clear();
+    TEST_ASSERT(!cmdManager.canUndo());
+    TEST_ASSERT(!cmdManager.canRedo());
+
+    EditorCore::reset();
+    std::cout << "[PASS] runCommandManagerTests" << std::endl;
+}
+
+void runWaveformCacheTests() {
+    using namespace catchim::media;
+
+    auto& cache = WaveformCache::instance();
+    cache.clearAll();
+    TEST_ASSERT(cache.size() == 0);
+
+    const std::string key = "audio:clip_123";
+    TEST_ASSERT(!cache.has(key));
+    TEST_ASSERT(!cache.get(key).has_value());
+
+    SourceWaveformSummary summary;
+    summary.sourceKey = key;
+    summary.sampleRate = 48000;
+    summary.totalSamples = 96000;
+    summary.bucketSize = 128;
+    summary.amplitudes = {0.1f, 0.5f, 0.8f, 0.3f};
+
+    cache.put(key, summary);
+    TEST_ASSERT(cache.has(key));
+    TEST_ASSERT(cache.size() == 1);
+
+    auto retrieved = cache.get(key);
+    TEST_ASSERT(retrieved.has_value());
+    TEST_ASSERT(retrieved->sourceKey == key);
+    TEST_ASSERT(retrieved->sampleRate == 48000);
+    TEST_ASSERT(retrieved->totalSamples == 96000);
+    TEST_ASSERT(retrieved->amplitudes.size() == 4);
+    TEST_ASSERT(retrieved->amplitudes[2] == 0.8f);
+
+    cache.clearSource(key);
+    TEST_ASSERT(!cache.has(key));
+    TEST_ASSERT(cache.size() == 0);
+
+    std::cout << "[PASS] runWaveformCacheTests" << std::endl;
+}
+
+void runBackgroundBlurPresetsTests() {
+    using namespace catchim::render;
+
+    const auto& presets = BackgroundBlurPresets::getPresets();
+    TEST_ASSERT(presets.size() == 3);
+    TEST_ASSERT(presets[0].label == "Light" && presets[0].value == 100.0);
+    TEST_ASSERT(presets[1].label == "Medium" && presets[1].value == 200.0);
+    TEST_ASSERT(presets[2].label == "Heavy" && presets[2].value == 500.0);
+
+    auto found = BackgroundBlurPresets::findPresetByLabel("Medium");
+    TEST_ASSERT(found.has_value());
+    TEST_ASSERT(found->value == 200.0);
+
+    auto notFound = BackgroundBlurPresets::findPresetByLabel("Ultra");
+    TEST_ASSERT(!notFound.has_value());
+
+    TEST_ASSERT(BackgroundBlurPresets::isValidIntensity(50.0));
+    TEST_ASSERT(!BackgroundBlurPresets::isValidIntensity(-1.0));
+    TEST_ASSERT(!BackgroundBlurPresets::isValidIntensity(1001.0));
+
+    TEST_ASSERT(BackgroundBlurPresets::clampIntensity(1500.0) == 1000.0);
+    TEST_ASSERT(BackgroundBlurPresets::clampIntensity(-50.0) == 0.0);
+    TEST_ASSERT(BackgroundBlurPresets::clampIntensity(250.0) == 250.0);
+
+    double defaultBlur = BackgroundBlurPresets::DEFAULT_BACKGROUND_BLUR_INTENSITY;
+    TEST_ASSERT(defaultBlur == 10.0);
+    std::string defaultColor = BackgroundBlurPresets::DEFAULT_BACKGROUND_COLOR;
+    TEST_ASSERT(defaultColor == "#000000");
+
+    std::cout << "[PASS] runBackgroundBlurPresetsTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -10692,8 +10948,12 @@ int main() {
     runEditorCoreTests();
     runSavedSoundsStoreTests();
     runCanvasSnapMathTests();
-    std::cout << ">>> ALL 175 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTranscriptionCaptionBuilderTests();
+    runDiagnosticsManagerTests();
+    runGraphicsDefinitionsTests();
+    runCommandManagerTests();
+    runWaveformCacheTests();
+    runBackgroundBlurPresetsTests();
+    std::cout << ">>> ALL 181 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
-
-

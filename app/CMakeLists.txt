@@ -283,6 +283,10 @@ add_library(catchim_editor STATIC
     src/editor/EditorEngine.h
     src/editor/core/EditorCore.cpp
     src/editor/core/EditorCore.h
+    src/editor/diagnostics/DiagnosticsManager.cpp
+    src/editor/diagnostics/DiagnosticsManager.h
+    src/editor/commands/CommandManager.cpp
+    src/editor/commands/CommandManager.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -297,6 +301,8 @@ add_library(catchim_subtitles STATIC
     src/subtitles/TranscriptionEngine.h
     src/subtitles/TranscriptionCatalog.cpp
     src/subtitles/TranscriptionCatalog.h
+    src/subtitles/TranscriptionCaptionBuilder.cpp
+    src/subtitles/TranscriptionCaptionBuilder.h
 )
 target_link_libraries(catchim_subtitles PUBLIC catchim_core)
 
@@ -336,6 +342,8 @@ add_library(catchim_media STATIC
     src/media/StickerIdUtils.h
     src/media/SavedSoundsStore.cpp
     src/media/SavedSoundsStore.h
+    src/media/WaveformCache.cpp
+    src/media/WaveformCache.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 
@@ -440,6 +448,10 @@ add_library(catchim_render STATIC
     src/render/masks/MaskGeometryUtils.h
     src/render/canvas/CanvasSnapMath.cpp
     src/render/canvas/CanvasSnapMath.h
+    src/render/graphics/GraphicsDefinitions.cpp
+    src/render/graphics/GraphicsDefinitions.h
+    src/render/canvas/BackgroundBlurPresets.cpp
+    src/render/canvas/BackgroundBlurPresets.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 

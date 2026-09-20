@@ -1565,6 +1565,61 @@ Quy ước trạng thái:
 | 1D Scalar Axis Snapping | `web/src/preview/preview-snap.ts` | `catchim::render::CanvasSnapMath::snapScalar` | Verified |
 | 2D Canvas Bounds & Center Snapping | `web/src/preview/preview-snap.ts` | `catchim::render::CanvasSnapMath::snapToCanvas` | Verified |
 
+---
+
+## 164. Subtitle Transcription Caption Builder
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Word Segmentation & Words-per-Chunk Grouping | `web/src/transcription/caption.ts` | `catchim::subtitles::TranscriptionCaptionBuilder::buildCaptionChunks`, `DEFAULT_WORDS_PER_CAPTION` | Verified |
+| Word Rate Clamping & Min Duration Enforcement | `web/src/transcription/caption.ts` | `catchim::subtitles::TranscriptionCaptionBuilder::buildCaptionChunks`, `MIN_CAPTION_DURATION_SECONDS` | Verified |
+| Monotonic Timeline Sequencing & Overlap Prevention | `web/src/transcription/caption.ts` | `catchim::subtitles::TranscriptionCaptionBuilder::buildCaptionChunks` | Verified |
+
+---
+
+## 165. Editor Diagnostics Manager
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Diagnostic Registration & Scoped Active Querying | `web/src/core/managers/diagnostics-manager.ts` | `catchim::editor::DiagnosticsManager::registerDiagnostic`, `getActive` | Verified |
+| Observer Subscriptions & Notifications | `web/src/core/managers/diagnostics-manager.ts` | `catchim::editor::DiagnosticsManager::subscribe`, `notify` | Verified |
+| Transcription Audio Check Diagnostic | `web/src/transcription/diagnostics.ts` | `catchim::editor::registerTranscriptionDiagnostics` | Verified |
+
+---
+
+## 166. 2D Vector Graphics Definitions
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Regular Polygon Vertex Calculation | `web/src/graphics/definitions/polygon.ts` | `catchim::render::GraphicsDefinitions::buildPolygonVertices` | Verified |
+| Star Polygon Vertex & Depth Calculation | `web/src/graphics/definitions/star.ts` | `catchim::render::GraphicsDefinitions::buildStarVertices`, `buildStarVerticesWithDepth` | Verified |
+| Stroke Alignment Insets (Center, Inside, Outside) | `web/src/graphics/definitions/shared.ts` | `catchim::render::GraphicsDefinitions::calculateStrokeInset` | Verified |
+| Rectangle & Ellipse Inset Bounds Calculation | `web/src/graphics/definitions/rectangle.ts`, `ellipse.ts` | `catchim::render::GraphicsDefinitions::calculateRectangleBounds`, `calculateEllipseBounds` | Verified |
+
+---
+
+## 167. Advanced Command Manager & History
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Command Execution with Selection Snapshotting | `web/src/core/managers/commands.ts` | `catchim::editor::CommandManager::execute`, `push` | Verified |
+| Selection-Aware Undo & Redo Stacks | `web/src/core/managers/commands.ts` | `catchim::editor::CommandManager::undo`, `redo` | Verified |
+| Reactor Callbacks Pipeline & Ripple Toggle | `web/src/core/managers/commands.ts` | `catchim::editor::CommandManager::registerReactor`, `runReactors`, `isRippleEnabled` | Verified |
+
+---
+
+## 168. Waveform Summary Cache
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Thread-Safe In-Memory Waveform Summary Caching | `web/src/services/waveform-cache/service.ts` | `catchim::media::WaveformCache::instance`, `has`, `get`, `put` | Verified |
+| Source Invalidation & Cache Eviction | `web/src/services/waveform-cache/service.ts` | `catchim::media::WaveformCache::clearSource`, `clearAll`, `size` | Verified |
+
+---
+
+## 169. Background Blur Intensity Presets
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Background Blur Intensity Presets (Light, Medium, Heavy) | `web/src/background/blur.ts` | `catchim::render::BackgroundBlurPresets::getPresets`, `findPresetByLabel` | Verified |
+| Default Blur Intensity & Default Canvas Color | `web/src/background/blur.ts`, `color.ts` | `catchim::render::BackgroundBlurPresets::DEFAULT_BACKGROUND_BLUR_INTENSITY`, `DEFAULT_BACKGROUND_COLOR` | Verified |
+| Intensity Validation & Clamping | `web/src/background/blur.ts` | `catchim::render::BackgroundBlurPresets::isValidIntensity`, `clampIntensity` | Verified |
+
+
 
 
 
