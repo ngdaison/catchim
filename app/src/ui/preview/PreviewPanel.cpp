@@ -197,5 +197,22 @@ void PreviewPanel::onZoomChanged(int index) {
     }
 }
 
+void PreviewPanel::toggleSafeZones() {
+    if (previewWidget_) {
+        previewWidget_->toggleSafeZones();
+    }
+}
+
+void PreviewPanel::toggleFullscreen() {
+    QWidget* top = window();
+    if (top) {
+        if (top->isFullScreen()) {
+            top->showNormal();
+        } else {
+            top->showFullScreen();
+        }
+    }
+}
+
 } // namespace catchim::ui
 #endif

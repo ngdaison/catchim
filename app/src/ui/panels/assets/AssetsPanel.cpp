@@ -7,6 +7,7 @@
 #include "subtitles/SrtParser.h"
 #include "subtitles/TranscriptionLanguagesRegistry.h"
 #include "audio/TtsEngine.h"
+#include "audio/TtsServiceEngine.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
@@ -19,8 +20,16 @@
 #include <QComboBox>
 #include <QSlider>
 #include <QTextEdit>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMimeData>
+#include <QUrl>
+#include <QDir>
+#include <QDateTime>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 namespace catchim::ui {
 
@@ -30,6 +39,7 @@ AssetsPanel::AssetsPanel(editor::EditorEngine& engine, media::MediaLibrary& medi
     , mediaLibrary_(mediaLibrary)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    setAcceptDrops(true);
     setupUi();
     refresh();
 }
@@ -149,6 +159,7 @@ QWidget* AssetsPanel::createMediaView() {
 
     // Media list
     mediaListWidget_ = new QListWidget(view);
+    mediaListWidget_->setAcceptDrops(false);
     mediaListWidget_->setStyleSheet(R"(
         QListWidget {
             background: transparent;
@@ -395,6 +406,59 @@ QWidget* AssetsPanel::createTextView() {
             }
         }
 
+        // 1. Synthesize voiced speech audio samples
+        constexpr uint32_t sampleRate = 44100;
+        size_t numSamples = static_cast<size_t>(durationSec * sampleRate);
+        std::vector<float> monoSamples(numSamples, 0.0f);
+
+        std::string vId = voiceCombo->currentData().toString().toStdString();
+        bool isFemale = (vId.find("female") != std::string::npos);
+        double f0 = isFemale ? 220.0 : 130.0;
+        double f1 = isFemale ? 600.0 : 500.0;
+        double f2 = isFemale ? 1800.0 : 1500.0;
+        constexpr double kPi = 3.14159265358979323846;
+
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = 1.0;
+            if (t < 0.05) {
+                env = t / 0.05;
+            } else if (t > durationSec - 0.05) {
+                env = std::max(0.0, (durationSec - t) / 0.05);
+            }
+
+            double cadence = 0.6 + 0.4 * std::sin(2.0 * kPi * 4.0 * t);
+            double s0 = std::sin(2.0 * kPi * f0 * t);
+            double s1 = 0.5 * std::sin(2.0 * kPi * f1 * t);
+            double s2 = 0.25 * std::sin(2.0 * kPi * f2 * t);
+            monoSamples[i] = static_cast<float>((s0 * 0.5 + s1 * 0.3 + s2 * 0.2) * env * cadence * 0.7);
+        }
+
+        // 2. Encode to physical WAV bytes
+        auto wavBytes = audio::TtsServiceEngine::encodePcmToWav(monoSamples, sampleRate);
+
+        // 3. Save to disk cache
+        QString cacheDir = QDir::tempPath() + "/catchim_audio_cache";
+        QDir().mkpath(cacheDir);
+        QString wavFilePath = QString("%1/tts_%2.wav").arg(cacheDir).arg(QDateTime::currentMSecsSinceEpoch());
+
+        std::ofstream wavOut(wavFilePath.toStdString(), std::ios::binary);
+        if (wavOut.is_open()) {
+            wavOut.write(reinterpret_cast<const char*>(wavBytes.data()), static_cast<std::streamsize>(wavBytes.size()));
+            wavOut.close();
+        }
+
+        // 4. Probe media file and register in media library
+        core::MediaId assetId;
+        auto probeRes = media::MediaProbe::probe(wavFilePath.toStdString());
+        if (probeRes.ok()) {
+            auto asset = probeRes.unwrap();
+            mediaLibrary_.addAsset(asset);
+            assetId = asset->id();
+            refresh();
+        }
+
+        // 5. Add clip with real asset reference
         core::TimelineTime insertTime = engine_.playback().currentTime();
         editor::Clip clip(
             core::ClipId::generate(),
@@ -404,8 +468,11 @@ QWidget* AssetsPanel::createTextView() {
             core::TimelineTime::fromSeconds(durationSec)
         );
         clip.setParam("audio.ttsText", text.toStdString());
-        clip.setParam("audio.ttsVoice", voiceCombo->currentData().toString().toStdString());
+        clip.setParam("audio.ttsVoice", vId);
         clip.setParam("audio.speed", rateMultiplier);
+        if (!assetId.str().empty()) {
+            clip.setMediaId(assetId);
+        }
 
         engine_.addClip(audioTrackId, std::move(clip));
         engine_.project().setDirty(true);
@@ -875,6 +942,66 @@ void AssetsPanel::refresh() {
 
         item->setText(label);
         item->setData(Qt::UserRole, QString::fromStdString(asset->id().str()));
+    }
+}
+
+void AssetsPanel::dragEnterEvent(QDragEnterEvent* event) {
+    if (event->mimeData() && event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void AssetsPanel::dragMoveEvent(QDragMoveEvent* event) {
+    if (event->mimeData() && event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
+    }
+}
+
+void AssetsPanel::dropEvent(QDropEvent* event) {
+    const QMimeData* mime = event->mimeData();
+    if (!mime || !mime->hasUrls()) {
+        event->ignore();
+        return;
+    }
+
+    bool addedAny = false;
+    for (const QUrl& url : mime->urls()) {
+        if (!url.isLocalFile()) continue;
+        QString localPath = url.toLocalFile();
+        if (localPath.isEmpty()) continue;
+
+        auto probeRes = media::MediaProbe::probe(localPath.toStdString());
+        if (probeRes.ok()) {
+            auto asset = probeRes.unwrap();
+            mediaLibrary_.addAsset(asset);
+            addedAny = true;
+
+            // Auto add to main track if project is empty
+            auto* tl = engine_.activeTimeline();
+            if (tl && tl->mainTrack().clips().empty()) {
+                editor::Clip clip(
+                    core::ClipId::generate(),
+                    (asset->type() == media::MediaType::Video) ? editor::ClipType::Video :
+                    (asset->type() == media::MediaType::Audio) ? editor::ClipType::Audio : editor::ClipType::Image,
+                    asset->fileName(),
+                    core::TimelineTime::fromSeconds(0),
+                    asset->duration()
+                );
+                clip.setMediaId(asset->id());
+                engine_.addClip(tl->mainTrack().id(), std::move(clip));
+            }
+        }
+    }
+
+    if (addedAny) {
+        refresh();
+        event->acceptProposedAction();
+    } else {
+        event->ignore();
     }
 }
 

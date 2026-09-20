@@ -23,6 +23,8 @@ public:
     );
 
     void refresh();
+    void toggleSafeZones();
+    void toggleFullscreen();
 
 private slots:
     void onPlayPauseClicked();

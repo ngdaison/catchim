@@ -63,6 +63,7 @@ private:
     QPoint dragStartPos_;
     core::TimelineTime dragStartTime_;
     core::TimelineTime dragStartDuration_;
+    int snapIndicatorX_{-1};
 };
 
 } // namespace catchim::ui

@@ -5,6 +5,9 @@
 #include "ui/theme/Theme.h"
 #include "media/waveform/WaveformGenerator.h"
 #include "media/probe/MediaProbe.h"
+#include "audio/AudioWaveformBarEngine.h"
+#include "audio/AudioVolumeLineEngine.h"
+#include "editor/timeline/AdvancedSnapEngine.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QDragEnterEvent>
@@ -151,23 +154,46 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
             painter.setPen(isSelected ? QPen(palette.primaryAccent, 2.0) : QPen(QColor(0, 0, 0, 100), 1.0));
             painter.drawRoundedRect(clipRect.adjusted(1, 1, -1, -1), 6, 6);
 
-            // Draw Audio Waveform if audio clip
+            // Draw Audio Waveform & Volume line if audio clip
             if (clip.type() == editor::ClipType::Audio) {
                 auto wf = media::WaveformGenerator::instance().getWaveform(clip.mediaId());
                 if (!wf) {
-                    wf = media::WaveformGenerator::generateDummyWaveform(clip.mediaId(), std::max(10, clipW / 3));
+                    wf = media::WaveformGenerator::generateDummyWaveform(clip.mediaId(), std::max(10, clipW / 2));
                 }
+                double volLinear = clip.getParam<double>("volume", 1.0);
+                std::vector<double> gainSamples = { volLinear };
+
                 if (wf && !wf->buckets.empty()) {
-                    painter.setPen(palette.waveformColor);
-                    int midY = yOffset + trackHeight / 2;
-                    size_t count = std::min<size_t>(wf->buckets.size(), clipW / 2);
-                    for (size_t b = 0; b < count; ++b) {
-                        int bx = clipX + static_cast<int>(b * 2);
-                        int h1 = static_cast<int>(wf->buckets[b].maxPeak * (trackHeight / 2 - 6));
-                        int h2 = static_cast<int>(wf->buckets[b].minPeak * (trackHeight / 2 - 6));
-                        painter.drawLine(bx, midY - h1, bx, midY - h2);
+                    std::vector<float> amplitudes;
+                    amplitudes.reserve(wf->buckets.size());
+                    for (const auto& b : wf->buckets) {
+                        amplitudes.push_back(b.maxPeak);
+                    }
+
+                    double innerH = static_cast<double>(trackHeight - 12);
+                    auto bars = audio::AudioWaveformBarEngine::calculateWaveformBars(
+                        amplitudes,
+                        static_cast<double>(clipW),
+                        innerH,
+                        gainSamples,
+                        clip.duration().toSeconds()
+                    );
+
+                    for (const auto& bar : bars) {
+                        int bx = clipX + static_cast<int>(bar.x);
+                        int by = yOffset + 6 + static_cast<int>(bar.top);
+                        int bh = std::max(1, static_cast<int>(bar.height));
+                        painter.setPen(bar.isBurnt ? QColor("#ff6e14") : palette.waveformColor);
+                        painter.drawLine(bx, by, bx, by + bh);
                     }
                 }
+
+                // Draw horizontal volume automation line
+                double volDb = (volLinear > 0.0001) ? (20.0 * std::log10(volLinear)) : -60.0;
+                double linePosPercent = audio::AudioVolumeLineEngine::getLinePositionPercent(volDb);
+                int lineY = yOffset + 6 + static_cast<int>((linePosPercent / 100.0) * (trackHeight - 12));
+                painter.setPen(QPen(QColor(255, 255, 255, 130), 1.0, Qt::DashLine));
+                painter.drawLine(clipX, lineY, clipX + clipW, lineY);
             }
 
             // Clip label text
@@ -227,6 +253,12 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
     if (playheadX >= Metrics::trackLabelsWidth && playheadX < width()) {
         painter.setPen(QPen(palette.primaryAccent, 2.0));
         painter.drawLine(playheadX, 0, playheadX, height());
+    }
+
+    // 4. Draw Snap Indicator Guideline if snapping is active
+    if (snapIndicatorX_ >= Metrics::trackLabelsWidth && snapIndicatorX_ < width()) {
+        painter.setPen(QPen(QColor("#38bdf8"), 1.5, Qt::DashLine));
+        painter.drawLine(snapIndicatorX_, 0, snapIndicatorX_, height());
     }
 }
 
@@ -294,18 +326,72 @@ void TimelineTracksWidget::mouseMoveEvent(QMouseEvent* event) {
         core::TimelineTime deltaTime = core::TimelineTime::fromSeconds(deltaX / pixelsPerSecond);
         core::TimelineTime newStart = dragStartTime_ + deltaTime;
         if (newStart.ticks() >= 0) {
-            auto* track = engine_.activeTimeline()->findTrackContainingClip(activeClipId_);
-            if (track) {
-                engine_.moveClip(activeClipId_, track->id(), newStart);
-                update();
+            auto* tl = engine_.activeTimeline();
+            if (tl) {
+                auto* track = tl->findTrackContainingClip(activeClipId_);
+                if (track) {
+                    if (engine_.isSnappingEnabled()) {
+                        auto snapPoints = editor::AdvancedSnapEngine::collectAllSnapPoints(*tl, engine_.playback().currentTime(), true, activeClipId_);
+                        auto maxSnap = editor::AdvancedSnapEngine::getTimelineSnapThresholdInTicks(zoomFactor_, 8.0);
+
+                        auto snapStart = editor::AdvancedSnapEngine::resolveSortedTimelineSnap(newStart, snapPoints, maxSnap);
+                        if (snapStart.hasSnapped) {
+                            newStart = snapStart.snappedTime;
+                            snapIndicatorX_ = timeToPixel(newStart);
+                        } else {
+                            auto snapEnd = editor::AdvancedSnapEngine::resolveSortedTimelineSnap(newStart + dragStartDuration_, snapPoints, maxSnap);
+                            if (snapEnd.hasSnapped) {
+                                newStart = snapEnd.snappedTime - dragStartDuration_;
+                                snapIndicatorX_ = timeToPixel(snapEnd.snappedTime);
+                            } else {
+                                snapIndicatorX_ = -1;
+                            }
+                        }
+                    } else {
+                        snapIndicatorX_ = -1;
+                    }
+
+                    if (newStart.ticks() >= 0) {
+                        engine_.moveClip(activeClipId_, track->id(), newStart);
+                    }
+                    update();
+                }
             }
         }
     } else if (dragMode_ == DragMode::TrimmingStart) {
         core::TimelineTime targetTime = pixelToTime(event->pos().x());
+        auto* tl = engine_.activeTimeline();
+        if (tl && engine_.isSnappingEnabled()) {
+            auto snapPoints = editor::AdvancedSnapEngine::collectAllSnapPoints(*tl, engine_.playback().currentTime(), true, activeClipId_);
+            auto maxSnap = editor::AdvancedSnapEngine::getTimelineSnapThresholdInTicks(zoomFactor_, 8.0);
+            auto snapRes = editor::AdvancedSnapEngine::resolveSortedTimelineSnap(targetTime, snapPoints, maxSnap);
+            if (snapRes.hasSnapped) {
+                targetTime = snapRes.snappedTime;
+                snapIndicatorX_ = timeToPixel(targetTime);
+            } else {
+                snapIndicatorX_ = -1;
+            }
+        } else {
+            snapIndicatorX_ = -1;
+        }
         engine_.trimClipStart(activeClipId_, targetTime);
         update();
     } else if (dragMode_ == DragMode::TrimmingEnd) {
         core::TimelineTime targetTime = pixelToTime(event->pos().x());
+        auto* tl = engine_.activeTimeline();
+        if (tl && engine_.isSnappingEnabled()) {
+            auto snapPoints = editor::AdvancedSnapEngine::collectAllSnapPoints(*tl, engine_.playback().currentTime(), true, activeClipId_);
+            auto maxSnap = editor::AdvancedSnapEngine::getTimelineSnapThresholdInTicks(zoomFactor_, 8.0);
+            auto snapRes = editor::AdvancedSnapEngine::resolveSortedTimelineSnap(targetTime, snapPoints, maxSnap);
+            if (snapRes.hasSnapped) {
+                targetTime = snapRes.snappedTime;
+                snapIndicatorX_ = timeToPixel(targetTime);
+            } else {
+                snapIndicatorX_ = -1;
+            }
+        } else {
+            snapIndicatorX_ = -1;
+        }
         core::TimelineTime newDur = targetTime - dragStartTime_;
         if (newDur.ticks() > 0) {
             engine_.trimClipEnd(activeClipId_, newDur);
@@ -316,12 +402,15 @@ void TimelineTracksWidget::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TimelineTracksWidget::mouseReleaseEvent(QMouseEvent* event) {
+    snapIndicatorX_ = -1;
     if (dragMode_ != DragMode::None) {
         dragMode_ = DragMode::None;
         setCursor(Qt::ArrowCursor);
+        update();
         event->accept();
         return;
     }
+    update();
     QWidget::mouseReleaseEvent(event);
 }
 

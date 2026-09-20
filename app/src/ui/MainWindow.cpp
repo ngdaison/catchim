@@ -146,6 +146,7 @@ void MainWindow::onThemeToggleRequested() {
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event) {
+    // 1. Playback & Navigation
     if (event->key() == Qt::Key_Space) {
         engine_.togglePlay();
         previewPanel_->refresh();
@@ -153,6 +154,110 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         return;
     }
 
+    if (event->modifiers() == Qt::NoModifier) {
+        if (event->key() == Qt::Key_J) {
+            engine_.playback().setPlaybackRate(-1.5);
+            if (!engine_.playback().isPlaying()) engine_.play();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_K) {
+            engine_.pause();
+            event->accept();
+            return;
+        }
+        if (event->key() == Qt::Key_L) {
+            engine_.playback().setPlaybackRate(1.5);
+            if (!engine_.playback().isPlaying()) engine_.play();
+            event->accept();
+            return;
+        }
+    }
+
+    if (event->key() == Qt::Key_Left) {
+        const auto& fps = engine_.project().settings().fps;
+        engine_.playback().stepFrame(-1, fps);
+        previewPanel_->refresh();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Right) {
+        const auto& fps = engine_.project().settings().fps;
+        engine_.playback().stepFrame(1, fps);
+        previewPanel_->refresh();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Home) {
+        engine_.seek(core::TimelineTime::zero());
+        previewPanel_->refresh();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_End) {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            engine_.seek(tl->totalDuration());
+            previewPanel_->refresh();
+            timelinePanel_->refresh();
+        }
+        event->accept();
+        return;
+    }
+
+    // 2. Timeline Editing
+    if (event->key() == Qt::Key_S && event->modifiers() == Qt::NoModifier) {
+        engine_.splitAtPlayhead();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Q && event->modifiers() == Qt::NoModifier) {
+        engine_.splitLeftAtPlayhead();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_W && event->modifiers() == Qt::NoModifier) {
+        engine_.splitRightAtPlayhead();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
+        engine_.deleteSelectedClips();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_R && event->modifiers() == Qt::NoModifier) {
+        engine_.toggleRipple();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_N && event->modifiers() == Qt::NoModifier) {
+        engine_.toggleSnapping();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_M && event->modifiers() == Qt::NoModifier) {
+        engine_.toggleBookmarkAtPlayhead();
+        timelinePanel_->refresh();
+        event->accept();
+        return;
+    }
+
+    // 3. History & Selection
     if (event->matches(QKeySequence::Undo)) {
         engine_.undo();
         event->accept();
@@ -165,27 +270,48 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
         return;
     }
 
-    if (event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) {
-        engine_.deleteSelectedClips();
-        event->accept();
-        return;
-    }
-
-    if (event->key() == Qt::Key_S && event->modifiers() == Qt::NoModifier) {
-        engine_.splitAtPlayhead();
-        event->accept();
-        return;
-    }
-
     if (event->key() == Qt::Key_D && (event->modifiers() & Qt::ControlModifier)) {
         engine_.duplicateSelectedClips();
         event->accept();
         return;
     }
 
-    if (event->key() == Qt::Key_N && event->modifiers() == Qt::NoModifier) {
-        engine_.toggleSnapping();
-        timelinePanel_->refresh();
+    if (event->key() == Qt::Key_A && (event->modifiers() & Qt::ControlModifier)) {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            std::vector<core::ClipId> allIds;
+            for (const auto* track : tl->allTracks()) {
+                for (const auto& c : track->clips()) {
+                    allIds.push_back(c.id());
+                }
+            }
+            engine_.selectClips(allIds, false);
+        }
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Escape) {
+        engine_.deselectAll();
+        event->accept();
+        return;
+    }
+
+    // 4. Preview & Export
+    if (event->key() == Qt::Key_E && (event->modifiers() & Qt::ControlModifier)) {
+        onExportRequested();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_F11 || (event->key() == Qt::Key_F && event->modifiers() == Qt::NoModifier)) {
+        previewPanel_->toggleFullscreen();
+        event->accept();
+        return;
+    }
+
+    if (event->key() == Qt::Key_Z && event->modifiers() == Qt::NoModifier) {
+        previewPanel_->toggleSafeZones();
         event->accept();
         return;
     }

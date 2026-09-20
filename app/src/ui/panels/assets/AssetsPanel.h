@@ -20,6 +20,11 @@ public:
 
     void refresh();
 
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dragMoveEvent(QDragMoveEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
+
 private slots:
     void onImportClicked();
     void onMediaItemDoubleClicked(QListWidgetItem* item);
