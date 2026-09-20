@@ -301,6 +301,18 @@ add_library(catchim_editor STATIC
     src/editor/selection/SelectionStateEngine.h
     src/editor/timeline/TimelineCreationDefaults.cpp
     src/editor/timeline/TimelineCreationDefaults.h
+    src/editor/timeline/controllers/TimelineDropTargetResolver.cpp
+    src/editor/timeline/controllers/TimelineDropTargetResolver.h
+    src/editor/timeline/controllers/TimelineDragDropController.cpp
+    src/editor/timeline/controllers/TimelineDragDropController.h
+    src/editor/timeline/controllers/TimelineElementInteractionController.cpp
+    src/editor/timeline/controllers/TimelineElementInteractionController.h
+    src/editor/timeline/TimelineInteractionMetrics.cpp
+    src/editor/timeline/TimelineInteractionMetrics.h
+    src/editor/timeline/TimelineElementFactory.cpp
+    src/editor/timeline/TimelineElementFactory.h
+    src/editor/timeline/TimelineDragUtils.cpp
+    src/editor/timeline/TimelineDragUtils.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 

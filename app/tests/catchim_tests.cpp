@@ -208,6 +208,12 @@
 #include "editor/timeline/controllers/ResizeController.h"
 #include "editor/selection/SelectionStateEngine.h"
 #include "editor/timeline/TimelineCreationDefaults.h"
+#include "editor/timeline/controllers/TimelineDropTargetResolver.h"
+#include "editor/timeline/controllers/TimelineDragDropController.h"
+#include "editor/timeline/controllers/TimelineElementInteractionController.h"
+#include "editor/timeline/TimelineInteractionMetrics.h"
+#include "editor/timeline/TimelineElementFactory.h"
+#include "editor/timeline/TimelineDragUtils.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -11253,6 +11259,220 @@ void runTimelineCreationDefaultsTests() {
     std::cout << "[PASS] runTimelineCreationDefaultsTests" << std::endl;
 }
 
+void runTimelineDropTargetResolverTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    Timeline timeline;
+    auto& vTrack = timeline.addTrack(TrackType::Video, "Main Video");
+    Clip clip1(ClipId::generate(), ClipType::Video, "Clip1", TimelineTime(0), TimelineTime::fromSeconds(4.0));
+    timeline.addClip(vTrack.id(), std::move(clip1));
+
+    // 1. Get track at Y
+    auto trackAtY = TimelineDropTargetResolver::getTrackAtY(20.0, timeline);
+    TEST_ASSERT(trackAtY.has_value());
+    TEST_ASSERT(trackAtY->trackIndex == 0);
+
+    // 2. Find element at position
+    auto found = TimelineDropTargetResolver::findElementAtPosition(
+        50.0, // 50px = 1.0s
+        timeline,
+        0,
+        {ClipType::Video},
+        50.0,
+        1.0
+    );
+    TEST_ASSERT(found.has_value());
+    TEST_ASSERT(found->trackId == vTrack.id());
+
+    // 3. Compute drop target
+    ComputeDropTargetParams params;
+    params.clipType = ClipType::Video;
+    params.mouseX = 300.0; // 6.0s (after Clip1)
+    params.mouseY = 20.0;
+    params.elementDuration = TimelineTime::fromSeconds(3.0);
+    params.pixelsPerSecond = 50.0;
+    params.zoomLevel = 1.0;
+
+    auto dropTarget = TimelineDropTargetResolver::computeDropTarget(timeline, params);
+    TEST_ASSERT(!dropTarget.isNewTrack);
+    TEST_ASSERT(dropTarget.trackIndex == 0);
+    TEST_ASSERT(dropTarget.xPosition == TimelineTime::fromSeconds(6.0));
+
+    // 4. Drop line Y
+    double dropY0 = TimelineDropTargetResolver::getDropLineY(dropTarget, timeline);
+    TEST_ASSERT(dropY0 == 0.0);
+
+    dropTarget.trackIndex = 1;
+    double dropY1 = TimelineDropTargetResolver::getDropLineY(dropTarget, timeline);
+    TEST_ASSERT(dropY1 > 0.0);
+
+    std::cout << "[PASS] runTimelineDropTargetResolverTests" << std::endl;
+}
+
+void runTimelineDragDropControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    Timeline timeline;
+    auto& track = timeline.addTrack(TrackType::Video, "Video Track");
+    Clip clip(ClipId::generate(), ClipType::Video, "Base", TimelineTime(0), TimelineTime::fromSeconds(5.0));
+    timeline.addClip(track.id(), std::move(clip));
+
+    bool dropped = false;
+    DropTarget receivedTarget;
+    ClipType receivedType = ClipType::Video;
+
+    DragDropConfig config;
+    config.zoomLevel = 1.0;
+    config.playheadTime = TimelineTime(0);
+    config.onDropElement = [&](const DropTarget& dt, ClipType ct) {
+        dropped = true;
+        receivedTarget = dt;
+        receivedType = ct;
+    };
+
+    TimelineDragDropController controller(config);
+    TEST_ASSERT(!controller.isOver());
+
+    controller.onDragEnter(ClipType::Text);
+    TEST_ASSERT(controller.isOver());
+
+    controller.onDragOver(timeline, 300.0, 10.0, ClipType::Text, TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(controller.isOver());
+    TEST_ASSERT(controller.state().dropTarget.has_value());
+
+    controller.onDrop(timeline, 300.0, 10.0, ClipType::Text, TimelineTime::fromSeconds(5.0));
+    TEST_ASSERT(!controller.isOver());
+    TEST_ASSERT(dropped);
+    TEST_ASSERT(receivedType == ClipType::Text);
+
+    std::cout << "[PASS] runTimelineDragDropControllerTests" << std::endl;
+}
+
+void runTimelineElementInteractionControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    bool movesCommitted = false;
+    TimelineTime committedDelta{0};
+
+    ElementInteractionConfig config;
+    config.zoomLevel = 1.0;
+    config.onCommitMoves = [&](const std::vector<ClipId>& /*ids*/, TimelineTime delta) {
+        movesCommitted = true;
+        committedDelta = delta;
+    };
+
+    TimelineElementInteractionController controller(config);
+    TEST_ASSERT(!controller.hasSession());
+
+    TrackId tId("t-1");
+    ClipId cId("c-1");
+
+    // 1. Mouse down (start drag session)
+    controller.onMouseDown(tId, cId, TimelineTime::fromSeconds(2.0), 100.0, 50.0, {cId});
+    TEST_ASSERT(controller.hasSession());
+    TEST_ASSERT(!controller.isDragging());
+
+    // 2. Move past 5px threshold
+    controller.handleMouseMove(150.0, 50.0); // +50px = +1.0s
+    TEST_ASSERT(controller.isDragging());
+    TEST_ASSERT(std::abs(controller.currentDeltaTime().toSeconds() - 1.0) < 1e-3);
+
+    // 3. Mouse up commits move
+    controller.handleMouseUp(150.0, 50.0, false);
+    TEST_ASSERT(!controller.hasSession());
+    TEST_ASSERT(!controller.isDragging());
+    TEST_ASSERT(movesCommitted);
+    TEST_ASSERT(std::abs(committedDelta.toSeconds() - 1.0) < 1e-3);
+
+    std::cout << "[PASS] runTimelineElementInteractionControllerTests" << std::endl;
+}
+
+void runTimelineInteractionMetricsTests() {
+    using namespace catchim::editor;
+
+    double dragThreshold = TimelineInteractionMetrics::TIMELINE_DRAG_THRESHOLD_PX;
+    TEST_ASSERT(dragThreshold == 5.0);
+    double wheelStep = TimelineInteractionMetrics::TIMELINE_HORIZONTAL_WHEEL_STEP_PX;
+    TEST_ASSERT(wheelStep == 40.0);
+
+    double zoomedIn = TimelineInteractionMetrics::calculateZoomIn(1.0);
+    TEST_ASSERT(std::abs(zoomedIn - 1.7) < 1e-4);
+
+    double zoomedOut = TimelineInteractionMetrics::calculateZoomOut(1.7);
+    TEST_ASSERT(std::abs(zoomedOut - 1.0) < 1e-4);
+
+    TEST_ASSERT(TimelineInteractionMetrics::isDragGesture(0.0, 0.0, 6.0, 0.0));
+    TEST_ASSERT(!TimelineInteractionMetrics::isDragGesture(0.0, 0.0, 2.0, 2.0));
+
+    TEST_ASSERT(TimelineInteractionMetrics::calculateWheelScrollDelta(10.0) == 40.0);
+    TEST_ASSERT(TimelineInteractionMetrics::calculateWheelScrollDelta(-10.0) == -40.0);
+
+    std::cout << "[PASS] runTimelineInteractionMetricsTests" << std::endl;
+}
+
+void runTimelineElementFactoryTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    auto graphic = TimelineElementFactory::buildGraphicElement(ClipId("g-1"), "circle", TimelineTime(0), TimelineTime::fromSeconds(3.0));
+    TEST_ASSERT(graphic.type() == ClipType::Graphic);
+    TEST_ASSERT(graphic.duration() == TimelineTime::fromSeconds(3.0));
+
+    auto sticker = TimelineElementFactory::buildStickerElement(ClipId("s-1"), "star_badge");
+    TEST_ASSERT(sticker.type() == ClipType::Sticker);
+
+    auto effect = TimelineElementFactory::buildEffectElement(ClipId("e-1"), "gaussian_blur");
+    TEST_ASSERT(effect.type() == ClipType::Effect);
+
+    // Introspection
+    TEST_ASSERT(TimelineElementFactory::canElementHaveAudio(ClipType::Video));
+    TEST_ASSERT(TimelineElementFactory::canElementHaveAudio(ClipType::Audio));
+    TEST_ASSERT(!TimelineElementFactory::canElementHaveAudio(ClipType::Text));
+
+    TEST_ASSERT(TimelineElementFactory::isVisualElement(ClipType::Video));
+    TEST_ASSERT(TimelineElementFactory::isVisualElement(ClipType::Image));
+    TEST_ASSERT(TimelineElementFactory::isVisualElement(ClipType::Text));
+    TEST_ASSERT(!TimelineElementFactory::isVisualElement(ClipType::Audio));
+
+    TEST_ASSERT(TimelineElementFactory::isMaskableElement(ClipType::Video));
+    TEST_ASSERT(!TimelineElementFactory::isMaskableElement(ClipType::Audio));
+
+    TEST_ASSERT(TimelineElementFactory::isRetimableElement(ClipType::Video));
+    TEST_ASSERT(TimelineElementFactory::isRetimableElement(ClipType::Audio));
+    TEST_ASSERT(!TimelineElementFactory::isRetimableElement(ClipType::Text));
+
+    TEST_ASSERT(TimelineElementFactory::requiresMediaId(ClipType::Video));
+    TEST_ASSERT(!TimelineElementFactory::requiresMediaId(ClipType::Text));
+
+    std::cout << "[PASS] runTimelineElementFactoryTests" << std::endl;
+}
+
+void runTimelineDragUtilsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 50px/sec at zoom 1.0: 100px = 2.0s
+    auto t1 = TimelineDragUtils::getMouseTimeFromClientX(150.0, 50.0, 0.0, 1.0);
+    TEST_ASSERT(std::abs(t1.toSeconds() - 2.0) < 1e-4);
+
+    // Frame-snapped at 30 fps
+    FrameRate fps{30, 1};
+    auto t2 = TimelineDragUtils::getMouseTimeSnapped(151.0, 50.0, 0.0, 1.0, fps);
+    TEST_ASSERT(t2 >= TimelineTime(0));
+
+    // Clamping
+    auto clamped = TimelineDragUtils::clampTimeToDuration(
+        TimelineTime::fromSeconds(15.0),
+        TimelineTime::fromSeconds(10.0)
+    );
+    TEST_ASSERT(clamped == TimelineTime::fromSeconds(10.0));
+
+    std::cout << "[PASS] runTimelineDragUtilsTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -11448,6 +11668,12 @@ int main() {
     runResizeControllerTests();
     runSelectionStateEngineTests();
     runTimelineCreationDefaultsTests();
-    std::cout << ">>> ALL 193 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTimelineDropTargetResolverTests();
+    runTimelineDragDropControllerTests();
+    runTimelineElementInteractionControllerTests();
+    runTimelineInteractionMetricsTests();
+    runTimelineElementFactoryTests();
+    runTimelineDragUtilsTests();
+    std::cout << ">>> ALL 199 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

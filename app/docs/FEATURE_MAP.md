@@ -1725,6 +1725,60 @@ Quy ước trạng thái:
 | Standard Track Type Names (Video, Audio, Text, Graphic, Effect) | `web/src/timeline/tracks.ts` | `catchim::editor::TimelineCreationDefaults::getDefaultTrackName` | Verified |
 | Scale & Volume dB Ranges (-60dB to 20dB, 0.1 to 100 zoom) | `web/src/timeline/scale.ts`, `audio-constants.ts` | `catchim::editor::TimelineCreationDefaults::isVolumeDbValid`, `clampVolumeDb`, `clampZoomLevel` | Verified |
 
+---
+
+## 182. Timeline Drop Target Resolution & Layout Geometry
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Track At Mouse Y Resolution with Gaps | `web/src/timeline/components/drop-target.ts` | `catchim::editor::TimelineDropTargetResolver::getTrackAtY` | Verified |
+| Element Hit Testing for Effect Application | `web/src/timeline/components/drop-target.ts` | `catchim::editor::TimelineDropTargetResolver::findElementAtPosition` | Verified |
+| Multi-Condition Drop Target Computing | `web/src/timeline/components/drop-target.ts` | `catchim::editor::TimelineDropTargetResolver::computeDropTarget`, `getDropLineY` | Verified |
+
+---
+
+## 183. Timeline Drag & Drop Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Drag State Machine (Idle, Over) | `web/src/timeline/controllers/drag-drop-controller.ts` | `catchim::editor::TimelineDragDropController`, `DragDropState` | Verified |
+| Realtime Drag Over Target Resolution | `web/src/timeline/controllers/drag-drop-controller.ts` | `catchim::editor::TimelineDragDropController::onDragOver` | Verified |
+| Drop Execution (Clip Insertion & Clip Effect) | `web/src/timeline/controllers/drag-drop-controller.ts` | `catchim::editor::TimelineDragDropController::onDrop` | Verified |
+
+---
+
+## 184. Timeline Element Interaction Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Mousedown Snapshot & Origin Tracking | `web/src/timeline/controllers/element-interaction-controller.ts` | `catchim::editor::TimelineElementInteractionController`, `MousedownSnapshot` | Verified |
+| Drag Threshold (5px) Selection vs Move | `web/src/timeline/controllers/element-interaction-controller.ts` | `catchim::editor::TimelineElementInteractionController::handleMouseMove` | Verified |
+| Multi-Element Move Preview & Commit | `web/src/timeline/controllers/element-interaction-controller.ts` | `catchim::editor::TimelineElementInteractionController::handleMouseUp`, `currentDeltaTime` | Verified |
+
+---
+
+## 185. Timeline Interaction Metrics & Wheel Steps
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Zoom Step Calculations (1.7x factor) | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineInteractionMetrics::calculateZoomIn`, `calculateZoomOut` | Verified |
+| Wheel Horizontal Step (40px) | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineInteractionMetrics::calculateWheelScrollDelta` | Verified |
+| Interaction Thresholds & Constants | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineInteractionMetrics::TIMELINE_DRAG_THRESHOLD_PX` | Verified |
+
+---
+
+## 186. Timeline Element Factory & Type Introspection
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Graphic, Sticker, & Effect Clip Builders | `web/src/timeline/element-utils.ts` | `catchim::editor::TimelineElementFactory::buildGraphicElement`, `buildStickerElement`, `buildEffectElement` | Verified |
+| Element Type Introspection Predicates | `web/src/timeline/element-utils.ts` | `catchim::editor::TimelineElementFactory::canElementHaveAudio`, `isVisualElement`, `isMaskableElement`, `isRetimableElement` | Verified |
+
+---
+
+## 187. Timeline Drag Utilities & Pixel Conversion
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Mouse X to Timeline Time with Zoom & Scroll | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragUtils::getMouseTimeFromClientX` | Verified |
+| Frame-Snapped Mouse Time Resolution | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragUtils::getMouseTimeSnapped` | Verified |
+| Duration Clamping Utilities | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragUtils::clampTimeToDuration` | Verified |
+
+
 
 
 
