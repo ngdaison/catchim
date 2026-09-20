@@ -238,6 +238,12 @@
 #include "editor/scene/TimelineSceneUtils.h"
 #include "audio/AudibleCandidateCollector.h"
 #include "editor/timeline/TimelineToolbarEngine.h"
+#include "editor/timeline/RulerIntervalEngine.h"
+#include "editor/timeline/TimelineExpandedLayoutEngine.h"
+#include "editor/panels/AssetsPanelStoreEngine.h"
+#include "editor/panels/PropertiesPanelStoreEngine.h"
+#include "editor/retime/SpeedInputController.h"
+#include "storage/NativeFileSystemStorageAdapter.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -12385,6 +12391,220 @@ void runTimelineToolbarEngineTests() {
     std::cout << "[PASS] runTimelineToolbarEngineTests" << std::endl;
 }
 
+void runRulerIntervalEngineTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // Default zoom 1.0, 30fps
+    auto cfg = RulerIntervalEngine::getRulerConfig(1.0, 30.0);
+    TEST_ASSERT(cfg.labelIntervalSeconds > 0.0);
+    TEST_ASSERT(cfg.tickIntervalSeconds > 0.0);
+    TEST_ASSERT(cfg.labelIntervalSeconds >= cfg.tickIntervalSeconds);
+
+    // Zoomed in (10x): labels and ticks become denser in seconds
+    auto cfgZoomedIn = RulerIntervalEngine::getRulerConfig(10.0, 30.0);
+    TEST_ASSERT(cfgZoomedIn.labelIntervalSeconds <= cfg.labelIntervalSeconds);
+
+    // shouldShowLabel
+    TEST_ASSERT(RulerIntervalEngine::shouldShowLabel(0.0, 1.0));
+    TEST_ASSERT(RulerIntervalEngine::shouldShowLabel(2.0, 1.0));
+    TEST_ASSERT(!RulerIntervalEngine::shouldShowLabel(0.5, 1.0));
+
+    // isSecondBoundary
+    TEST_ASSERT(RulerIntervalEngine::isSecondBoundary(1.0));
+    TEST_ASSERT(RulerIntervalEngine::isSecondBoundary(120.0));
+    TEST_ASSERT(!RulerIntervalEngine::isSecondBoundary(1.25));
+
+    // formatTimestamp & formatRulerLabel
+    TEST_ASSERT(RulerIntervalEngine::formatTimestamp(0.0) == "00:00");
+    TEST_ASSERT(RulerIntervalEngine::formatTimestamp(65.0) == "01:05");
+    TEST_ASSERT(RulerIntervalEngine::formatTimestamp(3665.0) == "1:01:05");
+
+    // Label format on second boundary
+    TEST_ASSERT(RulerIntervalEngine::formatRulerLabel(2.0, 30.0) == "00:02");
+    // Between seconds: e.g. 2.5s at 30fps -> 15f
+    TEST_ASSERT(RulerIntervalEngine::formatRulerLabel(2.5, 30.0) == "15f");
+
+    std::cout << "[PASS] runRulerIntervalEngineTests" << std::endl;
+}
+
+void runTimelineExpandedLayoutEngineTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // Property labels
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("transform.positionX") == "Position X");
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("opacity") == "Opacity");
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("volume") == "Volume");
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("background.cornerRadius") == "Corner Radius");
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("params.fontSize") == "fontSize");
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getPropertyLabel("effects.blur.radius") == "radius");
+
+    // Expanded rows ordering
+    std::vector<std::string> paths = {
+        "effects.blur.radius",
+        "transform.positionX",
+        "volume",
+        "background.color"
+    };
+    auto rows = TimelineExpandedLayoutEngine::getExpandedRowsFromPaths(paths);
+    TEST_ASSERT(rows.size() == 4);
+    // Group ordering: transform (0) -> volume (1) -> background (2) -> effects (4)
+    TEST_ASSERT(rows[0].propertyPath == "transform.positionX");
+    TEST_ASSERT(rows[1].propertyPath == "volume");
+    TEST_ASSERT(rows[2].propertyPath == "background.color");
+    TEST_ASSERT(rows[3].propertyPath == "effects.blur.radius");
+
+    // Height calculation: 4 rows * 24.0 = 96.0 px
+    TEST_ASSERT(TimelineExpandedLayoutEngine::getExpansionHeight(rows) == 96.0);
+
+    // Track expansion height
+    Track track(TrackId("t1"), TrackType::Video, "Video Track");
+    Clip clip(ClipId("c1"), ClipType::Video, "Clip 1", TimelineTime::zero(), TimelineTime::fromSeconds(5.0));
+    clip.getOrCreateAnimationChannel("transform.positionX").addOrUpdateKeyframe(Keyframe{ .time = TimelineTime::zero(), .value = 0.0 });
+    clip.getOrCreateAnimationChannel("opacity").addOrUpdateKeyframe(Keyframe{ .time = TimelineTime::zero(), .value = 1.0 });
+    track.clips().push_back(clip);
+
+    std::unordered_set<std::string> expandedIds = {"c1"};
+    double trackH = TimelineExpandedLayoutEngine::computeTrackExpansionHeight(track, expandedIds);
+    TEST_ASSERT(trackH == 48.0); // 2 rows * 24.0
+
+    auto trackRows = TimelineExpandedLayoutEngine::getTrackExpandedRows(track, expandedIds);
+    TEST_ASSERT(trackRows.size() == 2);
+
+    std::cout << "[PASS] runTimelineExpandedLayoutEngineTests" << std::endl;
+}
+
+void runAssetsPanelStoreEngineTests() {
+    using namespace catchim::editor;
+
+    AssetsPanelStoreEngine store;
+    TEST_ASSERT(store.activeTab() == AssetsTab::Media);
+    TEST_ASSERT(store.mediaViewMode() == MediaViewMode::Grid);
+    TEST_ASSERT(store.mediaSortBy() == MediaSortKey::Name);
+    TEST_ASSERT(store.mediaSortOrder() == MediaSortOrder::Asc);
+
+    store.setActiveTab(AssetsTab::Stickers);
+    TEST_ASSERT(store.activeTab() == AssetsTab::Stickers);
+    TEST_ASSERT(std::string(AssetsPanelStoreEngine::tabToString(store.activeTab())) == "stickers");
+
+    store.requestRevealMedia("media-789");
+    TEST_ASSERT(store.activeTab() == AssetsTab::Media);
+    TEST_ASSERT(store.highlightMediaId().has_value() && *store.highlightMediaId() == "media-789");
+
+    store.clearHighlight();
+    TEST_ASSERT(!store.highlightMediaId().has_value());
+
+    store.setMediaViewMode(MediaViewMode::List);
+    store.setMediaSort(MediaSortKey::Size, MediaSortOrder::Desc);
+
+    auto json = store.toJson();
+    AssetsPanelStoreEngine restored;
+    restored.fromJson(json);
+    TEST_ASSERT(restored.mediaViewMode() == MediaViewMode::List);
+    TEST_ASSERT(restored.mediaSortBy() == MediaSortKey::Size);
+    TEST_ASSERT(restored.mediaSortOrder() == MediaSortOrder::Desc);
+
+    std::cout << "[PASS] runAssetsPanelStoreEngineTests" << std::endl;
+}
+
+void runPropertiesPanelStoreEngineTests() {
+    using namespace catchim::editor;
+
+    PropertiesPanelStoreEngine store;
+    TEST_ASSERT(store.getActiveTab("video", "basic") == "basic");
+    TEST_ASSERT(!store.isTransformScaleLocked());
+
+    store.setActiveTab("video", "transform");
+    TEST_ASSERT(store.getActiveTab("video") == "transform");
+
+    store.setTransformScaleLocked(true);
+    TEST_ASSERT(store.isTransformScaleLocked());
+    store.toggleTransformScaleLock();
+    TEST_ASSERT(!store.isTransformScaleLocked());
+
+    store.setTransformScaleLocked(true);
+    auto j = store.toJson();
+    PropertiesPanelStoreEngine restored;
+    restored.fromJson(j);
+    TEST_ASSERT(restored.isTransformScaleLocked());
+    TEST_ASSERT(restored.getActiveTab("video") == "transform");
+
+    std::cout << "[PASS] runPropertiesPanelStoreEngineTests" << std::endl;
+}
+
+void runSpeedInputControllerTests() {
+    using namespace catchim::editor;
+
+    // Display formatting
+    TEST_ASSERT(SpeedInputController::rateToDisplay(1.0) == "1.00");
+    TEST_ASSERT(SpeedInputController::rateToDisplay(0.5) == "0.50");
+    TEST_ASSERT(SpeedInputController::rateToDisplay(2.25) == "2.25");
+
+    // Input parsing
+    auto parsed = SpeedInputController::parseSpeedInput("1.256");
+    TEST_ASSERT(parsed.has_value());
+    TEST_ASSERT(std::abs(*parsed - 1.26) < 1e-4); // snapped to 0.01
+
+    TEST_ASSERT(!SpeedInputController::parseSpeedInput("abc").has_value());
+    TEST_ASSERT(!SpeedInputController::parseSpeedInput("").has_value());
+
+    // Clamping
+    auto parsedLarge = SpeedInputController::parseSpeedInput("100.0");
+    TEST_ASSERT(parsedLarge.has_value());
+    TEST_ASSERT(*parsedLarge == RetimeRateEngine::MAX_RETIME_RATE);
+
+    // Retime builder
+    auto defRetime = SpeedInputController::buildRetime(1.0, false);
+    TEST_ASSERT(!defRetime.has_value()); // 1.0 without pitch maintenance is nullopt
+
+    auto customRetime = SpeedInputController::buildRetime(1.5, true);
+    TEST_ASSERT(customRetime.has_value());
+    TEST_ASSERT(customRetime->rate == 1.5);
+    TEST_ASSERT(customRetime->maintainPitch == true);
+
+    // Maintain pitch compatibility
+    TEST_ASSERT(SpeedInputController::canMaintainPitch(ClipType::Audio));
+    TEST_ASSERT(SpeedInputController::canMaintainPitch(ClipType::Video));
+    TEST_ASSERT(!SpeedInputController::canMaintainPitch(ClipType::Text));
+
+    std::cout << "[PASS] runSpeedInputControllerTests" << std::endl;
+}
+
+void runNativeFileSystemStorageAdapterTests() {
+    using namespace catchim::storage;
+
+    NativeFileSystemStorageAdapter adapter("test_adapter");
+    adapter.clear();
+
+    std::vector<uint8_t> sampleData = {0xDE, 0xAD, 0xBE, 0xEF};
+    bool okSet = adapter.set("sample.bin", sampleData);
+    TEST_ASSERT(okSet);
+    TEST_ASSERT(adapter.exists("sample.bin"));
+    TEST_ASSERT(adapter.size("sample.bin") == 4);
+
+    auto loaded = adapter.get("sample.bin");
+    TEST_ASSERT(loaded.has_value());
+    TEST_ASSERT(*loaded == sampleData);
+
+    auto keys = adapter.list();
+    TEST_ASSERT(keys.size() == 1);
+    TEST_ASSERT(keys[0] == "sample.bin");
+
+    bool okRemove = adapter.remove("sample.bin");
+    TEST_ASSERT(okRemove);
+    TEST_ASSERT(!adapter.exists("sample.bin"));
+
+    // Multiple files and clear
+    adapter.set("f1.dat", sampleData);
+    adapter.set("f2.dat", sampleData);
+    TEST_ASSERT(adapter.list().size() == 2);
+    adapter.clear();
+    TEST_ASSERT(adapter.list().empty());
+
+    std::cout << "[PASS] runNativeFileSystemStorageAdapterTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -12610,6 +12830,12 @@ int main() {
     runTimelineSceneUtilsTests();
     runAudibleCandidateCollectorTests();
     runTimelineToolbarEngineTests();
-    std::cout << ">>> ALL 223 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runRulerIntervalEngineTests();
+    runTimelineExpandedLayoutEngineTests();
+    runAssetsPanelStoreEngineTests();
+    runPropertiesPanelStoreEngineTests();
+    runSpeedInputControllerTests();
+    runNativeFileSystemStorageAdapterTests();
+    std::cout << ">>> ALL 229 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

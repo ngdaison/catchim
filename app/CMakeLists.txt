@@ -349,6 +349,16 @@ add_library(catchim_editor STATIC
     src/editor/scene/TimelineSceneUtils.h
     src/editor/timeline/TimelineToolbarEngine.cpp
     src/editor/timeline/TimelineToolbarEngine.h
+    src/editor/timeline/RulerIntervalEngine.cpp
+    src/editor/timeline/RulerIntervalEngine.h
+    src/editor/timeline/TimelineExpandedLayoutEngine.cpp
+    src/editor/timeline/TimelineExpandedLayoutEngine.h
+    src/editor/panels/AssetsPanelStoreEngine.cpp
+    src/editor/panels/AssetsPanelStoreEngine.h
+    src/editor/panels/PropertiesPanelStoreEngine.cpp
+    src/editor/panels/PropertiesPanelStoreEngine.h
+    src/editor/retime/SpeedInputController.cpp
+    src/editor/retime/SpeedInputController.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -596,6 +606,8 @@ add_library(catchim_storage STATIC
     src/storage/ProjectBundle.h
     src/storage/StorageQuotaEngine.cpp
     src/storage/StorageQuotaEngine.h
+    src/storage/NativeFileSystemStorageAdapter.cpp
+    src/storage/NativeFileSystemStorageAdapter.h
 )
 target_link_libraries(catchim_storage PUBLIC catchim_editor)
 

@@ -1994,6 +1994,61 @@ Quy ước trạng thái:
 | Multi-Selection Deletion & Split Command Dispatch | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineToolbarEngine::createToolbarCommand` | Verified |
 | Ripple Edit & Magnetism Toggle Resolution | `web/src/timeline/components/timeline-toolbar.tsx` | `catchim::editor::TimelineToolbarEngine::toggleRippleMode` | Verified |
 
+---
+
+## 212. Ruler Interval & Label Formatting Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Optimal Label & Tick Interval Calculation | `web/src/timeline/ruler-utils.ts` | `catchim::editor::RulerIntervalEngine::getRulerConfig` | Verified |
+| Tick-Divides-Label Even Alignment Enforcement | `web/src/timeline/ruler-utils.ts` | `catchim::editor::RulerIntervalEngine::ensureTickDividesLabel` | Verified |
+| Label Formatting on Second & Frame Boundaries | `web/src/timeline/ruler-utils.ts` | `catchim::editor::RulerIntervalEngine::formatRulerLabel` | Verified |
+
+---
+
+## 213. Timeline Expanded Row & Keyframe Lane Layout Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Property Group Matching & Human-Readable Labels | `web/src/timeline/components/expanded-layout.ts` | `catchim::editor::TimelineExpandedLayoutEngine::getPropertyLabel` | Verified |
+| Unique Ordered Expanded Rows Resolution | `web/src/timeline/components/expanded-layout.ts` | `catchim::editor::TimelineExpandedLayoutEngine::getExpandedRowsForClip` | Verified |
+| Track Expansion Height & Maximum Lane Resolution | `web/src/timeline/components/expanded-layout.ts` | `catchim::editor::TimelineExpandedLayoutEngine::computeTrackExpansionHeight` | Verified |
+
+---
+
+## 214. Assets Panel Store & Media Organization Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Tab Key Navigation (Media, Sounds, Text, Stickers...) | `web/src/components/editor/panels/assets/assets-panel-store.tsx` | `catchim::editor::AssetsPanelStoreEngine::setActiveTab` | Verified |
+| Media View Mode & Multi-Key Sorting (Name, Type, Size...) | `web/src/components/editor/panels/assets/assets-panel-store.tsx` | `catchim::editor::AssetsPanelStoreEngine::setMediaSort` | Verified |
+| Media Reveal & Highlight Request Handling | `web/src/components/editor/panels/assets/assets-panel-store.tsx` | `catchim::editor::AssetsPanelStoreEngine::requestRevealMedia` | Verified |
+
+---
+
+## 215. Properties Panel Store & Scale Lock Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Active Tab Memory Per Element Type | `web/src/components/editor/panels/properties/stores/properties-store.ts` | `catchim::editor::PropertiesPanelStoreEngine::setActiveTab` | Verified |
+| Transform Uniform Scale Aspect Ratio Locking | `web/src/components/editor/panels/properties/stores/properties-store.ts` | `catchim::editor::PropertiesPanelStoreEngine::setTransformScaleLocked` | Verified |
+| Panel State JSON Serialization & Restoration | `web/src/components/editor/panels/properties/stores/properties-store.ts` | `catchim::editor::PropertiesPanelStoreEngine::toJson` | Verified |
+
+---
+
+## 216. Speed & Retime Input Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Speed Rate Number Display Formatting (2 Decimals) | `web/src/speed/components/speed-tab.tsx` | `catchim::editor::SpeedInputController::rateToDisplay` | Verified |
+| User Input Parsing, Step Snapping, & Bounds Clamping | `web/src/speed/components/speed-tab.tsx` | `catchim::editor::SpeedInputController::parseSpeedInput` | Verified |
+| Constant Retime Specification Construction | `web/src/speed/components/speed-tab.tsx` | `catchim::editor::SpeedInputController::buildRetime` | Verified |
+
+---
+
+## 217. Native File System Storage Adapter
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Binary File Atomic Read & Write (Get / Set) | `web/src/services/storage/opfs-adapter.ts` | `catchim::storage::NativeFileSystemStorageAdapter::get`, `set` | Verified |
+| Key-Based File Removal & Partition Clearing | `web/src/services/storage/opfs-adapter.ts` | `catchim::storage::NativeFileSystemStorageAdapter::remove`, `clear` | Verified |
+| Directory Key Enumeration & File Size Queries | `web/src/services/storage/opfs-adapter.ts` | `catchim::storage::NativeFileSystemStorageAdapter::list`, `size` | Verified |
+
+
 
 
 
