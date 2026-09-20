@@ -46,6 +46,14 @@ int TimelineTracksWidget::totalTracksHeight() const {
     return std::max(total, 200);
 }
 
+QSize TimelineTracksWidget::sizeHint() const {
+    double pixelsPerSecond = 50.0 * zoomFactor_;
+    double durSec = engine_.project().totalDuration().toSeconds();
+    if (durSec < 30.0) durSec = 30.0;
+    int w = Metrics::trackLabelsWidth + static_cast<int>(durSec * pixelsPerSecond) + 300;
+    return QSize(w, totalTracksHeight());
+}
+
 core::TimelineTime TimelineTracksWidget::pixelToTime(int pixelX) const {
     int contentX = pixelX - Metrics::trackLabelsWidth + scrollX_;
     double pixelsPerSecond = 50.0 * zoomFactor_;
@@ -455,16 +463,6 @@ void TimelineTracksWidget::dropEvent(QDropEvent* event) {
             auto asset = probeRes.unwrap();
             mediaLibrary_.addAsset(asset);
 
-            core::TrackId targetTrack = tl->mainTrack().id();
-            if (asset->type() == media::MediaType::Audio) {
-                for (const auto* t : tl->allTracks()) {
-                    if (t->type() == editor::TrackType::Audio) {
-                        targetTrack = t->id();
-                        break;
-                    }
-                }
-            }
-
             editor::Clip clip(
                 core::ClipId::generate(),
                 (asset->type() == media::MediaType::Video) ? editor::ClipType::Video :
@@ -474,7 +472,7 @@ void TimelineTracksWidget::dropEvent(QDropEvent* event) {
                 asset->duration()
             );
             clip.setMediaId(asset->id());
-            engine_.addClip(targetTrack, std::move(clip));
+            engine_.insertElement(std::move(clip), dropTime);
 
             dropTime = dropTime + asset->duration();
         }

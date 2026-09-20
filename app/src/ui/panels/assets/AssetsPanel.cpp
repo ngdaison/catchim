@@ -439,7 +439,7 @@ QWidget* AssetsPanel::createTextView() {
             clip.setMediaId(assetId);
         }
 
-        engine_.addClip(audioTrackId, std::move(clip));
+        engine_.insertElement(std::move(clip), insertTime);
         engine_.project().setDirty(true);
         engine_.notifyTimelineChanged();
     });
@@ -963,7 +963,7 @@ void AssetsPanel::dropEvent(QDropEvent* event) {
                     asset->duration()
                 );
                 clip.setMediaId(asset->id());
-                engine_.addClip(tl->mainTrack().id(), std::move(clip));
+                engine_.insertElement(std::move(clip), core::TimelineTime::fromSeconds(0));
             }
         }
     }
@@ -998,7 +998,7 @@ void AssetsPanel::onImportClicked() {
                     asset->duration()
                 );
                 clip.setMediaId(asset->id());
-                engine_.addClip(tl->mainTrack().id(), std::move(clip));
+                engine_.insertElement(std::move(clip), core::TimelineTime::fromSeconds(0));
             }
         }
     }
@@ -1015,9 +1015,6 @@ void AssetsPanel::onAddMediaToTimeline(const core::MediaId& id) {
     auto asset = mediaLibrary_.findAsset(id);
     if (!asset) return;
 
-    auto* tl = engine_.activeTimeline();
-    if (!tl) return;
-
     core::TimelineTime insertTime = engine_.playback().currentTime();
     editor::Clip clip(
         core::ClipId::generate(),
@@ -1029,33 +1026,105 @@ void AssetsPanel::onAddMediaToTimeline(const core::MediaId& id) {
     );
     clip.setMediaId(asset->id());
 
-    // Pick target track based on type
-    core::TrackId targetTrack = tl->mainTrack().id();
-    if (asset->type() == media::MediaType::Audio) {
-        for (const auto* t : tl->allTracks()) {
-            if (t->type() == editor::TrackType::Audio) {
-                targetTrack = t->id();
-                break;
-            }
+    engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
+}
+
+static core::MediaId createSfxAsset(media::MediaLibrary& mediaLibrary, const QString& name, double durationSec) {
+    constexpr uint32_t sampleRate = 44100;
+    size_t numSamples = static_cast<size_t>(std::max(0.1, durationSec) * sampleRate);
+    std::vector<float> samples(numSamples, 0.0f);
+    constexpr double kPi = 3.14159265358979323846;
+
+    if (name.contains("Whoosh", Qt::CaseInsensitive)) {
+        // Filtered noise sweep
+        uint32_t rng = 12345;
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / numSamples;
+            double env = std::sin(kPi * t);
+            env = env * env;
+            rng = rng * 1664525u + 1013904223u;
+            double white = (static_cast<double>(rng & 0x7FFF) / 16384.0) - 1.0;
+            double centerFreq = 300.0 + 1200.0 * std::sin(kPi * t);
+            double tone = std::sin(2.0 * kPi * centerFreq * (static_cast<double>(i) / sampleRate));
+            samples[i] = static_cast<float>((white * 0.4 + tone * 0.4) * env);
+        }
+    } else if (name.contains("Bubble", Qt::CaseInsensitive)) {
+        // Rising pitch pop
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::exp(-18.0 * t);
+            double freq = 250.0 + 600.0 * (static_cast<double>(i) / numSamples);
+            samples[i] = static_cast<float>(std::sin(2.0 * kPi * freq * t) * env * 0.8);
+        }
+    } else if (name.contains("Bell", Qt::CaseInsensitive)) {
+        // Two-tone bell chime
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::exp(-3.5 * t);
+            double s1 = std::sin(2.0 * kPi * 880.0 * t);
+            double s2 = 0.5 * std::sin(2.0 * kPi * 1760.0 * t);
+            samples[i] = static_cast<float>((s1 + s2) * env * 0.7);
+        }
+    } else if (name.contains("Boom", Qt::CaseInsensitive)) {
+        // Sub-bass impact
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::exp(-2.2 * t);
+            double freq = 120.0 * std::exp(-3.0 * t) + 30.0;
+            samples[i] = static_cast<float>(std::sin(2.0 * kPi * freq * t) * env * 0.9);
+        }
+    } else if (name.contains("Click", Qt::CaseInsensitive)) {
+        // Crisp click
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::exp(-120.0 * t);
+            samples[i] = static_cast<float>(std::sin(2.0 * kPi * 1800.0 * t) * env * 0.8);
+        }
+    } else if (name.contains("Laser", Qt::CaseInsensitive)) {
+        // Downward laser chirp
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::exp(-4.0 * t);
+            double freq = 1800.0 * std::exp(-5.0 * t) + 150.0;
+            samples[i] = static_cast<float>(std::sin(2.0 * kPi * freq * t) * env * 0.8);
+        }
+    } else {
+        // Ambient / Melody / Shutter default
+        for (size_t i = 0; i < numSamples; ++i) {
+            double t = static_cast<double>(i) / sampleRate;
+            double env = std::min(1.0, std::min(t / 0.1, (durationSec - t) / 0.1));
+            double s = std::sin(2.0 * kPi * 440.0 * t) * 0.4 +
+                       std::sin(2.0 * kPi * 554.37 * t) * 0.3 +
+                       std::sin(2.0 * kPi * 659.25 * t) * 0.3;
+            samples[i] = static_cast<float>(s * env * 0.6);
         }
     }
 
-    engine_.addClip(targetTrack, std::move(clip));
+    auto wavBytes = audio::TtsServiceEngine::encodePcmToWav(samples, sampleRate);
+    QString cacheDir = QDir::tempPath() + "/catchim_audio_cache";
+    QDir().mkpath(cacheDir);
+    QString safeName = name;
+    safeName.replace(" ", "_");
+    QString wavFilePath = QString("%1/sfx_%2_%3.wav").arg(cacheDir).arg(safeName).arg(QDateTime::currentMSecsSinceEpoch());
+
+    std::ofstream wavOut(wavFilePath.toStdString(), std::ios::binary);
+    if (wavOut.is_open()) {
+        wavOut.write(reinterpret_cast<const char*>(wavBytes.data()), static_cast<std::streamsize>(wavBytes.size()));
+        wavOut.close();
+    }
+
+    auto probeRes = media::MediaProbe::probe(wavFilePath.toStdString());
+    if (probeRes.ok()) {
+        auto asset = probeRes.unwrap();
+        mediaLibrary.addAsset(asset);
+        return asset->id();
+    }
+    return core::MediaId();
 }
 
 void AssetsPanel::onAddAudioSfx(const QString& name, double durationSec) {
-    auto* tl = engine_.activeTimeline();
-    if (!tl) return;
-
-    // Find or pick audio track
-    core::TrackId targetTrack = tl->mainTrack().id();
-    for (const auto* t : tl->allTracks()) {
-        if (t->type() == editor::TrackType::Audio) {
-            targetTrack = t->id();
-            break;
-        }
-    }
-
     core::TimelineTime insertTime = engine_.playback().currentTime();
     editor::Clip clip(
         core::ClipId::generate(),
@@ -1064,21 +1133,19 @@ void AssetsPanel::onAddAudioSfx(const QString& name, double durationSec) {
         insertTime,
         core::TimelineTime::fromSeconds(durationSec)
     );
-    engine_.addClip(targetTrack, std::move(clip));
+
+    core::MediaId assetId = createSfxAsset(mediaLibrary_, name, durationSec);
+    if (!assetId.isEmpty()) {
+        clip.setMediaId(assetId);
+    }
+
+    engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
+    refresh();
 }
 
 void AssetsPanel::onAddTextPreset(const QString& title, const QString& fontStyle) {
-    auto* tl = engine_.activeTimeline();
-    if (!tl) return;
-
-    core::TrackId targetTrack = tl->mainTrack().id();
-    for (const auto* t : tl->allTracks()) {
-        if (t->type() == editor::TrackType::Text) {
-            targetTrack = t->id();
-            break;
-        }
-    }
-
     core::TimelineTime insertTime = engine_.playback().currentTime();
     editor::Clip clip(
         core::ClipId::generate(),
@@ -1092,13 +1159,12 @@ void AssetsPanel::onAddTextPreset(const QString& title, const QString& fontStyle
     clip.setParam("text.fontSize", 48.0);
     clip.setParam("text.color", std::string("#FFFFFF"));
 
-    engine_.addClip(targetTrack, std::move(clip));
+    engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
 }
 
 void AssetsPanel::onAddGraphicPreset(const QString& name, const QString& shapeType) {
-    auto* tl = engine_.activeTimeline();
-    if (!tl) return;
-
     core::TimelineTime insertTime = engine_.playback().currentTime();
     editor::Clip clip(
         core::ClipId::generate(),
@@ -1110,7 +1176,9 @@ void AssetsPanel::onAddGraphicPreset(const QString& name, const QString& shapeTy
     clip.setParam("graphic.shape", shapeType.toStdString());
     clip.setParam("graphic.color", std::string("#38bdf8"));
 
-    engine_.addClip(tl->mainTrack().id(), std::move(clip));
+    engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
 }
 
 void AssetsPanel::onApplyEffectPreset(const QString& effectName) {
@@ -1187,7 +1255,9 @@ void AssetsPanel::onAddAdjustmentLayer() {
     clip.setParam("adjustment.contrast", 0.0);
     clip.setParam("adjustment.saturation", 0.0);
 
-    engine_.addClip(tl->mainTrack().id(), std::move(clip));
+    engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
 }
 
 void AssetsPanel::onImportSrtClicked() {
@@ -1206,15 +1276,6 @@ void AssetsPanel::onImportSrtClicked() {
     auto* tl = engine_.activeTimeline();
     if (!tl) return;
 
-    // Find or create Text track
-    core::TrackId textTrackId = tl->mainTrack().id();
-    for (const auto* t : tl->allTracks()) {
-        if (t->type() == editor::TrackType::Text) {
-            textTrackId = t->id();
-            break;
-        }
-    }
-
     for (const auto& cue : result.cues) {
         editor::Clip clip(
             core::ClipId::generate(),
@@ -1224,7 +1285,7 @@ void AssetsPanel::onImportSrtClicked() {
             cue.duration
         );
         clip.params()["text.content"] = cue.text;
-        engine_.addClip(textTrackId, std::move(clip));
+        engine_.insertElement(std::move(clip), cue.startTime);
     }
     engine_.project().setDirty(true);
     engine_.notifyTimelineChanged();
@@ -1252,7 +1313,7 @@ void AssetsPanel::onAutoTranscribeClicked() {
             core::TimelineTime::fromSeconds(chunkSec)
         );
         clip.params()["text.content"] = QString("Phụ đề tự động #%1").arg(i + 1).toStdString();
-        engine_.addClip(tl->mainTrack().id(), std::move(clip));
+        engine_.insertElement(std::move(clip), core::TimelineTime::fromSeconds(startSec));
     }
     engine_.project().setDirty(true);
     engine_.notifyTimelineChanged();

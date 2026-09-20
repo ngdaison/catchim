@@ -60,12 +60,14 @@ void TimelinePanel::setupUi() {
 void TimelinePanel::refresh() {
     toolbar_->refresh();
     rulerWidget_->update();
+    tracksWidget_->updateGeometry();
     tracksWidget_->update();
 }
 
 void TimelinePanel::onZoomChanged(double zoomFactor) {
     rulerWidget_->setZoomFactor(zoomFactor);
     tracksWidget_->setZoomFactor(zoomFactor);
+    tracksWidget_->updateGeometry();
 }
 
 void TimelinePanel::onSeekRequested(core::TimelineTime time) {

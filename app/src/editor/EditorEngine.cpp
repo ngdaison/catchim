@@ -2,6 +2,7 @@
 #include "project/ProjectSerializer.h"
 #include "history/commands/TimelineCommands.h"
 #include "history/commands/AdvancedTimelineCommands.h"
+#include "history/commands/InsertElementCommand.h"
 #include "history/commands/ToggleSourceAudioSeparationCommand.h"
 #include <algorithm>
 
@@ -84,19 +85,64 @@ bool EditorEngine::isClipSelected(const core::ClipId& clipId) const {
     return std::find(selectedClipIds_.begin(), selectedClipIds_.end(), clipId) != selectedClipIds_.end();
 }
 
-bool EditorEngine::addClip(const core::TrackId& trackId, Clip clip) {
+bool EditorEngine::insertElement(Clip clip, core::TimelineTime startTime, std::optional<core::TrackId> explicitTrackId) {
     Timeline* tl = activeTimeline();
     if (!tl) return false;
 
+    TrackType autoTrack = TrackType::Video;
+    if (clip.type() == ClipType::Audio) {
+        autoTrack = TrackType::Audio;
+    } else if (clip.type() == ClipType::Text) {
+        autoTrack = TrackType::Text;
+    } else if (clip.type() == ClipType::Graphic || clip.type() == ClipType::Sticker) {
+        autoTrack = TrackType::Graphic;
+    } else if (clip.type() == ClipType::Effect) {
+        autoTrack = TrackType::Effect;
+    }
+
+    InsertElementPlacement placement;
+    if (explicitTrackId.has_value() && !explicitTrackId->isEmpty()) {
+        placement.mode = InsertElementPlacement::Mode::Explicit;
+        placement.explicitTrackId = *explicitTrackId;
+    } else {
+        placement.mode = InsertElementPlacement::Mode::Auto;
+        placement.autoTrackType = autoTrack;
+    }
+    placement.startTime = startTime;
+
     core::ClipId cid = clip.id();
-    auto cmd = std::make_unique<AddClipCommand>(*tl, trackId, std::move(clip));
+    auto cmd = std::make_unique<InsertElementCommand>(*tl, std::move(clip), placement, &project_);
     if (history_.execute(std::move(cmd))) {
         project_.setDirty(true);
         playback_.setDuration(project_.totalDuration());
         selectClip(cid);
+        notifyTimelineChanged();
         return true;
     }
     return false;
+}
+
+bool EditorEngine::addClip(const core::TrackId& trackId, Clip clip) {
+    Timeline* tl = activeTimeline();
+    if (!tl) return false;
+
+    Track* trk = tl->findTrack(trackId);
+    if (trk && trk->acceptsClipType(clip.type()) && trk->canPlace(clip.startTime(), clip.duration(), std::nullopt)) {
+        core::ClipId cid = clip.id();
+        auto cmd = std::make_unique<AddClipCommand>(*tl, trackId, std::move(clip));
+        if (history_.execute(std::move(cmd))) {
+            project_.setDirty(true);
+            playback_.setDuration(project_.totalDuration());
+            selectClip(cid);
+            notifyTimelineChanged();
+            return true;
+        }
+        return false;
+    }
+
+    // Smart fallback: auto resolve track
+    core::TimelineTime start = clip.startTime();
+    return insertElement(std::move(clip), start, trackId);
 }
 
 bool EditorEngine::moveClip(const core::ClipId& clipId, const core::TrackId& targetTrackId, core::TimelineTime targetTime) {

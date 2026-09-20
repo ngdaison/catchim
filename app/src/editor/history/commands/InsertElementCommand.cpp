@@ -52,9 +52,12 @@ bool InsertElementCommand::execute() {
 
     if (placement_.mode == InsertElementPlacement::Mode::Explicit) {
         Track* t = timeline_.findTrack(placement_.explicitTrackId);
-        if (!t) return false;
-        targetTrackId_ = t->id();
-    } else {
+        if (t && t->acceptsClipType(element_.type()) && t->canPlace(placement_.startTime, element_.duration())) {
+            targetTrackId_ = t->id();
+        }
+    }
+    
+    if (targetTrackId_.isEmpty()) {
         if (placement_.autoTrackType == TrackType::Video) {
             if (timeline_.mainTrack().clips().empty() ||
                 timeline_.mainTrack().canPlace(placement_.startTime, element_.duration())) {
@@ -92,8 +95,10 @@ bool InsertElementCommand::execute() {
                 }
             }
             if (targetTrackId_.isEmpty()) {
-                TrackType tt = (element_.type() == ClipType::Text) ? TrackType::Text : TrackType::Graphic;
-                std::string name = (element_.type() == ClipType::Text) ? "Text Track" : "Graphic Track";
+                TrackType tt = (element_.type() == ClipType::Text) ? TrackType::Text :
+                               (element_.type() == ClipType::Effect) ? TrackType::Effect : TrackType::Graphic;
+                std::string name = (element_.type() == ClipType::Text) ? "Text Track" :
+                                   (element_.type() == ClipType::Effect) ? "Effect Track" : "Graphic Track";
                 Track& newOt = timeline_.addTrack(tt, name);
                 targetTrackId_ = newOt.id();
             }

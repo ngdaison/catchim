@@ -20,6 +20,7 @@ public:
     void setScrollOffset(int x, int y) { scrollX_ = x; scrollY_ = y; update(); }
 
     int totalTracksHeight() const;
+    QSize sizeHint() const override;
 
 signals:
     void seekRequested(core::TimelineTime time);
