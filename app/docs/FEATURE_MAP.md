@@ -1778,6 +1778,61 @@ Quy ước trạng thái:
 | Frame-Snapped Mouse Time Resolution | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragUtils::getMouseTimeSnapped` | Verified |
 | Duration Clamping Utilities | `web/src/timeline/drag-utils.ts` | `catchim::editor::TimelineDragUtils::clampTimeToDuration` | Verified |
 
+---
+
+## 188. Interactive Timeline Zoom Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Wheel Zoom Gesture with Capped Exponential Factor | `web/src/timeline/controllers/zoom-controller.ts` | `catchim::editor::TimelineInteractiveZoomController::handleWheel` | Verified |
+| Playhead-Anchored Zoom & Viewport Offset Maintenance | `web/src/timeline/controllers/zoom-controller.ts` | `catchim::editor::TimelineInteractiveZoomController::setZoomLevel`, `applyZoomLayout` | Verified |
+| Zoom Clamping & Threshold Reconciler | `web/src/timeline/controllers/zoom-controller.ts` | `catchim::editor::TimelineInteractiveZoomController::clampZoom`, `reconcileInitialAndMinZoom` | Verified |
+
+---
+
+## 189. Graph Editor Session Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Keyframe Selection Validation & Unavailable Reasons | `web/src/timeline/components/graph-editor/session.ts` | `catchim::editor::GraphEditorSessionEngine::resolveSelectionState` | Verified |
+| Segment Curve & Reference Span Resolution | `web/src/timeline/components/graph-editor/session.ts` | `catchim::editor::GraphEditorSessionEngine::getReferenceSpanValue` | Verified |
+| Graph Editor Ready State & Cubic Bezier Extraction | `web/src/timeline/components/graph-editor/session.ts` | `catchim::editor::GraphEditorSessionEngine::createUnavailableState`, `GraphEditorResolvedSegment` | Verified |
+
+---
+
+## 190. Graph Editor Easing Presets & Custom Presets
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Builtin Easing Presets (Smooth, EaseOut, EaseIn, EaseInOut, Pop, Linear) | `web/src/timeline/components/graph-editor/easing-presets.ts` | `catchim::editor::GraphEditorEasingPresets::builtinPresets` | Verified |
+| Tolerance-based Curve Matching (tolerance 0.02) | `web/src/timeline/components/graph-editor/easing-presets.ts` | `catchim::editor::GraphEditorEasingPresets::findMatchingPreset` | Verified |
+| Custom Easing Preset Management & Persistence | `web/src/timeline/components/graph-editor/custom-presets-store.ts` | `catchim::editor::GraphEditorEasingPresets::addCustomPreset`, `removeCustomPreset`, `allPresets` | Verified |
+
+---
+
+## 191. Track Layout Metrics & Expansion Layout
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Track Heights & Gap Calculations (Double Precision) | `web/src/timeline/components/track-layout.ts` | `catchim::editor::TrackLayoutMetrics::getTrackHeight`, `getExpandedTrackHeight` | Verified |
+| Cumulative Heights & Offsets with Extra Padding | `web/src/timeline/components/track-layout.ts` | `catchim::editor::TrackLayoutMetrics::getCumulativeHeightBefore`, `getTrackLayoutOffsets` | Verified |
+| Total Timeline Height Resolution | `web/src/timeline/components/track-layout.ts` | `catchim::editor::TrackLayoutMetrics::getTotalTracksHeight` | Verified |
+
+---
+
+## 192. Timeline Selection Box Hit-Testing
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Normalized Selection Rectangle Calculation | `web/src/timeline/components/selection-hit-testing.ts` | `catchim::editor::SelectionHitTesting::getNormalizedRectangle` | Verified |
+| Rectangle Intersection Detection | `web/src/timeline/components/selection-hit-testing.ts` | `catchim::editor::SelectionHitTesting::isRectangleIntersecting` | Verified |
+| Multi-Track Marquee Element Intersections Resolution | `web/src/timeline/components/selection-hit-testing.ts` | `catchim::editor::SelectionHitTesting::resolveTimelineElementIntersections` | Verified |
+
+---
+
+## 193. Export Mime Types, Layers & Preview Cursor
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Export MIME Types Resolution (webm, mp4) | `web/src/export/mime-types.ts` | `catchim::editor::ExportMimeTypes::getMimeTypeForExtension`, `getExtensionForMimeType` | Verified |
+| Timeline Z-Index Layer Constants | `web/src/timeline/components/layers.ts` | `catchim::editor::TimelineLayers::TRACK_CONTENT`, `DRAG_LINE`, `PLAYHEAD`, `SNAP_INDICATOR` | Verified |
+| Pen Tool SVG Cursor with Nib Tip Hotspot (1, 1) | `web/src/preview/components/cursors.ts` | `catchim::editor::PreviewPenCursor::getSvgContent`, `HOTSPOT_X`, `HOTSPOT_Y` | Verified |
+
+
 
 
 

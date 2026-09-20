@@ -313,6 +313,18 @@ add_library(catchim_editor STATIC
     src/editor/timeline/TimelineElementFactory.h
     src/editor/timeline/TimelineDragUtils.cpp
     src/editor/timeline/TimelineDragUtils.h
+    src/editor/timeline/controllers/TimelineInteractiveZoomController.cpp
+    src/editor/timeline/controllers/TimelineInteractiveZoomController.h
+    src/editor/animation/GraphEditorSessionEngine.cpp
+    src/editor/animation/GraphEditorSessionEngine.h
+    src/editor/animation/GraphEditorEasingPresets.cpp
+    src/editor/animation/GraphEditorEasingPresets.h
+    src/editor/timeline/TrackLayoutMetrics.cpp
+    src/editor/timeline/TrackLayoutMetrics.h
+    src/editor/timeline/SelectionHitTesting.cpp
+    src/editor/timeline/SelectionHitTesting.h
+    src/editor/export/ExportMimeTypesAndLayers.cpp
+    src/editor/export/ExportMimeTypesAndLayers.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 

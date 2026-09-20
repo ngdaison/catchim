@@ -214,6 +214,12 @@
 #include "editor/timeline/TimelineInteractionMetrics.h"
 #include "editor/timeline/TimelineElementFactory.h"
 #include "editor/timeline/TimelineDragUtils.h"
+#include "editor/timeline/controllers/TimelineInteractiveZoomController.h"
+#include "editor/animation/GraphEditorSessionEngine.h"
+#include "editor/animation/GraphEditorEasingPresets.h"
+#include "editor/timeline/TrackLayoutMetrics.h"
+#include "editor/timeline/SelectionHitTesting.h"
+#include "editor/export/ExportMimeTypesAndLayers.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -11473,6 +11479,227 @@ void runTimelineDragUtilsTests() {
     std::cout << "[PASS] runTimelineDragUtilsTests" << std::endl;
 }
 
+void runTimelineInteractiveZoomControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    InteractiveZoomConfig cfg;
+    cfg.minZoom = 0.1;
+    cfg.maxZoom = 100.0;
+    cfg.getCurrentPlayheadTime = []() { return TimelineTime::fromSeconds(2.0); };
+
+    TimelineInteractiveZoomController controller(cfg, 1.0);
+    TEST_ASSERT(controller.zoomLevel() == 1.0);
+
+    // Clamping
+    TEST_ASSERT(TimelineInteractiveZoomController::clampZoom(150.0, 0.1, 100.0) == 100.0);
+    TEST_ASSERT(TimelineInteractiveZoomController::clampZoom(0.01, 0.1, 100.0) == 0.1);
+
+    // Wheel zoom
+    bool handled = controller.handleWheel(0.0, -10.0, true, false, 5000.0, 1000.0);
+    TEST_ASSERT(handled);
+    TEST_ASSERT(controller.zoomLevel() > 1.0);
+
+    // Shift scroll should be ignored by zoom
+    bool ignored = controller.handleWheel(0.0, -10.0, true, true);
+    TEST_ASSERT(!ignored);
+
+    // Threshold anchoring
+    controller.setZoomLevel(0.2, 5000.0, 1000.0);
+    TEST_ASSERT(!controller.isInPlayheadAnchorMode());
+    controller.setZoomLevel(0.8, 5000.0, 1000.0);
+    TEST_ASSERT(controller.isInPlayheadAnchorMode());
+
+    std::cout << "[PASS] runTimelineInteractiveZoomControllerTests" << std::endl;
+}
+
+void runGraphEditorSessionEngineTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    Timeline timeline;
+    auto& track = timeline.addTrack(TrackType::Video, "Video Track");
+    Clip clip(ClipId("c-1"), ClipType::Video, "Clip 1", TimelineTime(0), TimelineTime::fromSeconds(10.0));
+
+    // Add animation channel
+    AnimationChannel channel("transform.positionX", 0.0);
+    Keyframe kf1{TimelineTime(0), 0.0, KeyframeInterpolation::Bezier};
+    Keyframe kf2{TimelineTime::fromSeconds(2.0), 100.0, KeyframeInterpolation::Bezier};
+    Keyframe kf3{TimelineTime::fromSeconds(4.0), 100.0, KeyframeInterpolation::Linear};
+    channel.addOrUpdateKeyframe(kf1);
+    channel.addOrUpdateKeyframe(kf2);
+    channel.addOrUpdateKeyframe(kf3);
+    clip.animationChannels()["transform.positionX"] = std::move(channel);
+
+    timeline.addClip(track.id(), std::move(clip));
+
+    // 1. Empty selection -> NoKeyframeSelected
+    auto stateEmpty = GraphEditorSessionEngine::resolveSelectionState(timeline, {});
+    TEST_ASSERT(!stateEmpty.isReady);
+    TEST_ASSERT(stateEmpty.reason == GraphEditorUnavailableReason::NoKeyframeSelected);
+
+    // 2. Valid selection
+    SelectedKeyframeRef ref{track.id(), ClipId("c-1"), "transform.positionX", TimelineTime(0)};
+    std::vector<SelectedKeyframeRef> selectedKeyframes = {ref};
+    auto stateReady = GraphEditorSessionEngine::resolveSelectionState(timeline, selectedKeyframes);
+    TEST_ASSERT(stateReady.isReady);
+    TEST_ASSERT(stateReady.reason == GraphEditorUnavailableReason::None);
+    TEST_ASSERT(stateReady.segments.size() == 1);
+    TEST_ASSERT(stateReady.segments[0].propertyPath == "transform.positionX");
+
+    // 3. Reference span
+    const Clip* retrieved = timeline.findClip(ClipId("c-1"));
+    TEST_ASSERT(retrieved != nullptr);
+    const auto* ch = retrieved->findAnimationChannel("transform.positionX");
+    TEST_ASSERT(ch != nullptr);
+    double span = GraphEditorSessionEngine::getReferenceSpanValue(*ch, 1);
+    TEST_ASSERT(span == 100.0);
+
+    std::cout << "[PASS] runGraphEditorSessionEngineTests" << std::endl;
+}
+
+void runGraphEditorEasingPresetsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    const auto& builtins = GraphEditorEasingPresets::builtinPresets();
+    TEST_ASSERT(builtins.size() == 6);
+    TEST_ASSERT(builtins[0].id == "smooth");
+    TEST_ASSERT(builtins[5].id == "linear");
+
+    // Exact match
+    auto matched = GraphEditorEasingPresets::findMatchingPreset(CubicBezier{0.0, 0.0, 1.0, 1.0});
+    TEST_ASSERT(matched.has_value());
+    TEST_ASSERT(matched->id == "linear");
+
+    // Within tolerance
+    auto matchedTol = GraphEditorEasingPresets::findMatchingPreset(CubicBezier{0.01, 0.01, 0.99, 1.01}, 0.02);
+    TEST_ASSERT(matchedTol.has_value());
+    TEST_ASSERT(matchedTol->id == "linear");
+
+    // Custom presets
+    GraphEditorEasingPresets store;
+    store.addCustomPreset("custom-1", "My Ease", CubicBezier{0.1, 0.2, 0.3, 0.4});
+    TEST_ASSERT(store.customPresets().size() == 1);
+    TEST_ASSERT(store.allPresets().size() == 7);
+
+    auto customMatch = GraphEditorEasingPresets::findMatchingPreset(
+        CubicBezier{0.1, 0.2, 0.3, 0.4},
+        0.02,
+        store.customPresets()
+    );
+    TEST_ASSERT(customMatch.has_value());
+    TEST_ASSERT(customMatch->id == "custom-1");
+
+    bool removed = store.removeCustomPreset("custom-1");
+    TEST_ASSERT(removed);
+    TEST_ASSERT(store.customPresets().empty());
+
+    std::cout << "[PASS] runGraphEditorEasingPresetsTests" << std::endl;
+}
+
+void runTrackLayoutMetricsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    TEST_ASSERT(TrackLayoutMetrics::getTrackHeight(TrackType::Video) == 65.0);
+    TEST_ASSERT(TrackLayoutMetrics::getTrackHeight(TrackType::Audio) == 50.0);
+    TEST_ASSERT(TrackLayoutMetrics::getTrackHeight(TrackType::Text) == 25.0);
+
+    TEST_ASSERT(TrackLayoutMetrics::getExpandedTrackHeight(TrackType::Video, 2) == 105.0); // 65 + 2*20
+
+    Track t1(TrackId("t-1"), TrackType::Video, "V1");
+    Track t2(TrackId("t-2"), TrackType::Audio, "A1");
+    Track t3(TrackId("t-3"), TrackType::Text, "T1");
+    std::vector<const Track*> tracks = {&t1, &t2, &t3};
+
+    // Cumulative height before index 1 (just t1)
+    double h0 = TrackLayoutMetrics::getCumulativeHeightBefore(tracks, 1);
+    TEST_ASSERT(h0 == 65.0 + 6.0);
+
+    // Cumulative height before index 2 (t1 + t2)
+    double h1 = TrackLayoutMetrics::getCumulativeHeightBefore(tracks, 2);
+    TEST_ASSERT(h1 == (65.0 + 6.0) + (50.0 + 6.0));
+
+    auto offsets = TrackLayoutMetrics::getTrackLayoutOffsets(tracks);
+    TEST_ASSERT(offsets.size() == 3);
+    TEST_ASSERT(offsets[0] == 0.0);
+    TEST_ASSERT(offsets[1] == 71.0);
+    TEST_ASSERT(offsets[2] == 127.0);
+
+    double totalH = TrackLayoutMetrics::getTotalTracksHeight(tracks);
+    TEST_ASSERT(totalH == 65.0 + 50.0 + 25.0 + 2 * 6.0);
+
+    std::cout << "[PASS] runTrackLayoutMetricsTests" << std::endl;
+}
+
+void runSelectionHitTestingTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // Normalization
+    SelectionPoint p1{100.0, 200.0};
+    SelectionPoint p2{50.0, 250.0};
+    auto rect = SelectionHitTesting::getNormalizedRectangle(p1, p2);
+    TEST_ASSERT(rect.left == 50.0);
+    TEST_ASSERT(rect.top == 200.0);
+    TEST_ASSERT(rect.right == 100.0);
+    TEST_ASSERT(rect.bottom == 250.0);
+
+    // Intersection
+    SelectionRectangle a{0.0, 0.0, 100.0, 100.0};
+    SelectionRectangle b{50.0, 50.0, 150.0, 150.0};
+    SelectionRectangle c{200.0, 200.0, 300.0, 300.0};
+    TEST_ASSERT(SelectionHitTesting::isRectangleIntersecting(a, b));
+    TEST_ASSERT(!SelectionHitTesting::isRectangleIntersecting(a, c));
+
+    // Multi-track marquee element intersection
+    Track t1(TrackId("t-1"), TrackType::Video, "V1");
+    Clip c1(ClipId("c-1"), ClipType::Video, "Clip 1", TimelineTime::fromSeconds(1.0), TimelineTime::fromSeconds(3.0));
+    t1.insertClip(c1);
+
+    Track t2(TrackId("t-2"), TrackType::Audio, "A1");
+    Clip c2(ClipId("c-2"), ClipType::Audio, "Clip 2", TimelineTime::fromSeconds(5.0), TimelineTime::fromSeconds(3.0));
+    t2.insertClip(c2);
+
+    std::vector<const Track*> tracks = {&t1, &t2};
+
+    // Marquee covering c1 (50px/sec -> 1.0s = 50px, 4.0s = 200px)
+    SelectionPoint start{40.0, 10.0};
+    SelectionPoint end{150.0, 60.0};
+    auto selected = SelectionHitTesting::resolveTimelineElementIntersections(tracks, 1.0, start, end);
+    TEST_ASSERT(selected.size() == 1);
+    TEST_ASSERT(selected[0].elementId == ClipId("c-1"));
+
+    std::cout << "[PASS] runSelectionHitTestingTests" << std::endl;
+}
+
+void runExportMimeTypesAndLayersTests() {
+    using namespace catchim::editor;
+
+    TEST_ASSERT(ExportMimeTypes::getMimeTypeForExtension("mp4") == "video/mp4");
+    TEST_ASSERT(ExportMimeTypes::getMimeTypeForExtension(".webm") == "video/webm");
+    TEST_ASSERT(ExportMimeTypes::getExtensionForMimeType("video/webm") == "webm");
+    TEST_ASSERT(ExportMimeTypes::getExtensionForMimeType("video/mp4") == "mp4");
+
+    int trackContent = TimelineLayers::TRACK_CONTENT;
+    int dragLine = TimelineLayers::DRAG_LINE;
+    int playhead = TimelineLayers::PLAYHEAD;
+    int snapIndicator = TimelineLayers::SNAP_INDICATOR;
+
+    TEST_ASSERT(trackContent < dragLine);
+    TEST_ASSERT(dragLine < playhead);
+    TEST_ASSERT(playhead < snapIndicator);
+
+    int hx = PreviewPenCursor::HOTSPOT_X;
+    int hy = PreviewPenCursor::HOTSPOT_Y;
+    TEST_ASSERT(hx == 1);
+    TEST_ASSERT(hy == 1);
+    TEST_ASSERT(std::strstr(PreviewPenCursor::getSvgContent(), "<svg") != nullptr);
+
+    std::cout << "[PASS] runExportMimeTypesAndLayersTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -11674,6 +11901,12 @@ int main() {
     runTimelineInteractionMetricsTests();
     runTimelineElementFactoryTests();
     runTimelineDragUtilsTests();
-    std::cout << ">>> ALL 199 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTimelineInteractiveZoomControllerTests();
+    runGraphEditorSessionEngineTests();
+    runGraphEditorEasingPresetsTests();
+    runTrackLayoutMetricsTests();
+    runSelectionHitTestingTests();
+    runExportMimeTypesAndLayersTests();
+    std::cout << ">>> ALL 205 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
