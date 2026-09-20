@@ -29,6 +29,7 @@ struct NativeVideoDecoder::SourceReaderContext {
 #endif
     int width{0};
     int height{0};
+    LONGLONG currentSampleHns{-1};
     double lastTimestamp{-1.0};
     std::vector<uint8_t> lastFrame;
     bool isImage{false};
@@ -71,7 +72,8 @@ bool NativeVideoDecoder::getFrame(
     double timestampSec,
     int& outWidth,
     int& outHeight,
-    std::vector<uint8_t>& outRgba
+    std::vector<uint8_t>& outRgba,
+    const std::string& clipId
 ) {
     std::lock_guard<std::mutex> lock(mutex_);
 
@@ -79,9 +81,11 @@ bool NativeVideoDecoder::getFrame(
     std::string ext = path.extension().string();
     for (char& c : ext) c = static_cast<char>(::tolower(c));
 
+    std::string readerKey = clipId.empty() ? pathKey : (clipId + "@" + pathKey);
+
     // 1. Image formats check
     if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".webp") {
-        auto it = readers_.find(pathKey);
+        auto it = readers_.find(readerKey);
         if (it != readers_.end() && it->second->isImage && !it->second->lastFrame.empty()) {
             outWidth = it->second->width;
             outHeight = it->second->height;
@@ -103,7 +107,7 @@ bool NativeVideoDecoder::getFrame(
             ctx->height = outHeight;
             ctx->isImage = true;
             ctx->lastFrame = outRgba;
-            readers_[pathKey] = ctx;
+            readers_[readerKey] = ctx;
             return true;
         }
 #endif
@@ -111,7 +115,7 @@ bool NativeVideoDecoder::getFrame(
     }
 
 #if defined(_WIN32)
-    auto it = readers_.find(pathKey);
+    auto it = readers_.find(readerKey);
     std::shared_ptr<SourceReaderContext> ctx;
     if (it != readers_.end()) {
         ctx = it->second;
@@ -139,13 +143,13 @@ bool NativeVideoDecoder::getFrame(
         if (pMediaType) {
             pMediaType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Video);
             pMediaType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_RGB32);
-            ctx->pReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, nullptr, pMediaType);
+            ctx->pReader->SetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), nullptr, pMediaType);
             pMediaType->Release();
         }
 
         // Query decoded width & height
         IMFMediaType* pCurrentType = nullptr;
-        if (SUCCEEDED(ctx->pReader->GetCurrentMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, &pCurrentType)) && pCurrentType) {
+        if (SUCCEEDED(ctx->pReader->GetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM), &pCurrentType)) && pCurrentType) {
             UINT32 w = 0, h = 0;
             MFGetAttributeSize(pCurrentType, MF_MT_FRAME_SIZE, &w, &h);
             ctx->width = static_cast<int>(w);
@@ -158,80 +162,114 @@ bool NativeVideoDecoder::getFrame(
             ctx->height = 1080;
         }
 
-        readers_[pathKey] = ctx;
+        readers_[readerKey] = ctx;
     }
 
     if (!ctx->pReader) return false;
 
-    // Fast check: if requested time is nearly identical to cached frame, return cached frame
-    if (ctx->lastTimestamp >= 0.0 && std::abs(ctx->lastTimestamp - timestampSec) < 0.02 && !ctx->lastFrame.empty()) {
+    // Fast check: if requested time matches current cached frame within a small tolerance, return cached frame
+    if (ctx->lastTimestamp >= 0.0 && std::abs(ctx->lastTimestamp - timestampSec) < 0.012 && !ctx->lastFrame.empty()) {
         outWidth = ctx->width;
         outHeight = ctx->height;
         outRgba = ctx->lastFrame;
         return true;
     }
 
-    // Seek to timestamp
     LONGLONG targetHns = static_cast<LONGLONG>(std::max(0.0, timestampSec) * 10000000.0);
-    PROPVARIANT var;
-    PropVariantInit(&var);
-    var.vt = VT_I8;
-    var.hVal.QuadPart = targetHns;
-    ctx->pReader->SetCurrentPosition(GUID_NULL, var);
-    PropVariantClear(&var);
 
-    DWORD streamIndex = 0, flags = 0;
-    LONGLONG sampleTimestamp = 0;
-    IMFSample* pSample = nullptr;
-
-    HRESULT hr = ctx->pReader->ReadSample(
-        MF_SOURCE_READER_FIRST_VIDEO_STREAM,
-        0,
-        &streamIndex,
-        &flags,
-        &sampleTimestamp,
-        &pSample
-    );
-
-    if (SUCCEEDED(hr) && pSample) {
-        IMFMediaBuffer* pBuffer = nullptr;
-        hr = pSample->ConvertToContiguousBuffer(&pBuffer);
-        if (SUCCEEDED(hr) && pBuffer) {
-            BYTE* pData = nullptr;
-            DWORD currentLength = 0;
-            hr = pBuffer->Lock(&pData, nullptr, &currentLength);
-            if (SUCCEEDED(hr) && pData && currentLength >= static_cast<DWORD>(ctx->width * ctx->height * 4)) {
-                outWidth = ctx->width;
-                outHeight = ctx->height;
-                outRgba.resize(ctx->width * ctx->height * 4);
-
-                // Convert BGRA to RGBA
-                const int pixelCount = ctx->width * ctx->height;
-                for (int i = 0; i < pixelCount; ++i) {
-                    uint8_t b = pData[i * 4 + 0];
-                    uint8_t g = pData[i * 4 + 1];
-                    uint8_t r = pData[i * 4 + 2];
-                    uint8_t a = pData[i * 4 + 3];
-                    outRgba[i * 4 + 0] = r;
-                    outRgba[i * 4 + 1] = g;
-                    outRgba[i * 4 + 2] = b;
-                    outRgba[i * 4 + 3] = (a == 0) ? 255 : a;
-                }
-
-                pBuffer->Unlock();
-                pBuffer->Release();
-                pSample->Release();
-
-                ctx->lastTimestamp = timestampSec;
-                ctx->lastFrame = outRgba;
-                return true;
-            }
-            pBuffer->Release();
-        }
-        pSample->Release();
+    // Determine if seek is required:
+    // 1) First read (currentSampleHns < 0)
+    // 2) Backward jump (> 250ms behind current sample)
+    // 3) Forward jump (> 2.5s ahead of current sample)
+    bool needSeek = false;
+    if (ctx->currentSampleHns < 0) {
+        needSeek = true;
+    } else if (targetHns < ctx->currentSampleHns - 2500000) {
+        needSeek = true;
+    } else if (targetHns > ctx->currentSampleHns + 25000000) {
+        needSeek = true;
     }
 
-    // If reading failed (e.g. at end of stream), return last valid frame if available
+    if (needSeek) {
+        PROPVARIANT var;
+        PropVariantInit(&var);
+        var.vt = VT_I8;
+        var.hVal.QuadPart = targetHns;
+        ctx->pReader->SetCurrentPosition(GUID_NULL, var);
+        PropVariantClear(&var);
+        ctx->currentSampleHns = -1;
+    }
+
+    // Read samples sequentially until sampleTimestamp reaches or passes targetHns (with tolerance ~15ms)
+    const LONGLONG toleranceHns = 150000; // 15ms
+    int safetyLoops = 120;
+
+    while (safetyLoops-- > 0) {
+        // If we already have a sample close enough to or beyond target, we are done
+        if (ctx->currentSampleHns >= 0 && ctx->currentSampleHns >= targetHns - toleranceHns) {
+            break;
+        }
+
+        DWORD streamIndex = 0, flags = 0;
+        LONGLONG sampleTimestamp = 0;
+        IMFSample* pSample = nullptr;
+
+        HRESULT hr = ctx->pReader->ReadSample(
+            static_cast<DWORD>(MF_SOURCE_READER_FIRST_VIDEO_STREAM),
+            0,
+            &streamIndex,
+            &flags,
+            &sampleTimestamp,
+            &pSample
+        );
+
+        if (FAILED(hr) || (flags & MF_SOURCE_READERF_ENDOFSTREAM)) {
+            if (pSample) pSample->Release();
+            break;
+        }
+
+        if (flags & MF_SOURCE_READERF_STREAMTICK) {
+            if (pSample) pSample->Release();
+            continue;
+        }
+
+        if (pSample) {
+            IMFMediaBuffer* pBuffer = nullptr;
+            hr = pSample->ConvertToContiguousBuffer(&pBuffer);
+            if (SUCCEEDED(hr) && pBuffer) {
+                BYTE* pData = nullptr;
+                DWORD currentLength = 0;
+                hr = pBuffer->Lock(&pData, nullptr, &currentLength);
+                if (SUCCEEDED(hr) && pData && currentLength >= static_cast<DWORD>(ctx->width * ctx->height * 4)) {
+                    ctx->lastFrame.resize(ctx->width * ctx->height * 4);
+
+                    // Convert BGRA to RGBA
+                    const int pixelCount = ctx->width * ctx->height;
+                    for (int i = 0; i < pixelCount; ++i) {
+                        uint8_t b = pData[i * 4 + 0];
+                        uint8_t g = pData[i * 4 + 1];
+                        uint8_t r = pData[i * 4 + 2];
+                        uint8_t a = pData[i * 4 + 3];
+                        ctx->lastFrame[i * 4 + 0] = r;
+                        ctx->lastFrame[i * 4 + 1] = g;
+                        ctx->lastFrame[i * 4 + 2] = b;
+                        ctx->lastFrame[i * 4 + 3] = (a == 0) ? 255 : a;
+                    }
+
+                    pBuffer->Unlock();
+                    ctx->currentSampleHns = sampleTimestamp;
+                    ctx->lastTimestamp = static_cast<double>(sampleTimestamp) / 10000000.0;
+                }
+                pBuffer->Release();
+            }
+            pSample->Release();
+
+            if (sampleTimestamp >= targetHns - toleranceHns) {
+                break;
+            }
+        }
+    }
+
     if (!ctx->lastFrame.empty()) {
         outWidth = ctx->width;
         outHeight = ctx->height;

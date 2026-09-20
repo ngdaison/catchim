@@ -392,7 +392,13 @@ void PropertiesPanel::onTransformChanged() {
     clip->setParam("transform.scaleY", scaleYSpin_->value());
     clip->setParam("transform.rotate", rotateSpin_->value());
     clip->setParam("opacity", static_cast<double>(opacitySlider_->value()) / 100.0);
-    clip->setParam("transform.blendMode", blendModeCombo_->currentIndex());
+    
+    static const char* s_blendModes[] = {"normal", "multiply", "screen", "overlay", "darken", "lighten", "color_dodge"};
+    int bIdx = blendModeCombo_->currentIndex();
+    if (bIdx >= 0 && bIdx < 7) {
+        clip->setParam("transform.blendMode", bIdx);
+        clip->setParam("transform.blendModeName", std::string(s_blendModes[bIdx]));
+    }
 
     engine_.project().setDirty(true);
     engine_.notifyProjectChanged();
@@ -444,7 +450,10 @@ void PropertiesPanel::onAudioChanged() {
     auto* clip = tl->findClip(sel[0]);
     if (!clip) return;
 
-    clip->setParam("volume", static_cast<double>(volumeSlider_->value()) / 100.0);
+    int volVal = volumeSlider_->value();
+    double volRatio = (volVal == 0) ? 0.0001 : (static_cast<double>(volVal) / 100.0);
+    clip->setParam("volume", volRatio);
+    clip->setParam("isMuted", volVal == 0);
     clip->setParam("audio.fadeIn", fadeInSpin_->value());
     clip->setParam("audio.fadeOut", fadeOutSpin_->value());
 

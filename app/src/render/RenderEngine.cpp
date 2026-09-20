@@ -149,6 +149,19 @@ const CompositorOutput& RenderEngine::renderFrame(
         layer.transform.rotate = clip.getParam<double>("transform.rotate", 0.0);
         layer.transform.opacity = clip.getParam<double>("opacity", 1.0);
 
+        // Extract blendMode (supports int index or string name)
+        static const char* s_blendModes[] = {"normal", "multiply", "screen", "overlay", "darken", "lighten", "color_dodge"};
+        if (clip.hasParam("transform.blendMode")) {
+            try {
+                int bmIdx = clip.getParam<int>("transform.blendMode", 0);
+                if (bmIdx >= 0 && bmIdx < 7) {
+                    layer.transform.blendMode = s_blendModes[bmIdx];
+                }
+            } catch (...) {
+                layer.transform.blendMode = clip.getParam<std::string>("transform.blendMode", "normal");
+            }
+        }
+
         bool decoded = false;
 
         // Try decoding real video or image frame if mediaId is present
@@ -157,12 +170,20 @@ const CompositorOutput& RenderEngine::renderFrame(
             if (asset) {
                 double speed = clip.getParam<double>("speed", 1.0);
                 if (speed <= 0.01) speed = 1.0;
+                bool reversed = clip.getParam<bool>("reversed", false);
 
-                double clipElapsed = (time - clip.startTime()).toSeconds() * speed + clip.trimStart().toSeconds();
+                double clipElapsed = 0.0;
+                if (reversed) {
+                    double rem = (clip.duration() - (time - clip.startTime())).toSeconds();
+                    clipElapsed = std::max(0.0, rem * speed + clip.trimStart().toSeconds());
+                } else {
+                    clipElapsed = (time - clip.startTime()).toSeconds() * speed + clip.trimStart().toSeconds();
+                }
+
                 int fw = 0, fh = 0;
                 std::vector<uint8_t> framePixels;
 
-                if (media::NativeVideoDecoder::instance().getFrame(asset->filePath(), clipElapsed, fw, fh, framePixels)) {
+                if (media::NativeVideoDecoder::instance().getFrame(asset->filePath(), clipElapsed, fw, fh, framePixels, clip.id().str())) {
                     layer.sourceWidth = fw;
                     layer.sourceHeight = fh;
                     layer.rgbaPixels = std::move(framePixels);
@@ -220,6 +241,8 @@ const CompositorOutput& RenderEngine::renderFrame(
 #if defined(HAVE_QT6)
             std::string shape = clip.getParam<std::string>("graphic.shape", "rectangle");
             std::string colorStr = clip.getParam<std::string>("graphic.color", "#38bdf8");
+            double cornerRadius = clip.getParam<double>("graphic.cornerRadius", 8.0);
+            double strokeWidth = clip.getParam<double>("graphic.strokeWidth", 0.0);
             bool isAdjustment = clip.getParam<bool>("isAdjustmentLayer", false);
 
             if (!isAdjustment) {
@@ -232,7 +255,11 @@ const CompositorOutput& RenderEngine::renderFrame(
                     if (!fillColor.isValid()) fillColor = QColor("#38bdf8");
 
                     painter.setBrush(fillColor);
-                    painter.setPen(Qt::NoPen);
+                    if (strokeWidth > 0.0) {
+                        painter.setPen(QPen(Qt::white, static_cast<int>(strokeWidth)));
+                    } else {
+                        painter.setPen(Qt::NoPen);
+                    }
 
                     int cx = layer.sourceWidth / 2;
                     int cy = layer.sourceHeight / 2;
@@ -250,7 +277,7 @@ const CompositorOutput& RenderEngine::renderFrame(
                         painter.drawPolygon(star);
                     } else {
                         // Rectangle
-                        painter.drawRoundedRect(QRect(cx - size, cy - size / 2, size * 2, size), 8, 8);
+                        painter.drawRoundedRect(QRect(cx - size, cy - size / 2, size * 2, size), cornerRadius, cornerRadius);
                     }
                 }
             }

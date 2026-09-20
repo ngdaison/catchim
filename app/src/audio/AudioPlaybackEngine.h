@@ -8,6 +8,10 @@
 #include <vector>
 #include <memory>
 
+namespace catchim::media {
+class MediaLibrary;
+}
+
 namespace catchim::audio {
 
 class AudioPlaybackEngine {
@@ -42,7 +46,8 @@ public:
         const editor::Timeline& timeline,
         core::TimelineTime startTime,
         core::TimelineTime duration,
-        int sampleRate = 48000
+        int sampleRate = 48000,
+        const media::MediaLibrary* mediaLibrary = nullptr
     );
 
 private:

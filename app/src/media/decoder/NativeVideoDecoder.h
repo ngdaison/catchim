@@ -24,7 +24,8 @@ public:
         double timestampSec,
         int& outWidth,
         int& outHeight,
-        std::vector<uint8_t>& outRgba
+        std::vector<uint8_t>& outRgba,
+        const std::string& clipId = ""
     );
 
     void clearCache();

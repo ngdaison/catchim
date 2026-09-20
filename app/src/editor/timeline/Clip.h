@@ -109,6 +109,10 @@ public:
     nlohmann::json& params() noexcept { return params_; }
     void setParams(nlohmann::json p) { params_ = std::move(p); }
 
+    bool hasParam(const std::string& key) const noexcept {
+        return params_.contains(key);
+    }
+
     template <typename T>
     T getParam(const std::string& key, const T& defaultValue) const {
         if (params_.contains(key)) {

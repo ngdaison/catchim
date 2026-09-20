@@ -2,6 +2,11 @@
 #include <algorithm>
 #include <cmath>
 
+#if defined(HAVE_QT6)
+#include <QImage>
+#include <QPainter>
+#endif
+
 namespace catchim::render {
 
 Compositor::Compositor(int32_t width, int32_t height)
@@ -49,7 +54,7 @@ void Compositor::compositeLayer(const RenderLayer& layer) {
 
     // Fast-path: 1:1 match canvas dimensions and default transform
     if (srcW == width_ && srcH == height_ && layer.transform.isDefault()) {
-        for (size_t i = 0; i < srcW * srcH; ++i) {
+        for (size_t i = 0; i < static_cast<size_t>(srcW * srcH); ++i) {
             uint8_t sr = src[i * 4 + 0];
             uint8_t sg = src[i * 4 + 1];
             uint8_t sb = src[i * 4 + 2];
@@ -72,7 +77,59 @@ void Compositor::compositeLayer(const RenderLayer& layer) {
         return;
     }
 
-    // General blit with centering and scaling
+#if defined(HAVE_QT6)
+    // Hardware-accelerated transformation pipeline using QPainter
+    QImage dstImg(output_.rgbaPixels.data(), width_, height_, width_ * 4, QImage::Format_RGBA8888);
+    QImage srcImg(const_cast<uint8_t*>(src), srcW, srcH, srcW * 4, QImage::Format_RGBA8888);
+
+    QPainter painter(&dstImg);
+    if (painter.isActive()) {
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+
+        // Blend modes
+        const std::string& bm = layer.transform.blendMode;
+        if (bm == "multiply") {
+            painter.setCompositionMode(QPainter::CompositionMode_Multiply);
+        } else if (bm == "screen") {
+            painter.setCompositionMode(QPainter::CompositionMode_Screen);
+        } else if (bm == "overlay") {
+            painter.setCompositionMode(QPainter::CompositionMode_Overlay);
+        } else if (bm == "darken") {
+            painter.setCompositionMode(QPainter::CompositionMode_Darken);
+        } else if (bm == "lighten") {
+            painter.setCompositionMode(QPainter::CompositionMode_Lighten);
+        } else if (bm == "color_dodge") {
+            painter.setCompositionMode(QPainter::CompositionMode_ColorDodge);
+        } else {
+            painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        }
+
+        painter.setOpacity(opacity);
+
+        // Center on canvas + position offset
+        double cx = (width_ / 2.0) + layer.transform.positionX;
+        double cy = (height_ / 2.0) + layer.transform.positionY;
+        painter.translate(cx, cy);
+
+        // Rotation around center
+        if (std::abs(layer.transform.rotate) > 0.001) {
+            painter.rotate(layer.transform.rotate);
+        }
+
+        // Scale & Flip
+        double sx = layer.transform.scaleX * (layer.transform.flipX ? -1.0 : 1.0);
+        double sy = layer.transform.scaleY * (layer.transform.flipY ? -1.0 : 1.0);
+        painter.scale(sx, sy);
+
+        // Draw image centered at origin
+        painter.drawImage(QRectF(-srcW / 2.0, -srcH / 2.0, srcW, srcH), srcImg);
+        painter.end();
+        return;
+    }
+#endif
+
+    // Fallback software blitter (for non-Qt environment)
     double scaleX = layer.transform.scaleX;
     double scaleY = layer.transform.scaleY;
     int32_t targetW = static_cast<int32_t>(srcW * scaleX);

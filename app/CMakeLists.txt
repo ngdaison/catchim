@@ -445,6 +445,8 @@ add_library(catchim_media STATIC
     src/media/MediaProcessingPipeline.h
     src/media/decoder/NativeVideoDecoder.cpp
     src/media/decoder/NativeVideoDecoder.h
+    src/media/decoder/NativeAudioDecoder.cpp
+    src/media/decoder/NativeAudioDecoder.h
     src/media/MediaUploadToastEngine.cpp
     src/media/MediaUploadToastEngine.h
 )
@@ -609,8 +611,13 @@ add_library(catchim_audio STATIC
     src/audio/TtsServiceEngine.h
     src/audio/AudibleCandidateCollector.cpp
     src/audio/AudibleCandidateCollector.h
+    src/audio/WindowsAudioPlayer.cpp
+    src/audio/WindowsAudioPlayer.h
 )
-target_link_libraries(catchim_audio PUBLIC catchim_core catchim_editor)
+target_link_libraries(catchim_audio PUBLIC catchim_core catchim_editor catchim_media)
+if(WIN32)
+    target_link_libraries(catchim_audio PUBLIC winmm)
+endif()
 
 # Export library (Scene exporter, Export settings)
 add_library(catchim_export STATIC

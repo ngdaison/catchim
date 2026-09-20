@@ -13,6 +13,9 @@
 #include "ui/panels/properties/PropertiesPanel.h"
 #include "ui/timeline/TimelinePanel.h"
 
+#include "audio/WindowsAudioPlayer.h"
+#include "audio/AudioPlaybackEngine.h"
+
 namespace catchim::ui {
 
 class MainWindow : public QMainWindow {
@@ -42,6 +45,10 @@ private:
     editor::EditorEngine& engine_;
     media::MediaLibrary& mediaLibrary_;
     render::RenderEngine& renderEngine_;
+
+    audio::WindowsAudioPlayer audioPlayer_;
+    audio::AudioPlaybackEngine audioPlaybackEngine_;
+    core::TimelineTime lastAudioTime_{core::TimelineTime(0)};
 
     EditorHeader* header_{nullptr};
     QSplitter* verticalSplitter_{nullptr};

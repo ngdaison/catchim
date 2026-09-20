@@ -53,9 +53,13 @@ MainWindow::MainWindow(
     tickTimer_ = new QTimer(this);
     connect(tickTimer_, &QTimer::timeout, this, &MainWindow::onAppTick);
     tickTimer_->start(16); // ~60 Hz
+
+    audioPlayer_.init(48000, 2);
+    lastAudioTime_ = engine_.playback().currentTime();
 }
 
 MainWindow::~MainWindow() {
+    audioPlayer_.shutdown();
     Theme::instance().removeListener("MainWindow");
 }
 
@@ -144,6 +148,8 @@ void MainWindow::setupUi() {
 
 void MainWindow::setupEngineCallbacks() {
     engine_.setOnProjectChanged([this]() {
+        audioPlayer_.reset();
+        lastAudioTime_ = engine_.playback().currentTime();
         header_->refresh();
         previewPanel_->refresh();
         timelinePanel_->refresh();
@@ -151,6 +157,8 @@ void MainWindow::setupEngineCallbacks() {
     });
 
     engine_.setOnTimelineChanged([this]() {
+        audioPlayer_.reset();
+        lastAudioTime_ = engine_.playback().currentTime();
         previewPanel_->refresh();
         timelinePanel_->refresh();
     });
@@ -159,6 +167,20 @@ void MainWindow::setupEngineCallbacks() {
         propertiesPanel_->refresh();
         timelinePanel_->refresh();
     });
+
+    engine_.playback().setOnPlayStateChanged([this](bool playing) {
+        if (!playing) {
+            audioPlayer_.reset();
+        }
+        lastAudioTime_ = engine_.playback().currentTime();
+    });
+
+    engine_.playback().setOnTimeChanged([this](core::TimelineTime t) {
+        if (!engine_.playback().isPlaying()) {
+            audioPlayer_.reset();
+            lastAudioTime_ = t;
+        }
+    });
 }
 
 void MainWindow::onAppTick() {
@@ -166,6 +188,45 @@ void MainWindow::onAppTick() {
         engine_.update();
         previewPanel_->refresh();
         timelinePanel_->refresh();
+
+        // Audio playback synchronization
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            core::TimelineTime curTime = engine_.playback().currentTime();
+            // If audio drift is detected (e.g. after jump or start)
+            if (lastAudioTime_ < curTime - core::TimelineTime::fromSeconds(0.2) ||
+                lastAudioTime_ > curTime + core::TimelineTime::fromSeconds(0.5)) {
+                audioPlayer_.reset();
+                lastAudioTime_ = curTime;
+            }
+
+            // Keep buffer filled ~120ms ahead
+            while (audioPlayer_.queuedMilliseconds() < 120) {
+                const double sliceSec = 0.05; // 50ms chunks
+                core::TimelineTime sliceDur = core::TimelineTime::fromSeconds(sliceSec);
+                if (lastAudioTime_ >= engine_.project().totalDuration()) {
+                    break;
+                }
+
+                auto slice = audioPlaybackEngine_.renderAudioSlice(
+                    *tl,
+                    lastAudioTime_,
+                    sliceDur,
+                    48000,
+                    &mediaLibrary_
+                );
+
+                if (!slice.samples().empty()) {
+                    audioPlayer_.writeSamples(slice.samples().data(), slice.samples().size());
+                }
+                lastAudioTime_ = lastAudioTime_ + sliceDur;
+            }
+        }
+    } else {
+        if (audioPlayer_.queuedMilliseconds() > 0) {
+            audioPlayer_.reset();
+        }
+        lastAudioTime_ = engine_.playback().currentTime();
     }
 }
 
@@ -188,6 +249,9 @@ void MainWindow::keyPressEvent(QKeyEvent* event) {
     // 1. Playback & Navigation
     if (event->key() == Qt::Key_Space) {
         engine_.togglePlay();
+        if (!engine_.playback().isPlaying()) {
+            audioPlayer_.reset();
+        }
         previewPanel_->refresh();
         event->accept();
         return;
