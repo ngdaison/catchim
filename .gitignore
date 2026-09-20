@@ -14,3 +14,4 @@ app/build/
 .vscode/
 Thumbs.db
 [Dd]esktop.ini
+*.log

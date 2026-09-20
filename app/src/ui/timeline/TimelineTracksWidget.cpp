@@ -95,7 +95,6 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
     if (!tl) return;
 
     int yOffset = Metrics::timelineContentTopPadding - scrollY_;
-    double pixelsPerSecond = 50.0 * zoomFactor_;
 
     // 1. Draw track rows
     for (const auto* track : tl->allTracks()) {

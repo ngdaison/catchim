@@ -41,6 +41,7 @@ find_package(Qt6 COMPONENTS Core Gui Widgets Svg OpenGL QUIET)
 if(Qt6_FOUND)
     message(STATUS "Qt6 found: ${Qt6_VERSION}")
     set(HAVE_QT6 ON)
+    add_compile_definitions(HAVE_QT6)
     set(CMAKE_AUTOMOC ON)
     set(CMAKE_AUTORCC ON)
     set(CMAKE_AUTOUIC ON)
@@ -682,7 +683,7 @@ if(HAVE_QT6)
         src/app/AppConfig.cpp
         src/app/AppConfig.h
     )
-    target_link_libraries(catchim_app PRIVATE catchim_ui catchim_storage)
+    target_link_libraries(catchim_app PRIVATE catchim_ui catchim_storage catchim_export)
 else()
     # Build core engine runner / console host when Qt6 is not yet linked
     add_executable(catchim_app

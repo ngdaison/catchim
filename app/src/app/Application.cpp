@@ -117,9 +117,9 @@ int Application::run() {
     }
 
 #if defined(HAVE_QT6)
-    QApplication qApp(argc_, argv_);
-    qApp.setApplicationName("Catchim");
-    qApp.setApplicationVersion("0.1.0");
+    QApplication qtApp(argc_, argv_);
+    qtApp.setApplicationName("Catchim");
+    qtApp.setApplicationVersion("0.1.0");
 
     // Apply dark theme by default
     ui::Theme::instance().setTheme(config_.theme == "light" ? ui::ThemeMode::Light : ui::ThemeMode::Dark);
@@ -132,7 +132,7 @@ int Application::run() {
         mainWindow.show();
     }
 
-    return qApp.exec();
+    return qtApp.exec();
 #else
     LOG_INFO("Running Catchim Native Engine in Console Interactive mode.");
     std::cout << "\n============================================\n"
