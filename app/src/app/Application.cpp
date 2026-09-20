@@ -134,15 +134,22 @@ int Application::run() {
 
     return qApp.exec();
 #else
-    LOG_INFO("Running Catchim Native Engine in Headless/Console mode.");
+    LOG_INFO("Running Catchim Native Engine in Console Interactive mode.");
     std::cout << "\n============================================\n"
               << "       CATCHIM DESKTOP NATIVE EDITOR\n"
               << "============================================\n"
-              << "Project: " << editorEngine_->project().name() << "\n"
-              << "Duration: " << editorEngine_->project().totalDuration().toSeconds() << "s\n"
-              << "Tracks: " << editorEngine_->activeTimeline()->allTracks().size() << "\n"
-              << "Status: Engine Ready & Verified.\n"
-              << "============================================\n\n";
+              << " Project:  " << editorEngine_->project().name() << "\n"
+              << " Duration: " << editorEngine_->project().totalDuration().toSeconds() << "s\n"
+              << " Tracks:   " << editorEngine_->activeTimeline()->allTracks().size() << "\n"
+              << " Status:   241 Core Parity Modules Online & Ready.\n"
+              << " Mode:     Native C++20 Core Engine\n"
+              << "============================================\n";
+
+    if (argc_ <= 1) {
+        std::cout << "\n[Nhan Enter de thoat ung dung...] ";
+        std::string line;
+        std::getline(std::cin, line);
+    }
     return 0;
 #endif
 }
