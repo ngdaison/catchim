@@ -33,7 +33,9 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override;
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dragMoveEvent(QDragMoveEvent* event) override;
+    void dragLeaveEvent(QDragLeaveEvent* event) override;
     void dropEvent(QDropEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent* event) override;
 
 private:
     enum class DragMode { None, MovingClip, TrimmingStart, TrimmingEnd, BoxSelecting };
@@ -49,6 +51,8 @@ private:
     };
 
     HitTestResult hitTest(const QPoint& pos) const;
+    editor::Track* findTrackAtY(int y);
+    const editor::Track* findTrackAtY(int y) const;
     core::TimelineTime pixelToTime(int pixelX) const;
     int timeToPixel(core::TimelineTime time) const;
 
@@ -65,6 +69,8 @@ private:
     core::TimelineTime dragStartTime_;
     core::TimelineTime dragStartDuration_;
     int snapIndicatorX_{-1};
+    QRect dropIndicatorRect_;
+    bool showDropIndicator_{false};
 };
 
 } // namespace catchim::ui

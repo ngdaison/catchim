@@ -28,11 +28,64 @@
 #include <QUrl>
 #include <QDir>
 #include <QDateTime>
+#include <QDrag>
+#include <QApplication>
+#include <QMenu>
 #include <fstream>
 #include <sstream>
 #include <cmath>
 
 namespace catchim::ui {
+
+class MediaListWidget : public QListWidget {
+public:
+    explicit MediaListWidget(QWidget* parent = nullptr) : QListWidget(parent) {}
+
+protected:
+    void mousePressEvent(QMouseEvent* event) override {
+        if (event->button() == Qt::LeftButton) {
+            dragStartPos_ = event->pos();
+        }
+        QListWidget::mousePressEvent(event);
+    }
+
+    void mouseMoveEvent(QMouseEvent* event) override {
+        if (!(event->buttons() & Qt::LeftButton)) {
+            QListWidget::mouseMoveEvent(event);
+            return;
+        }
+        if ((event->pos() - dragStartPos_).manhattanLength() < QApplication::startDragDistance()) {
+            QListWidget::mouseMoveEvent(event);
+            return;
+        }
+        auto* item = itemAt(dragStartPos_);
+        if (!item) {
+            item = currentItem();
+        }
+        if (!item) return;
+
+        QString assetId = item->data(Qt::UserRole).toString();
+        QString filePath = item->data(Qt::UserRole + 1).toString();
+        if (assetId.isEmpty()) return;
+
+        auto* drag = new QDrag(this);
+        auto* mime = new QMimeData();
+        mime->setData("application/x-catchim-media-id", assetId.toUtf8());
+        mime->setText(assetId);
+        if (!filePath.isEmpty()) {
+            QList<QUrl> urls;
+            urls.append(QUrl::fromLocalFile(filePath));
+            mime->setUrls(urls);
+        }
+        drag->setMimeData(mime);
+        drag->setPixmap(item->icon().pixmap(32, 32));
+        drag->setHotSpot(QPoint(16, 16));
+        drag->exec(Qt::CopyAction | Qt::MoveAction);
+    }
+
+private:
+    QPoint dragStartPos_;
+};
 
 static const std::vector<std::pair<QString, UiIcon>> kTabDefs = {
     {"Tệp đa phương tiện (Media)", UiIcon::Media},
@@ -141,17 +194,78 @@ QWidget* AssetsPanel::createMediaView() {
     layout->addWidget(mediaSearchInput_);
 
     // Media list
-    mediaListWidget_ = new QListWidget(view);
+    mediaListWidget_ = new MediaListWidget(view);
     mediaListWidget_->setObjectName("mediaListWidget");
     mediaListWidget_->setAcceptDrops(false);
     mediaListWidget_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     mediaListWidget_->setTextElideMode(Qt::ElideMiddle);
     mediaListWidget_->setWordWrap(true);
+    mediaListWidget_->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(mediaListWidget_, &QListWidget::itemDoubleClicked, this, &AssetsPanel::onMediaItemDoubleClicked);
+    connect(mediaListWidget_, &QListWidget::customContextMenuRequested, [this](const QPoint& pos) {
+        auto* item = mediaListWidget_->itemAt(pos);
+        if (!item) return;
+        std::string assetIdStr = item->data(Qt::UserRole).toString().toStdString();
+        core::MediaId assetId(assetIdStr);
+        const auto& pal = Theme::instance().palette();
+        auto* menu = new QMenu(this);
+        menu->addAction(UiIcons::get(UiIcon::Plus, pal.textPrimary, 14), "Thêm vào Timeline (Playhead)", [this, assetId]() {
+            onAddMediaToTimeline(assetId);
+        });
+        menu->addAction(UiIcons::get(UiIcon::Media, pal.textPrimary, 14), "Thêm vào Tầng mới (Video Overlay)", [this, assetId]() {
+            onAddMediaAsNewLayer(assetId);
+        });
+        menu->addSeparator();
+        menu->addAction(UiIcons::get(UiIcon::Delete, pal.destructive, 14), "Xóa tệp khỏi dự án", [this, assetId]() {
+            mediaLibrary_.removeAsset(assetId);
+            refresh();
+        });
+        menu->exec(mediaListWidget_->mapToGlobal(pos));
+    });
     layout->addWidget(mediaListWidget_, 1);
 
-    auto* hintLabel = new QLabel("Nhấp đúp vào tệp để thêm vào Timeline", view);
+    const auto& pal = Theme::instance().palette();
+    auto* actionsLayout = new QHBoxLayout();
+    actionsLayout->setSpacing(8);
+
+    auto* addTimelineBtn = new QPushButton("Thêm vào Timeline", view);
+    addTimelineBtn->setIcon(UiIcons::get(UiIcon::Plus, pal.textPrimary, 14));
+    addTimelineBtn->setFixedHeight(32);
+    addTimelineBtn->setProperty("class", "PrimaryAction");
+
+    auto* addLayerBtn = new QPushButton("Tầng mới (Overlay)", view);
+    addLayerBtn->setIcon(UiIcons::get(UiIcon::Media, pal.textPrimary, 14));
+    addLayerBtn->setFixedHeight(32);
+
+    actionsLayout->addWidget(addTimelineBtn);
+    actionsLayout->addWidget(addLayerBtn);
+    layout->addLayout(actionsLayout);
+
+    connect(addTimelineBtn, &QPushButton::clicked, [this]() {
+        auto* item = mediaListWidget_->currentItem();
+        if (!item && mediaListWidget_->count() > 0) {
+            item = mediaListWidget_->item(0);
+        }
+        if (item) {
+            std::string assetIdStr = item->data(Qt::UserRole).toString().toStdString();
+            onAddMediaToTimeline(core::MediaId(assetIdStr));
+        }
+    });
+
+    connect(addLayerBtn, &QPushButton::clicked, [this]() {
+        auto* item = mediaListWidget_->currentItem();
+        if (!item && mediaListWidget_->count() > 0) {
+            item = mediaListWidget_->item(0);
+        }
+        if (item) {
+            std::string assetIdStr = item->data(Qt::UserRole).toString().toStdString();
+            onAddMediaAsNewLayer(core::MediaId(assetIdStr));
+        }
+    });
+
+    auto* hintLabel = new QLabel("Kéo thả tệp hoặc nhấp đúp để thêm vào Timeline", view);
     hintLabel->setProperty("class", "SecondaryLabel");
+    hintLabel->setAlignment(Qt::AlignCenter);
     layout->addWidget(hintLabel);
 
     return view;
@@ -913,6 +1027,7 @@ void AssetsPanel::refresh() {
         item->setText(label);
         item->setToolTip(QString::fromStdString(asset->fileName()));
         item->setData(Qt::UserRole, QString::fromStdString(asset->id().str()));
+        item->setData(Qt::UserRole + 1, QString::fromStdString(asset->filePath().string()));
     }
 }
 
@@ -1027,6 +1142,35 @@ void AssetsPanel::onAddMediaToTimeline(const core::MediaId& id) {
     clip.setMediaId(asset->id());
 
     engine_.insertElement(std::move(clip), insertTime);
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
+}
+
+void AssetsPanel::onAddMediaAsNewLayer(const core::MediaId& id) {
+    auto asset = mediaLibrary_.findAsset(id);
+    if (!asset) return;
+
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+
+    core::TimelineTime insertTime = engine_.playback().currentTime();
+    editor::Clip clip(
+        core::ClipId::generate(),
+        (asset->type() == media::MediaType::Video) ? editor::ClipType::Video :
+        (asset->type() == media::MediaType::Audio) ? editor::ClipType::Audio : editor::ClipType::Image,
+        asset->fileName(),
+        insertTime,
+        asset->duration()
+    );
+    clip.setMediaId(asset->id());
+
+    editor::TrackType tt = (asset->type() == media::MediaType::Audio) ? editor::TrackType::Audio : editor::TrackType::Video;
+    std::string trackName = (asset->type() == media::MediaType::Audio)
+        ? "Audio " + std::to_string(tl->audioTracks().size() + 1)
+        : "Video " + std::to_string(tl->overlayTracks().size() + 2);
+
+    editor::Track& newTrk = tl->addTrack(tt, trackName);
+    engine_.addClip(newTrk.id(), std::move(clip));
     engine_.project().setDirty(true);
     engine_.notifyTimelineChanged();
 }

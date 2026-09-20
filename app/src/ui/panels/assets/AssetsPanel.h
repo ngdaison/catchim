@@ -32,6 +32,7 @@ private slots:
     void onImportClicked();
     void onMediaItemDoubleClicked(QListWidgetItem* item);
     void onAddMediaToTimeline(const core::MediaId& id);
+    void onAddMediaAsNewLayer(const core::MediaId& id);
     void onAddAudioSfx(const QString& name, double durationSec);
     void onAddTextPreset(const QString& title, const QString& fontStyle);
     void onAddGraphicPreset(const QString& name, const QString& shapeType);

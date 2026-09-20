@@ -35,6 +35,8 @@ private:
     void setupUi();
     void updateInfoLabel();
     QSize getTargetResolution() const;
+    // Probe available GPU encoders via FFmpeg and populate hwAccelCombo_
+    void probeGpuEncoders();
 
     editor::EditorEngine& engine_;
     media::MediaLibrary& mediaLibrary_;
@@ -44,6 +46,8 @@ private:
     QComboBox* formatCombo_{nullptr};
     QComboBox* qualityCombo_{nullptr};
     QComboBox* audioCombo_{nullptr};
+    QComboBox* hwAccelCombo_{nullptr};  // GPU HW encoder selector
+    QLabel* gpuStatusLabel_{nullptr};   // Shows detected GPU info
     QLabel* infoLabel_{nullptr};
 
     QWidget* settingsWidget_{nullptr};

@@ -75,18 +75,20 @@ void TimelineToolbar::setupUi() {
     addTrackBtn->setFixedHeight(28);
 
     auto* trackMenu = new QMenu(addTrackBtn);
-    trackMenu->addAction(UiIcons::get(UiIcon::Media), "Thêm Video Track", [this]() {
+    trackMenu->addAction(UiIcons::get(UiIcon::Media), "Thêm Video Track (Tầng mới)", [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
-            tl->addTrack(editor::TrackType::Video, "Video " + std::to_string(tl->allTracks().size() + 1));
+            tl->addTrack(editor::TrackType::Video, "Video " + std::to_string(tl->overlayTracks().size() + 2));
             engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
         }
     });
     trackMenu->addAction(UiIcons::get(UiIcon::Audio), "Thêm Audio Track", [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
-            tl->addTrack(editor::TrackType::Audio, "Audio " + std::to_string(tl->allTracks().size() + 1));
+            tl->addTrack(editor::TrackType::Audio, "Audio " + std::to_string(tl->audioTracks().size() + 1));
             engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
         }
     });
     trackMenu->addAction(UiIcons::get(UiIcon::Text), "Thêm Text Track", [this]() {
@@ -94,6 +96,15 @@ void TimelineToolbar::setupUi() {
         if (tl) {
             tl->addTrack(editor::TrackType::Text, "Text " + std::to_string(tl->allTracks().size() + 1));
             engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
+        }
+    });
+    trackMenu->addAction(UiIcons::get(UiIcon::Effects), "Thêm Effect Track", [this]() {
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            tl->addTrack(editor::TrackType::Effect, "Effect " + std::to_string(tl->allTracks().size() + 1));
+            engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
         }
     });
     addTrackBtn->setMenu(trackMenu);

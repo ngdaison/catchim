@@ -11,8 +11,11 @@
 #include <QPainter>
 #include <QMouseEvent>
 #include <QDragEnterEvent>
+#include <QDragLeaveEvent>
+#include <QContextMenuEvent>
 #include <QDropEvent>
 #include <QMimeData>
+#include <QMenu>
 #include <QUrl>
 #include <cmath>
 
@@ -111,6 +114,34 @@ TimelineTracksWidget::HitTestResult TimelineTracksWidget::hitTest(const QPoint& 
         yOffset += trackHeight + Metrics::trackGap;
     }
     return res;
+}
+
+editor::Track* TimelineTracksWidget::findTrackAtY(int y) {
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return nullptr;
+    int yOffset = Metrics::timelineContentTopPadding - scrollY_;
+    for (auto* track : tl->allTracks()) {
+        int trackHeight = Metrics::trackHeightVideo;
+        if (track->type() == editor::TrackType::Audio) trackHeight = Metrics::trackHeightAudio;
+        else if (track->type() != editor::TrackType::Video) trackHeight = Metrics::trackHeightText;
+        if (y >= yOffset && y < yOffset + trackHeight) return track;
+        yOffset += trackHeight + Metrics::trackGap;
+    }
+    return nullptr;
+}
+
+const editor::Track* TimelineTracksWidget::findTrackAtY(int y) const {
+    const auto* tl = engine_.activeTimeline();
+    if (!tl) return nullptr;
+    int yOffset = Metrics::timelineContentTopPadding - scrollY_;
+    for (const auto* track : tl->allTracks()) {
+        int trackHeight = Metrics::trackHeightVideo;
+        if (track->type() == editor::TrackType::Audio) trackHeight = Metrics::trackHeightAudio;
+        else if (track->type() != editor::TrackType::Video) trackHeight = Metrics::trackHeightText;
+        if (y >= yOffset && y < yOffset + trackHeight) return track;
+        yOffset += trackHeight + Metrics::trackGap;
+    }
+    return nullptr;
 }
 
 void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
@@ -280,6 +311,13 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
         painter.setPen(QPen(palette.primaryAccent, 1.5, Qt::DashLine));
         painter.drawLine(snapIndicatorX_, 0, snapIndicatorX_, height());
     }
+
+    // 5. Draw Drop Indicator (blue vertical line) during drag-over
+    if (showDropIndicator_ && !dropIndicatorRect_.isNull()) {
+        painter.setPen(QPen(QColor("#38bdf8"), 2, Qt::SolidLine));
+        painter.setBrush(QColor(56, 189, 248, 80));
+        painter.drawRect(dropIndicatorRect_);
+    }
 }
 
 void TimelineTracksWidget::mousePressEvent(QMouseEvent* event) {
@@ -348,8 +386,8 @@ void TimelineTracksWidget::mouseMoveEvent(QMouseEvent* event) {
         if (newStart.ticks() >= 0) {
             auto* tl = engine_.activeTimeline();
             if (tl) {
-                auto* track = tl->findTrackContainingClip(activeClipId_);
-                if (track) {
+                auto* sourceTrack = tl->findTrackContainingClip(activeClipId_);
+                if (sourceTrack) {
                     if (engine_.isSnappingEnabled()) {
                         auto snapPoints = editor::AdvancedSnapEngine::collectAllSnapPoints(*tl, engine_.playback().currentTime(), true, activeClipId_);
                         auto maxSnap = editor::AdvancedSnapEngine::getTimelineSnapThresholdInTicks(zoomFactor_, 8.0);
@@ -372,7 +410,21 @@ void TimelineTracksWidget::mouseMoveEvent(QMouseEvent* event) {
                     }
 
                     if (newStart.ticks() >= 0) {
-                        engine_.moveClip(activeClipId_, track->id(), newStart);
+                        // Resolve target track from Y position for cross-track dragging
+                        editor::Track* targetTrack = findTrackAtY(event->pos().y());
+                        core::TrackId targetTrackId = sourceTrack->id();
+                        if (targetTrack && targetTrack != sourceTrack) {
+                            // Determine clip type from sourceTrack type for compatibility check
+                            editor::ClipType ct = (sourceTrack->type() == editor::TrackType::Audio)
+                                ? editor::ClipType::Audio
+                                : (sourceTrack->type() == editor::TrackType::Text)
+                                    ? editor::ClipType::Text
+                                    : editor::ClipType::Video;
+                            if (targetTrack->acceptsClipType(ct)) {
+                                targetTrackId = targetTrack->id();
+                            }
+                        }
+                        engine_.moveClip(activeClipId_, targetTrackId, newStart);
                     }
                     update();
                 }
@@ -435,24 +487,80 @@ void TimelineTracksWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void TimelineTracksWidget::dragEnterEvent(QDragEnterEvent* event) {
-    if (event->mimeData()->hasUrls()) {
+    const auto* mime = event->mimeData();
+    if (mime->hasUrls() || mime->hasFormat("application/x-catchim-media-id")) {
+        showDropIndicator_ = true;
         event->acceptProposedAction();
     }
 }
 
+void TimelineTracksWidget::dragLeaveEvent(QDragLeaveEvent* /*event*/) {
+    showDropIndicator_ = false;
+    update();
+}
+
 void TimelineTracksWidget::dragMoveEvent(QDragMoveEvent* event) {
-    if (event->mimeData()->hasUrls()) {
-        event->acceptProposedAction();
+    const auto* mime = event->mimeData();
+    if (!mime->hasUrls() && !mime->hasFormat("application/x-catchim-media-id")) return;
+
+    QPoint pos = event->position().toPoint();
+    core::TimelineTime dropTime = pixelToTime(pos.x());
+    const editor::Track* targetTrack = findTrackAtY(pos.y());
+
+    if (targetTrack) {
+        int yOffset = Metrics::timelineContentTopPadding - scrollY_;
+        for (const auto* tr : engine_.activeTimeline()->allTracks()) {
+            int h = Metrics::trackHeightVideo;
+            if (tr->type() == editor::TrackType::Audio) h = Metrics::trackHeightAudio;
+            else if (tr->type() != editor::TrackType::Video) h = Metrics::trackHeightText;
+            if (tr == targetTrack) {
+                int xPx = timeToPixel(dropTime);
+                dropIndicatorRect_ = QRect(xPx - 1, yOffset, 3, h);
+                break;
+            }
+            yOffset += h + Metrics::trackGap;
+        }
     }
+
+    showDropIndicator_ = true;
+    update();
+    event->acceptProposedAction();
 }
 
 void TimelineTracksWidget::dropEvent(QDropEvent* event) {
     const auto* mime = event->mimeData();
-    if (!mime->hasUrls()) return;
-
-    core::TimelineTime dropTime = pixelToTime(event->position().toPoint().x());
+    QPoint pos = event->position().toPoint();
+    core::TimelineTime dropTime = pixelToTime(pos.x());
     auto* tl = engine_.activeTimeline();
-    if (!tl) return;
+    showDropIndicator_ = false;
+
+    if (!tl) { event->ignore(); return; }
+
+    // Handle drag from AssetsPanel (media-id MIME)
+    if (mime->hasFormat("application/x-catchim-media-id")) {
+        QByteArray idBytes = mime->data("application/x-catchim-media-id");
+        std::string idStr(idBytes.constData(), idBytes.size());
+        core::MediaId mediaId(idStr);
+        auto asset = mediaLibrary_.findAsset(mediaId);
+        if (asset) {
+            editor::Clip clip(
+                core::ClipId::generate(),
+                (asset->type() == media::MediaType::Video) ? editor::ClipType::Video :
+                (asset->type() == media::MediaType::Audio) ? editor::ClipType::Audio : editor::ClipType::Image,
+                asset->fileName(),
+                dropTime,
+                asset->duration()
+            );
+            clip.setMediaId(asset->id());
+            engine_.insertElement(std::move(clip), dropTime);
+        }
+        event->acceptProposedAction();
+        update();
+        return;
+    }
+
+    // Handle file drop from OS / file manager
+    if (!mime->hasUrls()) { event->ignore(); return; }
 
     for (const auto& url : mime->urls()) {
         QString localPath = url.toLocalFile();
@@ -480,6 +588,66 @@ void TimelineTracksWidget::dropEvent(QDropEvent* event) {
 
     event->acceptProposedAction();
     update();
+}
+
+void TimelineTracksWidget::contextMenuEvent(QContextMenuEvent* event) {
+    HitTestResult hit = hitTest(event->pos());
+    QMenu menu(this);
+
+    if (hit.clip) {
+        // Clip context menu
+        auto* splitAct = menu.addAction("✂  Cắt tại điểm phát (Split)");
+        auto* dupAct   = menu.addAction("⧉  Nhân đôi Clip");
+        menu.addSeparator();
+        auto* delAct   = menu.addAction("🗑  Xóa Clip");
+
+        QAction* chosen = menu.exec(event->globalPos());
+        if (chosen == delAct) {
+            engine_.rippleDelete(hit.clip->id());
+        } else if (chosen == dupAct) {
+            engine_.duplicateClip(hit.clip->id());
+        } else if (chosen == splitAct) {
+            engine_.splitClip(hit.clip->id(), engine_.playback().currentTime());
+        }
+    } else if (hit.track) {
+        // Track context menu — mute / hide (no removeTrack in public API)
+        auto* track = const_cast<editor::Track*>(hit.track);
+        QString muteLabel = track->isMuted() ? "🔊  Bỏ tắt tiếng Track" : "🔇  Tắt tiếng Track";
+        QString hideLabel = track->isHidden() ? "👁  Hiện Track" : "🙈  Ẩn Track";
+        auto* muteAct = menu.addAction(muteLabel);
+        auto* hideAct = menu.addAction(hideLabel);
+        QAction* chosen = menu.exec(event->globalPos());
+        if (chosen == muteAct) {
+            track->setMuted(!track->isMuted());
+            engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
+        } else if (chosen == hideAct) {
+            track->setHidden(!track->isHidden());
+            engine_.project().setDirty(true);
+            engine_.notifyTimelineChanged();
+        }
+    } else {
+        // Empty area — add track
+        auto* addVideoAct = menu.addAction("＋  Thêm Video Track (Overlay)");
+        auto* addAudioAct = menu.addAction("＋  Thêm Audio Track");
+        auto* addTextAct  = menu.addAction("＋  Thêm Text Track");
+        QAction* chosen = menu.exec(event->globalPos());
+        auto* tl = engine_.activeTimeline();
+        if (tl) {
+            if (chosen == addVideoAct) {
+                tl->addTrack(editor::TrackType::Video,
+                    "Video Overlay " + std::to_string(tl->overlayTracks().size() + 1));
+                engine_.notifyTimelineChanged();
+            } else if (chosen == addAudioAct) {
+                tl->addTrack(editor::TrackType::Audio,
+                    "Audio " + std::to_string(tl->audioTracks().size() + 1));
+                engine_.notifyTimelineChanged();
+            } else if (chosen == addTextAct) {
+                tl->addTrack(editor::TrackType::Text, "Text Track");
+                engine_.notifyTimelineChanged();
+            }
+        }
+    }
 }
 
 } // namespace catchim::ui

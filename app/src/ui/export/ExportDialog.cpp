@@ -8,6 +8,8 @@
 #include <QFormLayout>
 #include <QFileDialog>
 #include <QApplication>
+#include <QTimer>
+#include <QFile>
 #include <cmath>
 
 namespace catchim::ui {
@@ -124,7 +126,23 @@ void ExportDialog::setupUi() {
     audioCombo_->addItem("Tắt tiếng (Mute)", "mute");
     formLayout->addRow("Âm thanh:", audioCombo_);
 
+    // GPU Hardware Encoder
+    hwAccelCombo_ = new QComboBox(settingsWidget_);
+    // Default options (will be overridden by probeGpuEncoders)
+    hwAccelCombo_->addItem("CPU (libx264 — Phần mềm)", "cpu");
+    hwAccelCombo_->addItem("AMD GPU (h264_amf)", "amf");
+    hwAccelCombo_->addItem("NVIDIA GPU (h264_nvenc)", "nvenc");
+    hwAccelCombo_->addItem("Intel GPU (h264_qsv)", "qsv");
+    formLayout->addRow("Mã hóa:", hwAccelCombo_);
+
+    gpuStatusLabel_ = new QLabel("Đang kiểm tra GPU...", settingsWidget_);
+    gpuStatusLabel_->setStyleSheet(QString("color: %1; font-size: 11px; font-style: italic;").arg(pal.textSecondary.name()));
+    formLayout->addRow("", gpuStatusLabel_);
+
     mainLayout->addWidget(settingsWidget_);
+
+    // Probe GPU after UI is built
+    QTimer::singleShot(0, this, [this]() { probeGpuEncoders(); });
 
     // Info Label
     infoLabel_ = new QLabel(this);
@@ -257,6 +275,57 @@ void ExportDialog::onFormatChanged() {
     updateInfoLabel();
 }
 
+void ExportDialog::probeGpuEncoders() {
+    // Locate FFmpeg binary
+    QString ffmpegPath = "ffmpeg";
+    static const QString knownWingetFfmpeg = "C:/Users/sonng/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-9.0.1-full_build/bin/ffmpeg.exe";
+    if (QFile::exists(knownWingetFfmpeg)) {
+        ffmpegPath = knownWingetFfmpeg;
+    }
+
+    // Query available encoders from FFmpeg
+    QProcess probe;
+    probe.start(ffmpegPath, {"-encoders", "-v", "quiet"});
+    probe.waitForFinished(5000);
+    QString output = QString::fromUtf8(probe.readAllStandardOutput());
+
+    bool hasAmf   = output.contains("h264_amf");
+    bool hasNvenc = output.contains("h264_nvenc");
+    bool hasQsv   = output.contains("h264_qsv");
+
+    hwAccelCombo_->clear();
+    hwAccelCombo_->addItem("CPU (libx264 — Phần mềm)", "cpu");
+
+    QString detected;
+    if (hasAmf) {
+        hwAccelCombo_->addItem("⚡ AMD GPU (h264_amf) — Được phát hiện", "amf");
+        detected = "AMD GPU (h264_amf)";
+        hwAccelCombo_->setCurrentIndex(1); // auto-select AMD
+    }
+    if (hasNvenc) {
+        hwAccelCombo_->addItem("⚡ NVIDIA GPU (h264_nvenc) — Được phát hiện", "nvenc");
+        if (detected.isEmpty()) {
+            detected = "NVIDIA GPU (h264_nvenc)";
+            hwAccelCombo_->setCurrentIndex(hwAccelCombo_->count() - 1);
+        }
+    }
+    if (hasQsv) {
+        hwAccelCombo_->addItem("⚡ Intel GPU (h264_qsv) — Được phát hiện", "qsv");
+        if (detected.isEmpty()) {
+            detected = "Intel GPU (h264_qsv)";
+            hwAccelCombo_->setCurrentIndex(hwAccelCombo_->count() - 1);
+        }
+    }
+
+    if (!detected.isEmpty()) {
+        gpuStatusLabel_->setText("✓ Phát hiện GPU hỗ trợ: " + detected + " — Xuất video sẽ dùng GPU!");
+        gpuStatusLabel_->setStyleSheet("color: #22c55e; font-size: 11px; font-weight: 600;");
+    } else {
+        gpuStatusLabel_->setText("⚠ Không phát hiện GPU encoder — Sẽ dùng CPU (chậm hơn).");
+        gpuStatusLabel_->setStyleSheet("color: #f59e0b; font-size: 11px; font-style: italic;");
+    }
+}
+
 void ExportDialog::onCancelExport() {
     if (isExporting_) {
         cancelRequested_ = true;
@@ -338,10 +407,41 @@ void ExportDialog::onStartExport() {
              << "-crf" << crf
              << "-b:v" << "0";
     } else {
-        args << "-c:v" << "libx264"
-             << "-pix_fmt" << "yuv420p"
-             << "-preset" << "fast"
-             << "-crf" << crf;
+        // GPU hardware encoder selection
+        QString hwAccel = hwAccelCombo_ ? hwAccelCombo_->currentData().toString() : "cpu";
+
+        if (hwAccel == "amf") {
+            // AMD GPU (AMF/VCE) — AMD Radeon RX series supports this
+            QString amfBitrate = "6M";
+            if (crf == "14") amfBitrate = "20M";
+            else if (crf == "18") amfBitrate = "10M";
+            else if (crf == "28") amfBitrate = "3M";
+            args << "-c:v" << "h264_amf"
+                 << "-pix_fmt" << "yuv420p"
+                 << "-quality" << "balanced"   // speed | balanced | quality
+                 << "-rc" << "vbr_latency"
+                 << "-b:v" << amfBitrate;
+        } else if (hwAccel == "nvenc") {
+            // NVIDIA GPU NVENC
+            args << "-c:v" << "h264_nvenc"
+                 << "-pix_fmt" << "yuv420p"
+                 << "-preset" << "p4"          // p1(fast)..p7(slow)
+                 << "-tune" << "hq"
+                 << "-rc" << "vbr"
+                 << "-cq" << crf;
+        } else if (hwAccel == "qsv") {
+            // Intel Quick Sync Video
+            args << "-c:v" << "h264_qsv"
+                 << "-pix_fmt" << "nv12"
+                 << "-preset" << "medium"
+                 << "-global_quality" << crf;
+        } else {
+            // CPU fallback (libx264)
+            args << "-c:v" << "libx264"
+                 << "-pix_fmt" << "yuv420p"
+                 << "-preset" << "fast"
+                 << "-crf" << crf;
+        }
     }
     args << savePath;
 
