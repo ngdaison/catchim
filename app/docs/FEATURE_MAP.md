@@ -2102,6 +2102,61 @@ Quy ước trạng thái:
 | Lossy Persisted State Decoding & Error Dropping | `web/src/actions/keybindings/persistence.ts` | `catchim::editor::KeybindingPersistenceEngine::decodePersistedKeybindingsState` | Verified |
 | Strict User Configuration Import Validator | `web/src/actions/keybindings/persistence.ts` | `catchim::editor::KeybindingPersistenceEngine::parseImportedKeybindings` | Verified |
 
+---
+
+## 224. Media Time Lattice & Frame Mathematics Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Half-Away-From-Zero Integer Tick Rounding | `web/src/wasm/media-time.ts` | `catchim::core::MediaTimeUtils::roundMediaTime` | Verified |
+| Media Time Arithmetic & Bounds Clamping | `web/src/wasm/media-time.ts` | `catchim::core::MediaTimeUtils::addMediaTime`, `clampMediaTime` | Verified |
+| Frame Boundary Alignment & Snapped Seek Range | `web/src/wasm/media-time.ts` | `catchim::core::MediaTimeUtils::roundFrameTime`, `snapSeekMediaTime` | Verified |
+
+---
+
+## 225. Property Value Draft & Arithmetic Expression Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Arithmetic Expression Heuristic Detection | `web/src/components/editor/panels/properties/hooks/use-property-draft.ts` | `catchim::editor::PropertyDraftController::looksLikeExpression` | Verified |
+| Value Staging, Cancellation & Reversion | `web/src/components/editor/panels/properties/hooks/use-property-draft.ts` | `catchim::editor::PropertyDraftController::startEditing`, `cancelEditing` | Verified |
+| Live Math Evaluation & Scrubbing Preview | `web/src/components/editor/panels/properties/hooks/use-property-draft.ts` | `catchim::editor::PropertyDraftController::commitEditing`, `scrubTo` | Verified |
+
+---
+
+## 226. Timeline Bookmark Drag & Snapping Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Drag Activation Threshold (3px Distance Gate) | `web/src/timeline/bookmarks/hooks/use-bookmark-drag.ts` | `catchim::editor::timeline::BookmarkDragController::startPendingDrag` | Verified |
+| Mouse to Timeline Delta Time Tracking | `web/src/timeline/bookmarks/hooks/use-bookmark-drag.ts` | `catchim::editor::timeline::BookmarkDragController::updateDrag` | Verified |
+| Multi-Candidate Snapping & Shift Bypass | `web/src/timeline/bookmarks/hooks/use-bookmark-drag.ts` | `catchim::editor::timeline::BookmarkDragController::updateDrag` | Verified |
+
+---
+
+## 227. Transcription Languages & Metadata Registry
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Multi-Language Voice Recognition Catalog (10 Languages) | `web/src/transcription/languages.ts` | `catchim::subtitles::TranscriptionLanguagesRegistry::getAllLanguages` | Verified |
+| ISO Language Code Lookup & Validation | `web/src/transcription/languages.ts` | `catchim::subtitles::TranscriptionLanguagesRegistry::findByCode`, `isValidLanguageCode` | Verified |
+| Localized Vietnamese & English Name Resolution | `web/src/transcription/languages.ts` | `catchim::subtitles::TranscriptionLanguagesRegistry::findByName` | Verified |
+
+---
+
+## 228. Media Asset Ingestion & Upload Toast Feedback Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Grammatical Pluralization Formatter (asset vs assets) | `web/src/media/upload-toast.ts` | `catchim::media::MediaUploadToastEngine::getAssetLabel` | Verified |
+| Real-Time Ingestion Loading Status Message | `web/src/media/upload-toast.ts` | `catchim::media::MediaUploadToastEngine::formatLoadingMessage` | Verified |
+| Context-Aware Batch & Single Success Message | `web/src/media/upload-toast.ts` | `catchim::media::MediaUploadToastEngine::formatSuccessMessage` | Verified |
+
+---
+
+## 229. Editor App State & Initialization Store Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Initialization & Ready Lifecycle States | `web/src/editor/editor-store.ts` | `catchim::editor::EditorAppStoreEngine::isInitializing`, `isPanelsReady` | Verified |
+| Built-in Canvas Aspect Ratio Presets (16:9, 9:16, 1:1, 4:5, 21:9) | `web/src/editor/editor-store.ts` | `catchim::editor::EditorAppStoreEngine::getCanvasPresets` | Verified |
+| Application Readiness Dispatch & State Reset | `web/src/editor/editor-store.ts` | `catchim::editor::EditorAppStoreEngine::initializeApp`, `resetState` | Verified |
+
+
 
 
 

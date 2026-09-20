@@ -91,6 +91,8 @@ add_library(catchim_core STATIC
     src/storage/StorageServiceCoordinator.h
     src/utils/PlatformBrowserUtils.cpp
     src/utils/PlatformBrowserUtils.h
+    src/core/time/MediaTimeUtils.cpp
+    src/core/time/MediaTimeUtils.h
 )
 target_link_libraries(catchim_core PUBLIC nlohmann_json::nlohmann_json)
 
@@ -367,6 +369,12 @@ add_library(catchim_editor STATIC
     src/editor/timeline/TimelineSnapIndicatorEngine.h
     src/editor/actions/KeybindingPersistenceEngine.cpp
     src/editor/actions/KeybindingPersistenceEngine.h
+    src/editor/properties/PropertyDraftController.cpp
+    src/editor/properties/PropertyDraftController.h
+    src/editor/timeline/controllers/BookmarkDragController.cpp
+    src/editor/timeline/controllers/BookmarkDragController.h
+    src/editor/core/EditorAppStoreEngine.cpp
+    src/editor/core/EditorAppStoreEngine.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -385,6 +393,8 @@ add_library(catchim_subtitles STATIC
     src/subtitles/TranscriptionCaptionBuilder.h
     src/subtitles/TranscriptionService.cpp
     src/subtitles/TranscriptionService.h
+    src/subtitles/TranscriptionLanguagesRegistry.cpp
+    src/subtitles/TranscriptionLanguagesRegistry.h
 )
 target_link_libraries(catchim_subtitles PUBLIC catchim_core)
 
@@ -432,6 +442,8 @@ add_library(catchim_media STATIC
     src/media/MediaTypeUtils.h
     src/media/MediaProcessingPipeline.cpp
     src/media/MediaProcessingPipeline.h
+    src/media/MediaUploadToastEngine.cpp
+    src/media/MediaUploadToastEngine.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 

@@ -250,6 +250,12 @@
 #include "utils/PlatformBrowserUtils.h"
 #include "media/MediaProcessingPipeline.h"
 #include "editor/actions/KeybindingPersistenceEngine.h"
+#include "core/time/MediaTimeUtils.h"
+#include "editor/properties/PropertyDraftController.h"
+#include "editor/timeline/controllers/BookmarkDragController.h"
+#include "subtitles/TranscriptionLanguagesRegistry.h"
+#include "media/MediaUploadToastEngine.h"
+#include "editor/core/EditorAppStoreEngine.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -12808,6 +12814,176 @@ void runKeybindingPersistenceEngineTests() {
     std::cout << "[PASS] runKeybindingPersistenceEngineTests" << std::endl;
 }
 
+void runMediaTimeUtilsTests() {
+    using namespace catchim::core;
+
+    TEST_ASSERT(MediaTimeUtils::roundMediaTime(1.4) == 1LL);
+    TEST_ASSERT(MediaTimeUtils::roundMediaTime(1.5) == 2LL);
+    TEST_ASSERT(MediaTimeUtils::roundMediaTime(-1.5) == -2LL);
+    TEST_ASSERT(MediaTimeUtils::roundMediaTime(0.0) == 0LL);
+
+    TEST_ASSERT(MediaTimeUtils::addMediaTime(10LL, 20LL) == 30LL);
+    TEST_ASSERT(MediaTimeUtils::subMediaTime(50LL, 20LL) == 30LL);
+    TEST_ASSERT(MediaTimeUtils::maxMediaTime(10LL, 25LL) == 25LL);
+    TEST_ASSERT(MediaTimeUtils::minMediaTime(10LL, 25LL) == 10LL);
+    TEST_ASSERT(MediaTimeUtils::clampMediaTime(5LL, 10LL, 20LL) == 10LL);
+    TEST_ASSERT(MediaTimeUtils::clampMediaTime(25LL, 10LL, 20LL) == 20LL);
+    TEST_ASSERT(MediaTimeUtils::clampMediaTime(15LL, 10LL, 20LL) == 15LL);
+
+    FrameRate fps30{30, 1};
+    TimelineTime t1 = TimelineTime::fromSeconds(1.0);
+    TEST_ASSERT(MediaTimeUtils::roundFrameTime(t1, fps30) == t1);
+    TEST_ASSERT(MediaTimeUtils::roundFrameTicks(t1.ticks(), fps30) == t1.ticks());
+
+    TimelineTime dur = TimelineTime::fromSeconds(3.0);
+    TimelineTime lastF = MediaTimeUtils::lastFrameMediaTime(dur, fps30);
+    TEST_ASSERT(lastF < dur);
+    TEST_ASSERT(lastF == dur - fps30.frameDuration());
+
+    TimelineTime seekPast = TimelineTime::fromSeconds(10.0);
+    TimelineTime snapped = MediaTimeUtils::snapSeekMediaTime(seekPast, dur, fps30);
+    TEST_ASSERT(snapped == lastF);
+
+    std::cout << "[PASS] runMediaTimeUtilsTests" << std::endl;
+}
+
+void runPropertyDraftControllerTests() {
+    using namespace catchim::editor;
+
+    TEST_ASSERT(PropertyDraftController::looksLikeExpression("100 + 20"));
+    TEST_ASSERT(PropertyDraftController::looksLikeExpression("50*2"));
+    TEST_ASSERT(PropertyDraftController::looksLikeExpression("100/4"));
+    TEST_ASSERT(PropertyDraftController::looksLikeExpression("10 - 2"));
+    TEST_ASSERT(!PropertyDraftController::looksLikeExpression("-5"));
+    TEST_ASSERT(!PropertyDraftController::looksLikeExpression("120"));
+    TEST_ASSERT(!PropertyDraftController::looksLikeExpression(""));
+
+    PropertyDraftController ctrl("100");
+    TEST_ASSERT(!ctrl.isEditing());
+    TEST_ASSERT(ctrl.displayValue() == "100");
+
+    ctrl.startEditing();
+    TEST_ASSERT(ctrl.isEditing());
+    ctrl.updateDraft("100 + 50");
+    TEST_ASSERT(ctrl.displayValue() == "100 + 50");
+
+    std::string committed = ctrl.commitEditing(true);
+    TEST_ASSERT(!ctrl.isEditing());
+    TEST_ASSERT(committed == "150");
+    TEST_ASSERT(ctrl.displayValue() == "150");
+
+    // Cancel editing
+    ctrl.startEditing();
+    ctrl.updateDraft("999");
+    ctrl.cancelEditing();
+    TEST_ASSERT(!ctrl.isEditing());
+    TEST_ASSERT(ctrl.displayValue() == "150");
+
+    std::cout << "[PASS] runPropertyDraftControllerTests" << std::endl;
+}
+
+void runBookmarkDragControllerTests() {
+    using namespace catchim::editor::timeline;
+    using namespace catchim::core;
+
+    BookmarkDragController ctrl;
+    TEST_ASSERT(!ctrl.isDragging());
+
+    TimelineTime bmTime = TimelineTime::fromSeconds(2.0);
+    ctrl.startPendingDrag(bmTime, 100.0, 100.0);
+    TEST_ASSERT(!ctrl.isDragging());
+
+    // Small movement (< 3px threshold)
+    ctrl.updateDrag(101.0, 101.0, 1.0, false);
+    TEST_ASSERT(!ctrl.isDragging());
+
+    // Movement exceeding 3px threshold
+    ctrl.updateDrag(150.0, 100.0, 1.0, false); // +50px at zoom 1.0 (50px/s) -> +1.0s
+    TEST_ASSERT(ctrl.isDragging());
+    TEST_ASSERT(std::abs(ctrl.state().currentTime.toSeconds() - 3.0) < 0.05);
+
+    // Snapping
+    TimelineTime snapCandidate = TimelineTime::fromSeconds(3.05);
+    ctrl.updateDrag(150.0, 100.0, 1.0, false, {snapCandidate}, 10.0);
+    TEST_ASSERT(ctrl.state().snappedPoint.has_value());
+    TEST_ASSERT(*ctrl.state().snappedPoint == snapCandidate);
+    TEST_ASSERT(ctrl.state().currentTime == snapCandidate);
+
+    // Shift bypasses snapping
+    ctrl.updateDrag(150.0, 100.0, 1.0, true, {snapCandidate}, 10.0);
+    TEST_ASSERT(!ctrl.state().snappedPoint.has_value());
+
+    auto finalTime = ctrl.endDrag();
+    TEST_ASSERT(finalTime.has_value());
+    TEST_ASSERT(!ctrl.isDragging());
+
+    std::cout << "[PASS] runBookmarkDragControllerTests" << std::endl;
+}
+
+void runTranscriptionLanguagesRegistryTests() {
+    using namespace catchim::subtitles;
+
+    const auto& all = TranscriptionLanguagesRegistry::getAllLanguages();
+    TEST_ASSERT(all.size() == 10);
+
+    auto vi = TranscriptionLanguagesRegistry::findByCode("vi");
+    TEST_ASSERT(vi.has_value());
+    TEST_ASSERT(vi->name == "Vietnamese");
+    TEST_ASSERT(vi->nameVi == "Tiếng Việt");
+
+    auto en = TranscriptionLanguagesRegistry::findByCode("en");
+    TEST_ASSERT(en.has_value());
+    TEST_ASSERT(en->name == "English");
+
+    TEST_ASSERT(TranscriptionLanguagesRegistry::isValidLanguageCode("ja"));
+    TEST_ASSERT(!TranscriptionLanguagesRegistry::isValidLanguageCode("nonexistent"));
+
+    auto fr = TranscriptionLanguagesRegistry::findByName("Tiếng Pháp");
+    TEST_ASSERT(fr.has_value());
+    TEST_ASSERT(fr->code == "fr");
+
+    std::cout << "[PASS] runTranscriptionLanguagesRegistryTests" << std::endl;
+}
+
+void runMediaUploadToastEngineTests() {
+    using namespace catchim::media;
+
+    TEST_ASSERT(MediaUploadToastEngine::getAssetLabel(1) == "media asset");
+    TEST_ASSERT(MediaUploadToastEngine::getAssetLabel(3) == "media assets");
+
+    TEST_ASSERT(MediaUploadToastEngine::formatLoadingMessage(2) == "Uploading media assets...");
+
+    TEST_ASSERT(MediaUploadToastEngine::formatSuccessMessage(1, {"clip.mp4"}) == "clip.mp4 has been uploaded");
+    TEST_ASSERT(MediaUploadToastEngine::formatSuccessMessage(1, {}) == "1 media asset has been uploaded");
+    TEST_ASSERT(MediaUploadToastEngine::formatSuccessMessage(5) == "5 media assets have been uploaded");
+    TEST_ASSERT(MediaUploadToastEngine::formatSuccessMessage(0) == "No media assets were uploaded");
+
+    TEST_ASSERT(MediaUploadToastEngine::formatErrorMessage(4) == "Failed to upload media assets");
+
+    std::cout << "[PASS] runMediaUploadToastEngineTests" << std::endl;
+}
+
+void runEditorAppStoreEngineTests() {
+    using namespace catchim::editor;
+
+    EditorAppStoreEngine store;
+    TEST_ASSERT(store.isInitializing());
+    TEST_ASSERT(!store.isPanelsReady());
+
+    TEST_ASSERT(!store.getCanvasPresets().empty());
+    TEST_ASSERT(store.getCanvasPresets()[0].name == "16:9 Landscape");
+
+    store.initializeApp();
+    TEST_ASSERT(!store.isInitializing());
+    TEST_ASSERT(store.isPanelsReady());
+
+    store.resetState();
+    TEST_ASSERT(store.isInitializing());
+    TEST_ASSERT(!store.isPanelsReady());
+
+    std::cout << "[PASS] runEditorAppStoreEngineTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -13045,6 +13221,12 @@ int main() {
     runPlatformBrowserUtilsTests();
     runMediaProcessingPipelineTests();
     runKeybindingPersistenceEngineTests();
-    std::cout << ">>> ALL 235 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runMediaTimeUtilsTests();
+    runPropertyDraftControllerTests();
+    runBookmarkDragControllerTests();
+    runTranscriptionLanguagesRegistryTests();
+    runMediaUploadToastEngineTests();
+    runEditorAppStoreEngineTests();
+    std::cout << ">>> ALL 241 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
