@@ -3,8 +3,8 @@
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
 #include "ui/theme/Theme.h"
+#include "ShortcutsDialog.h"
 #include <QMenu>
-#include <QMessageBox>
 
 namespace catchim::ui {
 
@@ -47,15 +47,8 @@ void EditorHeader::setupUi() {
     });
     logoMenu->addSeparator();
     logoMenu->addAction("Phím tắt (Shortcuts)", [this]() {
-        QMessageBox::information(this, "Phím tắt Catchim",
-            "• Space: Phát / Tạm dừng\n"
-            "• S: Cắt clip tại đầu đọc\n"
-            "• Ctrl+D: Nhân bản clip\n"
-            "• Delete / Backspace: Xóa clip đang chọn\n"
-            "• N: Bật/tắt hít nam châm (Snapping)\n"
-            "• Ctrl+Z: Hoàn tác (Undo)\n"
-            "• Ctrl+Y: Làm lại (Redo)\n"
-            "• Home / End: Về đầu / Về cuối video");
+        ShortcutsDialog dlg(this);
+        dlg.exec();
     });
     logoButton->setMenu(logoMenu);
 

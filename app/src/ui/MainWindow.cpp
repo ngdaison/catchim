@@ -5,7 +5,6 @@
 #include "ui/export/ExportDialog.h"
 #include <QVBoxLayout>
 #include <QKeyEvent>
-#include <QMessageBox>
 #include <QFileDialog>
 #include <QProgressDialog>
 #include <QProcess>

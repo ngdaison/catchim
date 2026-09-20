@@ -53,6 +53,9 @@ private:
 
     QPushButton* exportBtn_{nullptr};
     QPushButton* cancelBtn_{nullptr};
+    QLabel* statusBanner_{nullptr};
+
+    void showStatusMessage(const QString& msg, const QString& type = "error");
 
     std::unique_ptr<QProcess> ffmpegProcess_;
     bool isExporting_{false};

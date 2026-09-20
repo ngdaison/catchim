@@ -141,6 +141,29 @@ void PreviewPanel::setupUi() {
     connect(zoomCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &PreviewPanel::onZoomChanged);
     tbLayout->addWidget(zoomCombo_);
 
+    // Safe Zones toggle button
+    auto* safeZoneBtn = makeIconTbBtn(UiIcon::Target, "Bật/Tắt khung an toàn (Safe Zones 90% & 80%)");
+    safeZoneBtn->setCheckable(true);
+    connect(safeZoneBtn, &QPushButton::clicked, [this, safeZoneBtn]() {
+        previewWidget_->toggleSafeZones();
+        safeZoneBtn->setChecked(previewWidget_->isSafeZonesEnabled());
+    });
+    tbLayout->addWidget(safeZoneBtn);
+
+    // Fullscreen toggle button
+    auto* fsBtn = makeIconTbBtn(UiIcon::Fullscreen, "Toàn màn hình (F11)");
+    connect(fsBtn, &QPushButton::clicked, [this]() {
+        QWidget* top = window();
+        if (top) {
+            if (top->isFullScreen()) {
+                top->showNormal();
+            } else {
+                top->showFullScreen();
+            }
+        }
+    });
+    tbLayout->addWidget(fsBtn);
+
     mainLayout->addWidget(toolbar);
 }
 

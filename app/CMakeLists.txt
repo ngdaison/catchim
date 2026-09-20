@@ -660,6 +660,8 @@ if(HAVE_QT6)
         src/ui/MainWindow.h
         src/ui/shell/EditorHeader.cpp
         src/ui/shell/EditorHeader.h
+        src/ui/shell/ShortcutsDialog.cpp
+        src/ui/shell/ShortcutsDialog.h
         src/ui/panels/assets/AssetsPanel.cpp
         src/ui/panels/assets/AssetsPanel.h
         src/ui/preview/PreviewWidget.cpp

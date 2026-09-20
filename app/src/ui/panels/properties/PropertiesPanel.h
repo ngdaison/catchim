@@ -28,6 +28,7 @@ private slots:
     void onSpeedChanged();
     void onTextChanged();
     void onAudioChanged();
+    void onGraphicChanged();
 
 private:
     void setupUi();
@@ -68,6 +69,19 @@ private:
     QLabel* volumeValLabel_{nullptr};
     QDoubleSpinBox* fadeInSpin_{nullptr};
     QDoubleSpinBox* fadeOutSpin_{nullptr};
+
+    // Graphic properties
+    QWidget* graphicGroup_{nullptr};
+    QComboBox* shapeCombo_{nullptr};
+    QPushButton* graphicColorBtn_{nullptr};
+    std::string currentGraphicColor_{"#38bdf8"};
+    QDoubleSpinBox* cornerRadiusSpin_{nullptr};
+    QDoubleSpinBox* strokeWidthSpin_{nullptr};
+
+    // Active Effects & Transitions
+    QWidget* activeEffectsGroup_{nullptr};
+    QLabel* activeEffectLabel_{nullptr};
+    QLabel* activeTransitionLabel_{nullptr};
 
     bool isUpdatingUi_{false};
 };

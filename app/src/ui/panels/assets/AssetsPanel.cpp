@@ -6,6 +6,7 @@
 #include "core/time/Timecode.h"
 #include "subtitles/SrtParser.h"
 #include "subtitles/TranscriptionLanguagesRegistry.h"
+#include "audio/TtsEngine.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QGridLayout>
@@ -17,6 +18,7 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QSlider>
+#include <QTextEdit>
 #include <fstream>
 #include <sstream>
 
@@ -112,7 +114,9 @@ QWidget* AssetsPanel::createMediaView() {
     layout->addWidget(titleLabel);
 
     // Import button
-    auto* importBtn = new QPushButton("＋ Nhập tệp (Video / Audio / Ảnh)", view);
+    auto* importBtn = new QPushButton("Nhập tệp (Video / Audio / Ảnh)", view);
+    importBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#38bdf8"), 16));
+    importBtn->setIconSize(QSize(16, 16));
     importBtn->setFixedHeight(38);
     importBtn->setStyleSheet(R"(
         QPushButton {
@@ -229,8 +233,10 @@ QWidget* AssetsPanel::createAudioView() {
         nameLabel->setTextFormat(Qt::RichText);
         rLayout->addWidget(nameLabel, 1);
 
-        auto* addBtn = new QPushButton("＋ Thêm", row);
-        addBtn->setFixedSize(64, 28);
+        auto* addBtn = new QPushButton("Thêm", row);
+        addBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 12));
+        addBtn->setIconSize(QSize(12, 12));
+        addBtn->setFixedSize(68, 28);
         connect(addBtn, &QPushButton::clicked, [this, sfx]() {
             onAddAudioSfx(sfx.name, sfx.duration);
         });
@@ -250,11 +256,25 @@ QWidget* AssetsPanel::createTextView() {
     auto* view = new QWidget(this);
     auto* layout = new QVBoxLayout(view);
     layout->setContentsMargins(12, 12, 12, 12);
-    layout->setSpacing(10);
+    layout->setSpacing(8);
 
-    auto* titleLabel = new QLabel("Mẫu chữ & Phụ đề (Text)", view);
+    auto* titleLabel = new QLabel("Mẫu chữ & Giọng đọc AI (Text / TTS)", view);
     titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
     layout->addWidget(titleLabel);
+
+    auto* scroll = new QScrollArea(view);
+    scroll->setWidgetResizable(true);
+    scroll->setStyleSheet("QScrollArea { border: none; background: transparent; }");
+
+    auto* container = new QWidget(scroll);
+    auto* cLayout = new QVBoxLayout(container);
+    cLayout->setContentsMargins(0, 0, 8, 0);
+    cLayout->setSpacing(10);
+
+    // Section 1: Text Presets
+    auto* presetsHeader = new QLabel("MẪU VĂN BẢN (TEXT PRESETS)", container);
+    presetsHeader->setStyleSheet("font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px;");
+    cLayout->addWidget(presetsHeader);
 
     struct TextPreset {
         QString title;
@@ -272,26 +292,132 @@ QWidget* AssetsPanel::createTextView() {
     };
 
     for (const auto& p : presets) {
-        auto* card = new QWidget(view);
-        auto* cLayout = new QHBoxLayout(card);
-        cLayout->setContentsMargins(10, 8, 10, 8);
+        auto* card = new QWidget(container);
+        auto* cardLayout = new QHBoxLayout(card);
+        cardLayout->setContentsMargins(10, 8, 10, 8);
 
         auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
             .arg(p.title).arg(p.desc), card);
         lbl->setTextFormat(Qt::RichText);
-        cLayout->addWidget(lbl, 1);
+        cardLayout->addWidget(lbl, 1);
 
-        auto* btn = new QPushButton("＋ Thêm", card);
-        btn->setFixedSize(64, 28);
+        auto* btn = new QPushButton("Thêm", card);
+        btn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 12));
+        btn->setIconSize(QSize(12, 12));
+        btn->setFixedSize(68, 28);
         connect(btn, &QPushButton::clicked, [this, p]() {
             onAddTextPreset(p.title, p.style);
         });
-        cLayout->addWidget(btn);
+        cardLayout->addWidget(btn);
 
         card->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
-        layout->addWidget(card);
+        cLayout->addWidget(card);
     }
-    layout->addStretch();
+
+    // Section 2: AI Voiceover (Text-to-Speech)
+    auto* ttsHeader = new QLabel("GIỌNG ĐỌC AI (TEXT TO SPEECH)", container);
+    ttsHeader->setStyleSheet("font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; padding-top: 8px;");
+    cLayout->addWidget(ttsHeader);
+
+    auto* ttsCard = new QWidget(container);
+    auto* ttsLayout = new QVBoxLayout(ttsCard);
+    ttsLayout->setContentsMargins(10, 10, 10, 10);
+    ttsLayout->setSpacing(8);
+    ttsCard->setStyleSheet("background: #141417; border: 1px solid #27272a; border-radius: 6px;");
+
+    auto* ttsInput = new QTextEdit(ttsCard);
+    ttsInput->setPlaceholderText("Nhập văn bản cần đọc thành tiếng...");
+    ttsInput->setPlainText("Chào mừng bạn đến với trình chỉnh sửa video Catchim.");
+    ttsInput->setFixedHeight(65);
+    ttsInput->setStyleSheet("background: #1e1e24; color: #f4f4f5; border: 1px solid #27272a; border-radius: 4px; font-size: 12px; padding: 4px;");
+    ttsLayout->addWidget(ttsInput);
+
+    auto* voiceCombo = new QComboBox(ttsCard);
+    voiceCombo->setStyleSheet("background: #1e1e24; color: #f4f4f5; border: 1px solid #27272a; border-radius: 4px; padding: 4px 8px; font-size: 11px;");
+    for (const auto& v : audio::TtsEngine::instance().voices()) {
+        QString label = QString::fromStdString(v.name + " (" + v.gender + " - " + v.language + ")");
+        voiceCombo->addItem(label, QString::fromStdString(v.id));
+    }
+    ttsLayout->addWidget(voiceCombo);
+
+    auto* rateLayout = new QHBoxLayout();
+    auto* rateTitle = new QLabel("Tốc độ đọc:", ttsCard);
+    rateTitle->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    rateLayout->addWidget(rateTitle);
+
+    auto* rateSlider = new QSlider(Qt::Horizontal, ttsCard);
+    rateSlider->setRange(50, 200);
+    rateSlider->setValue(100);
+    rateLayout->addWidget(rateSlider, 1);
+
+    auto* rateLabel = new QLabel("1.0x", ttsCard);
+    rateLabel->setFixedWidth(30);
+    rateLabel->setStyleSheet("color: #f4f4f5; font-size: 11px; font-weight: 600;");
+    rateLayout->addWidget(rateLabel);
+    connect(rateSlider, &QSlider::valueChanged, [rateLabel](int val) {
+        rateLabel->setText(QString("%1x").arg(val / 100.0, 0, 'f', 1));
+    });
+    ttsLayout->addLayout(rateLayout);
+
+    auto* genTtsBtn = new QPushButton("Tạo giọng nói vào Timeline", ttsCard);
+    genTtsBtn->setIcon(UiIcons::get(UiIcon::Audio, QColor("#ffffff"), 16));
+    genTtsBtn->setIconSize(QSize(16, 16));
+    genTtsBtn->setFixedHeight(32);
+    genTtsBtn->setStyleSheet(R"(
+        QPushButton {
+            background-color: #0284c7;
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        QPushButton:hover {
+            background-color: #0369a1;
+        }
+    )");
+
+    connect(genTtsBtn, &QPushButton::clicked, [this, ttsInput, voiceCombo, rateSlider]() {
+        QString text = ttsInput->toPlainText().trimmed();
+        if (text.isEmpty()) return;
+
+        double rateMultiplier = rateSlider->value() / 100.0;
+        double durationSec = audio::TtsEngine::estimateSpeechDuration(text.toStdString(), rateMultiplier, "vi");
+        if (durationSec < 0.5) durationSec = 0.5;
+
+        auto* tl = engine_.activeTimeline();
+        if (!tl) return;
+
+        core::TrackId audioTrackId = tl->mainTrack().id();
+        for (const auto* t : tl->allTracks()) {
+            if (t->type() == editor::TrackType::Audio) {
+                audioTrackId = t->id();
+                break;
+            }
+        }
+
+        core::TimelineTime insertTime = engine_.playback().currentTime();
+        editor::Clip clip(
+            core::ClipId::generate(),
+            editor::ClipType::Audio,
+            "Giọng đọc AI: " + text.left(16).toStdString() + "...",
+            insertTime,
+            core::TimelineTime::fromSeconds(durationSec)
+        );
+        clip.setParam("audio.ttsText", text.toStdString());
+        clip.setParam("audio.ttsVoice", voiceCombo->currentData().toString().toStdString());
+        clip.setParam("audio.speed", rateMultiplier);
+
+        engine_.addClip(audioTrackId, std::move(clip));
+        engine_.project().setDirty(true);
+        engine_.notifyTimelineChanged();
+    });
+
+    ttsLayout->addWidget(genTtsBtn);
+    cLayout->addWidget(ttsCard);
+
+    cLayout->addStretch();
+    scroll->setWidget(container);
+    layout->addWidget(scroll, 1);
 
     return view;
 }
@@ -647,7 +773,9 @@ QWidget* AssetsPanel::createAdjustmentView() {
     });
     cLayout->addWidget(resetBtn);
 
-    auto* addLayerBtn = new QPushButton("＋ Thêm lớp Điều chỉnh vào Timeline", container);
+    auto* addLayerBtn = new QPushButton("Thêm lớp Điều chỉnh vào Timeline", container);
+    addLayerBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#38bdf8"), 16));
+    addLayerBtn->setIconSize(QSize(16, 16));
     addLayerBtn->setFixedHeight(34);
     connect(addLayerBtn, &QPushButton::clicked, this, &AssetsPanel::onAddAdjustmentLayer);
     cLayout->addWidget(addLayerBtn);

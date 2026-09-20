@@ -83,7 +83,9 @@ void TimelineToolbar::setupUi() {
     });
 
     // Add Track Menu Button
-    auto* addTrackBtn = new QPushButton("＋ Track", this);
+    auto* addTrackBtn = new QPushButton("Track", this);
+    addTrackBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 14));
+    addTrackBtn->setIconSize(QSize(14, 14));
     addTrackBtn->setFixedHeight(28);
     addTrackBtn->setStyleSheet(R"(
         QPushButton {

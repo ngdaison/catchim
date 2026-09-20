@@ -100,64 +100,33 @@ void PreviewWidget::paintEvent(QPaintEvent* /* event */) {
         painter.drawImage(canvasRect, img);
     }
 
-    // 3. Render active Text and Graphic elements if not already composited
-    auto* tl = engine_.activeTimeline();
-    if (tl) {
-        for (const auto* track : tl->allTracks()) {
-            if (track->isHidden()) continue;
-            for (const auto& clip : track->clips()) {
-                if (curTime < clip.startTime() || curTime >= clip.endTime()) continue;
-
-                double px = clip.getParam<double>("transform.positionX", 0.0);
-                double py = clip.getParam<double>("transform.positionY", 0.0);
-                double sx = clip.getParam<double>("transform.scaleX", 1.0);
-                double sy = clip.getParam<double>("transform.scaleY", 1.0);
-                double opacity = clip.getParam<double>("opacity", 1.0);
-
-                if (clip.type() == editor::ClipType::Text) {
-                    std::string textContent = clip.getParam<std::string>("text.content", clip.name());
-                    double fontSize = clip.getParam<double>("text.fontSize", 48.0) * scale * sx;
-                    std::string textColor = clip.getParam<std::string>("text.color", "#FFFFFF");
-
-                    painter.save();
-                    painter.setOpacity(opacity);
-                    QFont font("Inter", std::max(8, static_cast<int>(fontSize)), QFont::Bold);
-                    painter.setFont(font);
-                    painter.setPen(QColor(QString::fromStdString(textColor)));
-
-                    int textCenterX = startX + dispW / 2 + static_cast<int>(px * scale);
-                    int textCenterY = startY + dispH / 2 + static_cast<int>(py * scale);
-                    QRect textBounds(textCenterX - dispW / 2, textCenterY - 40, dispW, 80);
-                    painter.drawText(textBounds, Qt::AlignCenter, QString::fromStdString(textContent));
-                    painter.restore();
-                } else if (clip.type() == editor::ClipType::Graphic) {
-                    std::string shape = clip.getParam<std::string>("graphic.shape", "rectangle");
-                    std::string color = clip.getParam<std::string>("graphic.color", "#38bdf8");
-
-                    painter.save();
-                    painter.setOpacity(opacity);
-                    painter.setBrush(QColor(QString::fromStdString(color)));
-                    painter.setPen(Qt::NoPen);
-
-                    int shapeW = static_cast<int>(200.0 * scale * sx);
-                    int shapeH = static_cast<int>(200.0 * scale * sy);
-                    int shapeX = startX + dispW / 2 + static_cast<int>(px * scale) - shapeW / 2;
-                    int shapeY = startY + dispH / 2 + static_cast<int>(py * scale) - shapeH / 2;
-
-                    if (shape == "circle") {
-                        painter.drawEllipse(shapeX, shapeY, shapeW, shapeH);
-                    } else {
-                        painter.drawRoundedRect(shapeX, shapeY, shapeW, shapeH, 8, 8);
-                    }
-                    painter.restore();
-                }
-            }
-        }
-    }
-
-    // 4. Draw Canvas outer border
+    // 3. Draw Canvas outer border
     painter.setPen(QPen(QColor("#27272a"), 1.0));
     painter.drawRect(canvasRect);
+
+    // 4. Draw Safe Zones & Guides (Action Safe 90%, Title Safe 80%, Center Crosshair)
+    if (showSafeZones_) {
+        // Action Safe (90%)
+        int asPadX = static_cast<int>(dispW * 0.05);
+        int asPadY = static_cast<int>(dispH * 0.05);
+        QRect actionSafeRect(startX + asPadX, startY + asPadY, dispW - 2 * asPadX, dispH - 2 * asPadY);
+        painter.setPen(QPen(QColor(56, 189, 248, 140), 1.0, Qt::DashLine));
+        painter.drawRect(actionSafeRect);
+
+        // Title Safe (80%)
+        int tsPadX = static_cast<int>(dispW * 0.10);
+        int tsPadY = static_cast<int>(dispH * 0.10);
+        QRect titleSafeRect(startX + tsPadX, startY + tsPadY, dispW - 2 * tsPadX, dispH - 2 * tsPadY);
+        painter.setPen(QPen(QColor(250, 204, 21, 140), 1.0, Qt::DashLine));
+        painter.drawRect(titleSafeRect);
+
+        // Center Crosshair
+        painter.setPen(QPen(QColor(244, 244, 245, 160), 1.0));
+        int cx = startX + dispW / 2;
+        int cy = startY + dispH / 2;
+        painter.drawLine(cx - 16, cy, cx + 16, cy);
+        painter.drawLine(cx, cy - 16, cx, cy + 16);
+    }
 
     // 5. Draw Center Alignment Snapping Guides
     if (showCenterGuideX_) {
@@ -170,6 +139,7 @@ void PreviewWidget::paintEvent(QPaintEvent* /* event */) {
     }
 
     // 6. Draw Selected Clip Bounding Box & Transform Handles
+    auto* tl = engine_.activeTimeline();
     const auto& sel = engine_.selectedClips();
     if (!sel.empty() && tl) {
         const auto* clip = tl->findClip(sel[0]);

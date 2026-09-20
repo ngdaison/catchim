@@ -52,7 +52,10 @@ enum class UiIcon {
     Contrast,
     Sliders,
     Volume,
-    VolumeMute
+    VolumeMute,
+    Grid,
+    Keyboard,
+    Check
 };
 
 class UiIcons {

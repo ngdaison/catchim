@@ -62,6 +62,11 @@ private:
 
     bool showCenterGuideX_{false};
     bool showCenterGuideY_{false};
+    bool showSafeZones_{false};
+
+public:
+    void toggleSafeZones() { showSafeZones_ = !showSafeZones_; update(); }
+    bool isSafeZonesEnabled() const noexcept { return showSafeZones_; }
 };
 
 } // namespace catchim::ui

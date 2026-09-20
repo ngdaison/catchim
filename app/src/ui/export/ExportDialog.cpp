@@ -6,7 +6,6 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QFileDialog>
-#include <QMessageBox>
 #include <QApplication>
 #include <cmath>
 
@@ -158,6 +157,12 @@ void ExportDialog::setupUi() {
     progressWidget_->hide();
     mainLayout->addWidget(progressWidget_);
 
+    // Inline Status Banner
+    statusBanner_ = new QLabel(this);
+    statusBanner_->setVisible(false);
+    statusBanner_->setWordWrap(true);
+    mainLayout->addWidget(statusBanner_);
+
     mainLayout->addStretch();
 
     // Buttons
@@ -258,13 +263,13 @@ void ExportDialog::onCancelExport() {
 void ExportDialog::onStartExport() {
     auto* tl = engine_.activeTimeline();
     if (!tl || tl->allTracks().empty()) {
-        QMessageBox::warning(this, "Thông báo", "Dự án hiện chưa có phần tử nào trên Timeline.");
+        showStatusMessage("Dự án hiện chưa có phần tử nào trên Timeline.", "warning");
         return;
     }
 
     double totalSec = tl->totalDuration().toSeconds();
     if (totalSec <= 0.01) {
-        QMessageBox::warning(this, "Thông báo", "Thời lượng Timeline quá ngắn để xuất.");
+        showStatusMessage("Thời lượng Timeline quá ngắn để xuất.", "warning");
         return;
     }
 
@@ -331,9 +336,7 @@ void ExportDialog::onStartExport() {
     ffmpegProcess_ = std::make_unique<QProcess>();
     ffmpegProcess_->start(ffmpegPath, args);
     if (!ffmpegProcess_->waitForStarted(5000)) {
-        QMessageBox::critical(this, "Lỗi kết xuất",
-            "Không thể khởi chạy tiến trình FFmpeg.\n"
-            "Vui lòng kiểm tra FFmpeg đã được cài đặt trong hệ thống.");
+        showStatusMessage("Không thể khởi chạy tiến trình FFmpeg.\nVui lòng kiểm tra FFmpeg đã được cài đặt trong hệ thống.", "error");
         return;
     }
 
@@ -387,9 +390,23 @@ void ExportDialog::onStartExport() {
         isExporting_ = false;
         progressBar_->setValue(100);
         progressStatusLabel_->setText("Xuất video thành công!");
-        QMessageBox::information(this, "Thành công", QString("Đã xuất video thành công vào:\n%1").arg(savePath));
-        accept();
+        showStatusMessage(QString("Đã xuất video thành công vào:\n%1").arg(savePath), "success");
+        cancelBtn_->setText("Hoàn tất");
+        cancelBtn_->setEnabled(true);
     }
+}
+
+void ExportDialog::showStatusMessage(const QString& msg, const QString& type) {
+    if (!statusBanner_) return;
+    statusBanner_->setText(msg);
+    if (type == "error") {
+        statusBanner_->setStyleSheet("background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
+    } else if (type == "warning") {
+        statusBanner_->setStyleSheet("background: #422006; border: 1px solid #d97706; color: #fde68a; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
+    } else {
+        statusBanner_->setStyleSheet("background: #052e16; border: 1px solid #16a34a; color: #86efac; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;");
+    }
+    statusBanner_->setVisible(true);
 }
 
 } // namespace catchim::ui

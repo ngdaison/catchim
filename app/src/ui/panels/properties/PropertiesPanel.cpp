@@ -202,6 +202,55 @@ void PropertiesPanel::setupUi() {
     aForm->addRow("Mờ dần ra (s):", fadeOutSpin_);
     insLayout->addWidget(audioGroup_);
 
+    // E. Graphic Controls Group
+    graphicGroup_ = new QGroupBox("Hình khối (Graphic / Shape)", inspectorView_);
+    auto* gForm = new QFormLayout(graphicGroup_);
+    gForm->setSpacing(8);
+
+    shapeCombo_ = new QComboBox(graphicGroup_);
+    shapeCombo_->addItem("Hình chữ nhật (Rectangle)", "rectangle");
+    shapeCombo_->addItem("Hình tròn (Circle)", "circle");
+    shapeCombo_->addItem("Ngôi sao (Star)", "star");
+    shapeCombo_->addItem("Mũi tên (Arrow)", "arrow");
+    shapeCombo_->addItem("Huy hiệu (Badge)", "badge");
+    connect(shapeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &PropertiesPanel::onGraphicChanged);
+
+    graphicColorBtn_ = new QPushButton("Chọn màu", graphicGroup_);
+    graphicColorBtn_->setFixedHeight(28);
+    connect(graphicColorBtn_, &QPushButton::clicked, [this]() {
+        QColor col = QColorDialog::getColor(QColor(QString::fromStdString(currentGraphicColor_)), this, "Chọn màu hình khối");
+        if (col.isValid()) {
+            currentGraphicColor_ = col.name().toStdString();
+            graphicColorBtn_->setStyleSheet(QString("background: %1; color: %2; font-weight: bold; border-radius: 4px;")
+                .arg(col.name()).arg(col.lightness() > 128 ? "#000000" : "#FFFFFF"));
+            onGraphicChanged();
+        }
+    });
+
+    cornerRadiusSpin_ = makeSpin(0.0, 100.0, 1.0, 8.0);
+    connect(cornerRadiusSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onGraphicChanged);
+
+    strokeWidthSpin_ = makeSpin(0.0, 50.0, 1.0, 0.0);
+    connect(strokeWidthSpin_, &QDoubleSpinBox::valueChanged, this, &PropertiesPanel::onGraphicChanged);
+
+    gForm->addRow("Loại hình:", shapeCombo_);
+    gForm->addRow("Màu tô:", graphicColorBtn_);
+    gForm->addRow("Bo góc (px):", cornerRadiusSpin_);
+    gForm->addRow("Độ dày viền:", strokeWidthSpin_);
+    insLayout->addWidget(graphicGroup_);
+
+    // F. Active Effects & Transitions
+    activeEffectsGroup_ = new QGroupBox("Hiệu ứng & Chuyển cảnh đang gắn", inspectorView_);
+    auto* effLayout = new QVBoxLayout(activeEffectsGroup_);
+    effLayout->setSpacing(6);
+    activeEffectLabel_ = new QLabel("Hiệu ứng: Không có", activeEffectsGroup_);
+    activeEffectLabel_->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    activeTransitionLabel_ = new QLabel("Chuyển cảnh: Không có", activeEffectsGroup_);
+    activeTransitionLabel_->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    effLayout->addWidget(activeEffectLabel_);
+    effLayout->addWidget(activeTransitionLabel_);
+    insLayout->addWidget(activeEffectsGroup_);
+
     insLayout->addStretch();
     scrollArea->setWidget(inspectorView_);
     rootLayout->addWidget(scrollArea, 1);
@@ -287,6 +336,39 @@ void PropertiesPanel::refresh() {
         fadeOutSpin_->setValue(clip->getParam<double>("audio.fadeOut", 0.0));
     }
 
+    // Graphic group visibility & values
+    bool isGraphic = (clip->type() == editor::ClipType::Graphic);
+    graphicGroup_->setVisible(isGraphic);
+    if (isGraphic) {
+        std::string shape = clip->getParam<std::string>("graphic.shape", "rectangle");
+        int shapeIdx = shapeCombo_->findData(QString::fromStdString(shape));
+        if (shapeIdx >= 0) shapeCombo_->setCurrentIndex(shapeIdx);
+
+        currentGraphicColor_ = clip->getParam<std::string>("graphic.color", "#38bdf8");
+        QColor col(QString::fromStdString(currentGraphicColor_));
+        graphicColorBtn_->setStyleSheet(QString("background: %1; color: %2; font-weight: bold; border-radius: 4px;")
+            .arg(col.name()).arg(col.lightness() > 128 ? "#000000" : "#FFFFFF"));
+
+        cornerRadiusSpin_->setValue(clip->getParam<double>("graphic.cornerRadius", 8.0));
+        strokeWidthSpin_->setValue(clip->getParam<double>("graphic.strokeWidth", 0.0));
+    }
+
+    // Active Effects / Transitions
+    std::string effName = clip->getParam<std::string>("effect.name", "");
+    if (!effName.empty()) {
+        activeEffectLabel_->setText(QString("Hiệu ứng: <b>%1</b>").arg(QString::fromStdString(effName)));
+    } else {
+        activeEffectLabel_->setText("Hiệu ứng: Không có");
+    }
+
+    std::string transName = clip->getParam<std::string>("transition.type", "");
+    if (!transName.empty()) {
+        double transDur = clip->getParam<double>("transition.duration", 0.5);
+        activeTransitionLabel_->setText(QString("Chuyển cảnh: <b>%1</b> (%2s)").arg(QString::fromStdString(transName)).arg(transDur, 0, 'f', 1));
+    } else {
+        activeTransitionLabel_->setText("Chuyển cảnh: Không có");
+    }
+
     isUpdatingUi_ = false;
 }
 
@@ -309,6 +391,7 @@ void PropertiesPanel::onTransformChanged() {
     clip->setParam("transform.blendMode", blendModeCombo_->currentIndex());
 
     engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
 }
 
 void PropertiesPanel::onSpeedChanged() {
@@ -325,6 +408,7 @@ void PropertiesPanel::onSpeedChanged() {
     clip->setParam("reversed", reverseCheck_->isChecked());
 
     engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
 }
 
 void PropertiesPanel::onTextChanged() {
@@ -343,6 +427,7 @@ void PropertiesPanel::onTextChanged() {
     clip->setParam("text.color", currentTextColor_);
 
     engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
 }
 
 void PropertiesPanel::onAudioChanged() {
@@ -360,6 +445,26 @@ void PropertiesPanel::onAudioChanged() {
     clip->setParam("audio.fadeOut", fadeOutSpin_->value());
 
     engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
+}
+
+void PropertiesPanel::onGraphicChanged() {
+    if (isUpdatingUi_) return;
+
+    const auto& sel = engine_.selectedClips();
+    if (sel.empty()) return;
+    auto* tl = engine_.activeTimeline();
+    if (!tl) return;
+    auto* clip = tl->findClip(sel[0]);
+    if (!clip) return;
+
+    clip->setParam("graphic.shape", shapeCombo_->currentData().toString().toStdString());
+    clip->setParam("graphic.color", currentGraphicColor_);
+    clip->setParam("graphic.cornerRadius", cornerRadiusSpin_->value());
+    clip->setParam("graphic.strokeWidth", strokeWidthSpin_->value());
+
+    engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
 }
 
 } // namespace catchim::ui
