@@ -33,6 +33,8 @@ MainWindow::MainWindow(
 
 void MainWindow::setupUi() {
     auto* centralWidget = new QWidget(this);
+    centralWidget->setObjectName("centralWidget");
+    centralWidget->setAttribute(Qt::WA_StyledBackground, true);
     setCentralWidget(centralWidget);
 
     auto* rootLayout = new QVBoxLayout(centralWidget);
@@ -41,25 +43,31 @@ void MainWindow::setupUi() {
 
     // 1. Top Header
     header_ = new EditorHeader(engine_, this);
+    header_->setObjectName("editorHeader");
     connect(header_, &EditorHeader::exportClicked, this, &MainWindow::onExportRequested);
     connect(header_, &EditorHeader::themeToggleClicked, this, &MainWindow::onThemeToggleRequested);
     rootLayout->addWidget(header_);
 
     // 2. Main vertical splitter (Top: Panels, Bottom: Timeline)
     verticalSplitter_ = new QSplitter(Qt::Vertical, centralWidget);
+    verticalSplitter_->setObjectName("verticalSplitter");
     verticalSplitter_->setHandleWidth(3);
 
     // 3. Top horizontal splitter (Assets, Preview, Properties)
     horizontalSplitter_ = new QSplitter(Qt::Horizontal, verticalSplitter_);
+    horizontalSplitter_->setObjectName("horizontalSplitter");
     horizontalSplitter_->setHandleWidth(3);
 
     assetsPanel_ = new AssetsPanel(engine_, mediaLibrary_, horizontalSplitter_);
+    assetsPanel_->setObjectName("assetsPanel");
     assetsPanel_->setProperty("class", "Panel");
 
     previewPanel_ = new PreviewPanel(engine_, renderEngine_, mediaLibrary_, horizontalSplitter_);
+    previewPanel_->setObjectName("previewPanel");
     previewPanel_->setProperty("class", "Panel");
 
     propertiesPanel_ = new PropertiesPanel(engine_, horizontalSplitter_);
+    propertiesPanel_->setObjectName("propertiesPanel");
     propertiesPanel_->setProperty("class", "Panel");
 
     horizontalSplitter_->addWidget(assetsPanel_);
@@ -75,6 +83,7 @@ void MainWindow::setupUi() {
 
     // 4. Bottom Timeline
     timelinePanel_ = new TimelinePanel(engine_, mediaLibrary_, verticalSplitter_);
+    timelinePanel_->setObjectName("timelinePanel");
     timelinePanel_->setProperty("class", "Panel");
     connect(timelinePanel_, &TimelinePanel::clipSelected, [this](core::ClipId /* id */) {
         propertiesPanel_->refresh();

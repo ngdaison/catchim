@@ -15,6 +15,7 @@ TimelinePanel::TimelinePanel(
     , engine_(engine)
     , mediaLibrary_(mediaLibrary)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     setupUi();
     refresh();
 }
@@ -37,7 +38,7 @@ void TimelinePanel::setupUi() {
     // 3. Tracks Area
     scrollArea_ = new QScrollArea(this);
     scrollArea_->setWidgetResizable(true);
-    scrollArea_->setStyleSheet("QScrollArea { border: none; background: #111111; }");
+    scrollArea_->setStyleSheet("QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget { border: none; background: #0c0c0e; }");
 
     tracksWidget_ = new TimelineTracksWidget(engine_, mediaLibrary_, scrollArea_);
     connect(tracksWidget_, &TimelineTracksWidget::seekRequested, this, &TimelinePanel::onSeekRequested);

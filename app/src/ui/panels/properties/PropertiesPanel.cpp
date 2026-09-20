@@ -15,6 +15,7 @@ PropertiesPanel::PropertiesPanel(editor::EditorEngine& engine, QWidget* parent)
     : QWidget(parent)
     , engine_(engine)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     setupUi();
     refresh();
 }

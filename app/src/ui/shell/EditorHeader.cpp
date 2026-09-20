@@ -11,6 +11,7 @@ EditorHeader::EditorHeader(editor::EditorEngine& engine, QWidget* parent)
     : QWidget(parent)
     , engine_(engine)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     setFixedHeight(Metrics::headerHeight);
     setStyleSheet("background-color: #0c0c0e; border-bottom: 1px solid #27272a;");
     setupUi();

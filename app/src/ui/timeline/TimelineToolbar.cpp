@@ -10,6 +10,7 @@ TimelineToolbar::TimelineToolbar(editor::EditorEngine& engine, QWidget* parent)
     : QWidget(parent)
     , engine_(engine)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     setFixedHeight(40);
     setStyleSheet("background-color: #0e0e11; border-bottom: 1px solid #27272a;");
     setupUi();

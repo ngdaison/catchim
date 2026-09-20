@@ -41,18 +41,23 @@ QString Theme::buildGlobalStyleSheet() const {
         QMainWindow, QWidget#centralWidget {
             background-color: %1;
             color: %2;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', Roboto, sans-serif;
             font-size: 13px;
         }
 
         QWidget {
-            background-color: transparent;
+            background-color: %1;
             color: %2;
             outline: none;
         }
 
+        QLabel {
+            background-color: transparent;
+            color: %2;
+        }
+
         /* Panels & Frames */
-        .Panel, QFrame#panelFrame {
+        .Panel, QFrame#panelFrame, QWidget#assetsPanel, QWidget#previewPanel, QWidget#propertiesPanel, QWidget#timelinePanel {
             background-color: %3;
             border: 1px solid %4;
             border-radius: 8px;
@@ -70,8 +75,8 @@ QString Theme::buildGlobalStyleSheet() const {
         }
 
         /* Scroll Areas */
-        QScrollArea {
-            background-color: transparent;
+        QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {
+            background-color: %3;
             border: none;
         }
 
@@ -178,7 +183,7 @@ QString Theme::buildGlobalStyleSheet() const {
 
         /* GroupBox */
         QGroupBox {
-            background-color: transparent;
+            background-color: %3;
             color: %2;
             font-weight: 600;
             border: 1px solid %4;

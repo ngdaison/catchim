@@ -26,6 +26,7 @@ AssetsPanel::AssetsPanel(editor::EditorEngine& engine, media::MediaLibrary& medi
     , engine_(engine)
     , mediaLibrary_(mediaLibrary)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     setupUi();
     refresh();
 }

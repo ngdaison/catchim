@@ -16,6 +16,7 @@ PreviewPanel::PreviewPanel(
     : QWidget(parent)
     , engine_(engine)
 {
+    setAttribute(Qt::WA_StyledBackground, true);
     previewWidget_ = new PreviewWidget(engine, renderEngine, mediaLibrary, this);
     setupUi();
     refresh();
