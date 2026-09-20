@@ -1408,6 +1408,57 @@ Quy ước trạng thái:
 | String Capitalization & Case Transformation | `web/src/utils/string.ts` | `catchim::core::StringUtils::capitalizeFirstLetter`, `uppercase`, `lowercase` | Verified |
 | Platform-Specific Modifier Keys Detection (⌘ / Ctrl, ⌥ / Alt) | `web/src/utils/platform.ts` | `catchim::core::StringUtils::isAppleDevice`, `getPlatformSpecialKey`, `getPlatformAlternateKey` | Verified |
 
+---
+
+## 146. Geometry & Aspect Ratio Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Greatest Common Divisor (GCD) Calculation | `web/src/utils/geometry.ts` | `catchim::core::GeometryUtils::gcd` | Verified |
+| Dimension to Aspect Ratio String Formatting (16:9, 4:3, 1:1) | `web/src/utils/geometry.ts` | `catchim::core::GeometryUtils::dimensionToAspectRatio` | Verified |
+
+---
+
+## 147. Date Formatting Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Standard en-US Date Formatting ("Sep 20, 2026") | `web/src/utils/date.ts` | `catchim::core::DateUtils::formatDate` | Verified |
+
+---
+
+## 148. Render Param & Transform Resolvers
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| 17 Standard Blend Modes Validation & Fallback | `web/src/rendering/index.ts` | `catchim::render::RenderParamResolvers::isBlendMode`, `readBlendModeFromParams` | Verified |
+| Opacity & Transform Parameter Extraction | `web/src/rendering/index.ts` | `catchim::render::RenderParamResolvers::readOpacityFromParams`, `buildTransformFromParams` | Verified |
+| Dynamic Animated Transform Evaluation at Time | `web/src/rendering/animation-values.ts` | `catchim::render::RenderParamResolvers::resolveTransformAtTime` | Verified |
+
+---
+
+## 149. Animation Value Resolvers & Curve Bridge
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Opacity, Number, & Color Evaluation at Local Time | `web/src/animation/values.ts` | `catchim::editor::AnimationValueResolvers::resolveOpacityAtTime`, `resolveNumberAtTime`, `resolveColorAtTime` | Verified |
+| Normalized Cubic Bezier Segment Conversion | `web/src/animation/curve-bridge.ts` | `catchim::editor::AnimationValueResolvers::getNormalizedCubicBezierForScalarSegment` | Verified |
+| Normalized Bezier to Curve Handles Reconstruction | `web/src/animation/curve-bridge.ts` | `catchim::editor::AnimationValueResolvers::getCurveHandlesForNormalizedCubicBezier` | Verified |
+
+---
+
+## 150. Timeline Track Names & Audio Defaults
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Default Track Names by Type (Video, Text, Audio, Graphic, Effect) | `web/src/timeline/tracks.ts` | `catchim::editor::TimelineTrackDefaults::getDefaultTrackName` | Verified |
+| Audio Decibel Range Bounds (-60 dB to +20 dB) | `web/src/timeline/audio-constants.ts` | `catchim::editor::TimelineTrackDefaults::clampVolumeDb`, `VOLUME_DB_MIN`, `VOLUME_DB_MAX` | Verified |
+| Playhead Snap Point Generator | `web/src/timeline/playhead-snap-source.ts` | `catchim::editor::TimelineTrackDefaults::getPlayheadSnapPoints` | Verified |
+
+---
+
+## 151. TTS Voice Catalog Registry
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Natural Vietnamese Voice Catalog (Hoài My, Nam Minh, GPT-SoVITS, Chị Google...) | `web/src/services/tts/voices.ts` | `catchim::media::TtsVoiceRegistry::getAllVoices`, `findVoiceById` | Verified |
+| Voice Filtering by Language, Category, and Gender | `web/src/services/tts/voices.ts`, `types.ts` | `catchim::media::TtsVoiceRegistry::getVoicesByLanguage`, `getVoicesByCategory`, `getVoicesByGender` | Verified |
+
+
 
 
 

@@ -79,6 +79,10 @@ add_library(catchim_core STATIC
     src/core/utils/UuidGenerator.h
     src/core/utils/StringUtils.cpp
     src/core/utils/StringUtils.h
+    src/core/utils/GeometryUtils.cpp
+    src/core/utils/GeometryUtils.h
+    src/core/utils/DateUtils.cpp
+    src/core/utils/DateUtils.h
 )
 target_link_libraries(catchim_core PUBLIC nlohmann_json::nlohmann_json)
 
@@ -265,6 +269,10 @@ add_library(catchim_editor STATIC
     src/editor/retime/RetimeResolutionEngine.h
     src/editor/scene/SceneHierarchyUtils.cpp
     src/editor/scene/SceneHierarchyUtils.h
+    src/editor/animation/AnimationValueResolvers.cpp
+    src/editor/animation/AnimationValueResolvers.h
+    src/editor/timeline/TimelineTrackDefaults.cpp
+    src/editor/timeline/TimelineTrackDefaults.h
     src/editor/EditorEngine.cpp
     src/editor/EditorEngine.h
 )
@@ -310,6 +318,8 @@ add_library(catchim_media STATIC
     src/media/SoundEffectsRegistry.h
     src/media/MediaAssetInspector.cpp
     src/media/MediaAssetInspector.h
+    src/media/TtsVoiceRegistry.cpp
+    src/media/TtsVoiceRegistry.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 
@@ -406,6 +416,8 @@ add_library(catchim_render STATIC
     src/render/effects/EffectDefinitionRegistry.h
     src/render/canvas/CanvasSizePresets.cpp
     src/render/canvas/CanvasSizePresets.h
+    src/render/RenderParamResolvers.cpp
+    src/render/RenderParamResolvers.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 

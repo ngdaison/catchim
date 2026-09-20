@@ -172,6 +172,12 @@
 #include "editor/scene/SceneHierarchyUtils.h"
 #include "core/utils/UuidGenerator.h"
 #include "core/utils/StringUtils.h"
+#include "core/utils/GeometryUtils.h"
+#include "core/utils/DateUtils.h"
+#include "render/RenderParamResolvers.h"
+#include "editor/animation/AnimationValueResolvers.h"
+#include "editor/timeline/TimelineTrackDefaults.h"
+#include "media/TtsVoiceRegistry.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -9603,6 +9609,237 @@ void runStringUtilsTests() {
     std::cout << "[PASS] runStringUtilsTests" << std::endl;
 }
 
+void runGeometryUtilsTests() {
+    using namespace catchim::core;
+
+    // 1. GCD calculations
+    TEST_ASSERT(GeometryUtils::gcd(1920, 1080) == 120);
+    TEST_ASSERT(GeometryUtils::gcd(1080, 1920) == 120);
+    TEST_ASSERT(GeometryUtils::gcd(1080, 1080) == 1080);
+    TEST_ASSERT(GeometryUtils::gcd(1440, 1080) == 360);
+
+    // 2. Aspect ratio strings
+    std::string ar1 = GeometryUtils::dimensionToAspectRatio(1920, 1080);
+    TEST_ASSERT(ar1 == "16:9");
+    std::string ar2 = GeometryUtils::dimensionToAspectRatio(1080, 1920);
+    TEST_ASSERT(ar2 == "9:16");
+    std::string ar3 = GeometryUtils::dimensionToAspectRatio(1080, 1080);
+    TEST_ASSERT(ar3 == "1:1");
+    std::string ar4 = GeometryUtils::dimensionToAspectRatio(1440, 1080);
+    TEST_ASSERT(ar4 == "4:3");
+    std::string ar5 = GeometryUtils::dimensionToAspectRatio(1080, 1350);
+    TEST_ASSERT(ar5 == "4:5");
+
+    // 3. Fallbacks and float overloads
+    std::string ar6 = GeometryUtils::dimensionToAspectRatio(0, 1080);
+    TEST_ASSERT(ar6 == "0:0");
+    std::string ar7 = GeometryUtils::dimensionToAspectRatio(1920.0, 1080.0);
+    TEST_ASSERT(ar7 == "16:9");
+    std::string ar8 = GeometryUtils::dimensionToAspectRatio(1080.0, 1920.0);
+    TEST_ASSERT(ar8 == "9:16");
+
+    std::cout << "[PASS] runGeometryUtilsTests" << std::endl;
+}
+
+void runDateUtilsTests() {
+    using namespace catchim::core;
+
+    // 1. Direct year/month/day
+    TEST_ASSERT(DateUtils::formatDate(2026, 9, 20) == "Sep 20, 2026");
+    TEST_ASSERT(DateUtils::formatDate(2025, 1, 1) == "Jan 1, 2025");
+    TEST_ASSERT(DateUtils::formatDate(2024, 12, 31) == "Dec 31, 2024");
+
+    // 2. Month clamping
+    TEST_ASSERT(DateUtils::formatDate(2026, 0, 5) == "Jan 5, 2026");
+    TEST_ASSERT(DateUtils::formatDate(2026, 13, 5) == "Jan 5, 2026");
+
+    // 3. System clock time_point
+    auto now = std::chrono::system_clock::now();
+    auto str = DateUtils::formatDate(now);
+    TEST_ASSERT(!str.empty());
+    TEST_ASSERT(str.find("202") != std::string::npos);
+
+    std::cout << "[PASS] runDateUtilsTests" << std::endl;
+}
+
+void runRenderParamResolversTests() {
+    using namespace catchim::render;
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 1. Blend mode checks
+    TEST_ASSERT(RenderParamResolvers::isBlendMode("normal"));
+    TEST_ASSERT(RenderParamResolvers::isBlendMode("multiply"));
+    TEST_ASSERT(RenderParamResolvers::isBlendMode("screen"));
+    TEST_ASSERT(RenderParamResolvers::isBlendMode("overlay"));
+    TEST_ASSERT(!RenderParamResolvers::isBlendMode("invalid"));
+
+    // 2. Parsing from json
+    nlohmann::json p1 = {
+        {"blendMode", "multiply"},
+        {"opacity", 0.75},
+        {"transform.positionX", 15.0},
+        {"transform.positionY", -25.0},
+        {"transform.scaleX", 1.5},
+        {"transform.scaleY", 0.8},
+        {"transform.rotate", 45.0}
+    };
+    TEST_ASSERT(RenderParamResolvers::readBlendModeFromParams(p1) == "multiply");
+    TEST_ASSERT(RenderParamResolvers::readOpacityFromParams(p1) == 0.75);
+
+    auto t = RenderParamResolvers::buildTransformFromParams(p1);
+    TEST_ASSERT(t.positionX == 15.0);
+    TEST_ASSERT(t.positionY == -25.0);
+    TEST_ASSERT(t.scaleX == 1.5);
+    TEST_ASSERT(t.scaleY == 0.8);
+    TEST_ASSERT(t.rotate == 45.0);
+    TEST_ASSERT(t.opacity == 0.75);
+    TEST_ASSERT(t.blendMode == "multiply");
+
+    // 3. Defaults
+    nlohmann::json pEmpty = nlohmann::json::object();
+    TEST_ASSERT(RenderParamResolvers::readBlendModeFromParams(pEmpty) == "normal");
+    TEST_ASSERT(RenderParamResolvers::readOpacityFromParams(pEmpty) == 1.0);
+
+    // 4. Animated transform resolution
+    AnimationChannel posX("transform.positionX");
+    posX.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(0.0), 0.0});
+    posX.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(2.0), 100.0});
+
+    std::vector<AnimationChannel> channels = { posX };
+    auto resolved = RenderParamResolvers::resolveTransformAtTime(t, channels, TimelineTime::fromSeconds(1.0));
+    TEST_ASSERT(std::abs(resolved.positionX - 50.0) < 1e-4);
+
+    std::cout << "[PASS] runRenderParamResolversTests" << std::endl;
+}
+
+void runAnimationValueResolversTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 1. Opacity and Number resolution
+    TEST_ASSERT(AnimationValueResolvers::resolveOpacityAtTime(0.8, nullptr, TimelineTime::fromSeconds(1.0)) == 0.8);
+    TEST_ASSERT(AnimationValueResolvers::resolveNumberAtTime(42.0, nullptr, TimelineTime::fromSeconds(1.0)) == 42.0);
+
+    AnimationChannel opChannel("opacity");
+    opChannel.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(0.0), 0.2});
+    opChannel.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(2.0), 0.8});
+    auto opVal = AnimationValueResolvers::resolveOpacityAtTime(1.0, &opChannel, TimelineTime::fromSeconds(1.0));
+    TEST_ASSERT(std::abs(opVal - 0.5) < 1e-4);
+
+    // 2. Color resolution
+    AnimationChannel greenChannel("color.g");
+    greenChannel.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(0.0), 0.0});
+    greenChannel.addOrUpdateKeyframe(Keyframe{TimelineTime::fromSeconds(2.0), 255.0});
+    std::vector<AnimationChannel> colorChannels = { greenChannel };
+
+    auto col = AnimationValueResolvers::resolveColorAtTime("#ff0000", colorChannels, TimelineTime::fromSeconds(1.0));
+    auto rgb = ColorUtils::hexToRgb(col);
+    TEST_ASSERT(rgb.has_value());
+    TEST_ASSERT(rgb->r == 255);
+    TEST_ASSERT(rgb->g >= 126 && rgb->g <= 129);
+    TEST_ASSERT(rgb->b == 0);
+
+    // 3. Normalized cubic bezier & curve handles
+    Keyframe leftKey;
+    leftKey.time = TimelineTime::fromSeconds(0.0);
+    leftKey.value = 0.0;
+    leftKey.rightHandle = KeyframeHandle{
+        .x = static_cast<double>(TimelineTime::fromSeconds(0.333).ticks()),
+        .y = 20.0
+    };
+
+    Keyframe rightKey;
+    rightKey.time = TimelineTime::fromSeconds(1.0);
+    rightKey.value = 100.0;
+    rightKey.leftHandle = KeyframeHandle{
+        .x = static_cast<double>(-TimelineTime::fromSeconds(0.333).ticks()),
+        .y = -20.0
+    };
+
+    auto bezierOpt = AnimationValueResolvers::getNormalizedCubicBezierForScalarSegment(leftKey, rightKey);
+    TEST_ASSERT(bezierOpt.has_value());
+    TEST_ASSERT(bezierOpt->x1 >= 0.0 && bezierOpt->x1 <= 1.0);
+    TEST_ASSERT(bezierOpt->x2 >= 0.0 && bezierOpt->x2 <= 1.0);
+
+    auto handlesOpt = AnimationValueResolvers::getCurveHandlesForNormalizedCubicBezier(leftKey, rightKey, *bezierOpt);
+    TEST_ASSERT(handlesOpt.has_value());
+    TEST_ASSERT(std::abs(handlesOpt->rightHandle.y - 20.0) < 1e-4);
+    TEST_ASSERT(std::abs(handlesOpt->leftHandle.y - (-20.0)) < 1e-4);
+
+    std::cout << "[PASS] runAnimationValueResolversTests" << std::endl;
+}
+
+void runTimelineTrackDefaultsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 1. Default track names
+    TEST_ASSERT(TimelineTrackDefaults::getDefaultTrackName(TrackType::Video) == "Video track");
+    TEST_ASSERT(TimelineTrackDefaults::getDefaultTrackName(TrackType::Text) == "Text track");
+    TEST_ASSERT(TimelineTrackDefaults::getDefaultTrackName(TrackType::Audio) == "Audio track");
+    TEST_ASSERT(TimelineTrackDefaults::getDefaultTrackName(TrackType::Graphic) == "Graphic track");
+    TEST_ASSERT(TimelineTrackDefaults::getDefaultTrackName(TrackType::Effect) == "Effect track");
+
+    // 2. Volume dB limits
+    TEST_ASSERT(TimelineTrackDefaults::clampVolumeDb(-100.0) == -60.0);
+    TEST_ASSERT(TimelineTrackDefaults::clampVolumeDb(50.0) == 20.0);
+    TEST_ASSERT(TimelineTrackDefaults::clampVolumeDb(0.0) == 0.0);
+
+    // 3. Playhead snap points
+    auto pts = TimelineTrackDefaults::getPlayheadSnapPoints(TimelineTime::fromSeconds(3.5));
+    TEST_ASSERT(pts.size() == 1);
+    TEST_ASSERT(pts[0].time == TimelineTime::fromSeconds(3.5));
+    TEST_ASSERT(pts[0].type == snapping::TimelineSnapPointType::Playhead);
+
+    std::cout << "[PASS] runTimelineTrackDefaultsTests" << std::endl;
+}
+
+void runTtsVoiceRegistryTests() {
+    using namespace catchim::media;
+
+    // 1. All voices query
+    const auto& voices = TtsVoiceRegistry::getAllVoices();
+    TEST_ASSERT(voices.size() >= 9);
+
+    // 2. Lookup by id
+    const auto* gptVoice = TtsVoiceRegistry::findVoiceById("vi-custom-gpt-sovits");
+    TEST_ASSERT(gptVoice != nullptr);
+    TEST_ASSERT(gptVoice->engine == "gpt-sovits");
+    TEST_ASSERT(gptVoice->langCode == "vi");
+
+    const auto* sweetVoice = TtsVoiceRegistry::findVoiceById("vi-female-sweet");
+    TEST_ASSERT(sweetVoice != nullptr);
+    TEST_ASSERT(sweetVoice->name == "Hoài My (Nữ miền Bắc)");
+    TEST_ASSERT(sweetVoice->gender == "female");
+
+    const auto* warmVoice = TtsVoiceRegistry::findVoiceById("vi-male-warm");
+    TEST_ASSERT(warmVoice != nullptr);
+    TEST_ASSERT(warmVoice->name == "Nam Minh (Nam miền Bắc)");
+    TEST_ASSERT(warmVoice->gender == "male");
+
+    const auto* googleVoice = TtsVoiceRegistry::findVoiceById("vi-female-google");
+    TEST_ASSERT(googleVoice != nullptr);
+    TEST_ASSERT(googleVoice->engine == "google");
+
+    // 3. Filter by language
+    auto viVoices = TtsVoiceRegistry::getVoicesByLanguage("vi-VN");
+    TEST_ASSERT(viVoices.size() >= 9);
+
+    // 4. Filter by category
+    auto trendingVoices = TtsVoiceRegistry::getVoicesByCategory("trending");
+    TEST_ASSERT(trendingVoices.size() >= 5);
+
+    // 5. Filter by gender
+    auto femaleVoices = TtsVoiceRegistry::getVoicesByGender("female");
+    TEST_ASSERT(femaleVoices.size() >= 4);
+
+    auto maleVoices = TtsVoiceRegistry::getVoicesByGender("male");
+    TEST_ASSERT(maleVoices.size() >= 4);
+
+    std::cout << "[PASS] runTtsVoiceRegistryTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -9762,7 +9999,13 @@ int main() {
     runSceneHierarchyUtilsTests();
     runUuidGeneratorTests();
     runStringUtilsTests();
-    std::cout << ">>> ALL 157 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runGeometryUtilsTests();
+    runDateUtilsTests();
+    runRenderParamResolversTests();
+    runAnimationValueResolversTests();
+    runTimelineTrackDefaultsTests();
+    runTtsVoiceRegistryTests();
+    std::cout << ">>> ALL 163 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
 
