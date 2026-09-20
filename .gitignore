@@ -1,0 +1,16 @@
+# Build artifacts
+app/build/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.lib
+*.exp
+.ninja_log
+.ninja_deps
+
+# IDE and OS
+.vs/
+.vscode/
+Thumbs.db
+[Dd]esktop.ini
