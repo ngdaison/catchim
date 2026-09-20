@@ -1619,6 +1619,59 @@ Quy ước trạng thái:
 | Default Blur Intensity & Default Canvas Color | `web/src/background/blur.ts`, `color.ts` | `catchim::render::BackgroundBlurPresets::DEFAULT_BACKGROUND_BLUR_INTENSITY`, `DEFAULT_BACKGROUND_COLOR` | Verified |
 | Intensity Validation & Clamping | `web/src/background/blur.ts` | `catchim::render::BackgroundBlurPresets::isValidIntensity`, `clampIntensity` | Verified |
 
+---
+
+## 170. PatternCraft Gradients & Color Palette
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| PatternCraft 22+ CSS Gradients Library | `web/src/data/colors/pattern-craft.ts` | `catchim::render::PatternCraftGradients::getGradients`, `findGradientByIndex` | Verified |
+| Standard 240+ Solid Colors Palette | `web/src/data/colors/solid.ts` | `catchim::render::PatternCraftGradients::getSolidColors`, `isValidHexColor` | Verified |
+
+---
+
+## 171. Export Options & Resolution Resolver
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Export Target Resolution Height & Aspect Ratio Math | `web/src/export/index.ts` | `catchim::exporting::ExportOptionsResolver::resolveExportCanvasSize`, `getResolutionHeight` | Verified |
+| Even-Pixel Dimension Rounding (H.264/VP9 alignment) | `web/src/export/index.ts` | `catchim::exporting::ExportOptionsResolver::roundToEven` | Verified |
+| Export Format MIME Types & File Extensions | `web/src/export/index.ts`, `mime-types.ts` | `catchim::exporting::ExportOptionsResolver::getExportMimeType`, `getExportFileExtension` | Verified |
+
+---
+
+## 172. Automated Speech Transcription Service
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Lifecycle & Progress State Machine | `web/src/services/transcription/service.ts` | `catchim::subtitles::TranscriptionService`, `TranscriptionProgress` | Verified |
+| Cancellation Token & Execution Control | `web/src/services/transcription/service.ts` | `catchim::subtitles::TranscriptionService::cancel`, `isCancelled`, `reset` | Verified |
+| Result Generation with Transcription Segments | `web/src/services/transcription/service.ts` | `catchim::subtitles::TranscriptionService::transcribe` | Verified |
+
+---
+
+## 173. TTS Voice Registry & Synthesis Options
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| TTS Voices Registry & Filtering (Category, Language, Gender) | `web/src/services/tts/voices.ts` | `catchim::media::TtsVoiceService::getAllVoices`, `filterByCategory`, `filterByLanguage`, `filterByGender` | Verified |
+| Voice Pitch Factor & Rate Multiplier Modeling | `web/src/services/tts/types.ts` | `catchim::media::TtsVoice` | Verified |
+| Synthesis Parameters Validation (Speed, Pitch, Volume) | `web/src/services/tts/types.ts` | `catchim::media::TtsVoiceService::validateOptions` | Verified |
+
+---
+
+## 174. Editor Panel Layout Configuration
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Default 5-Panel Workspace Ratios (tools, preview, properties, main, timeline) | `web/src/panels/layout.ts` | `catchim::editor::PanelLayoutConfig::DEFAULT_CONFIG`, `getDefaultRatios` | Verified |
+| Panel Size Clamping & Ratio Validation | `web/src/panels/layout.ts` | `catchim::editor::PanelLayoutConfig::isValidRatio`, `clampPanelSize` | Verified |
+
+---
+
+## 175. Audio Media Processing & Timeline Analysis
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Stereo to Mono Downmixing Math | `web/src/media/audio.ts` | `catchim::audio::AudioMediaUtils::downmixStereo` | Verified |
+| Timeline Audio Presence & Audible Clip Collection | `web/src/media/audio.ts` | `catchim::audio::AudioMediaUtils::timelineHasAudio`, `collectAudibleClips` | Verified |
+| Decibel to Linear Gain Conversions | `web/src/timeline/audio-state.ts` | `catchim::audio::AudioMediaUtils::dBToLinear`, `linearToDb` | Verified |
+
+
 
 
 

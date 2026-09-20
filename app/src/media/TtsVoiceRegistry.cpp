@@ -58,7 +58,7 @@ const std::vector<TtsVoice>& TtsVoiceRegistry::getAllVoices() noexcept {
             .name = "Chị Google (Việt Nam)",
             .language = "vi-VN",
             .gender = "female",
-            .categories = {"vietnamese", "trending"},
+            .categories = {"vietnamese", "trending", "fun"},
             .description = "Giọng đọc Google nguyên bản quen thuộc, kinh điển trên mạng xã hội",
             .avatarGradient = "from-amber-400 via-orange-500 to-yellow-500",
             .avatarIcon = "📢",

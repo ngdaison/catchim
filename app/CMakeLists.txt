@@ -287,6 +287,8 @@ add_library(catchim_editor STATIC
     src/editor/diagnostics/DiagnosticsManager.h
     src/editor/commands/CommandManager.cpp
     src/editor/commands/CommandManager.h
+    src/editor/panels/PanelLayoutConfig.cpp
+    src/editor/panels/PanelLayoutConfig.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -303,6 +305,8 @@ add_library(catchim_subtitles STATIC
     src/subtitles/TranscriptionCatalog.h
     src/subtitles/TranscriptionCaptionBuilder.cpp
     src/subtitles/TranscriptionCaptionBuilder.h
+    src/subtitles/TranscriptionService.cpp
+    src/subtitles/TranscriptionService.h
 )
 target_link_libraries(catchim_subtitles PUBLIC catchim_core)
 
@@ -344,6 +348,8 @@ add_library(catchim_media STATIC
     src/media/SavedSoundsStore.h
     src/media/WaveformCache.cpp
     src/media/WaveformCache.h
+    src/media/TtsVoiceService.cpp
+    src/media/TtsVoiceService.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 
@@ -452,6 +458,8 @@ add_library(catchim_render STATIC
     src/render/graphics/GraphicsDefinitions.h
     src/render/canvas/BackgroundBlurPresets.cpp
     src/render/canvas/BackgroundBlurPresets.h
+    src/render/canvas/PatternCraftGradients.cpp
+    src/render/canvas/PatternCraftGradients.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 
@@ -481,6 +489,8 @@ add_library(catchim_audio STATIC
     src/audio/AudioStateEngine.h
     src/audio/AudioManager.cpp
     src/audio/AudioManager.h
+    src/audio/AudioMediaUtils.cpp
+    src/audio/AudioMediaUtils.h
 )
 target_link_libraries(catchim_audio PUBLIC catchim_core catchim_editor)
 
@@ -497,6 +507,8 @@ add_library(catchim_export STATIC
     src/export/ExportCanvasGeometryResolver.h
     src/export/ExportDefaults.cpp
     src/export/ExportDefaults.h
+    src/export/ExportOptionsResolver.cpp
+    src/export/ExportOptionsResolver.h
 )
 target_link_libraries(catchim_export PUBLIC catchim_core catchim_editor catchim_render catchim_audio)
 

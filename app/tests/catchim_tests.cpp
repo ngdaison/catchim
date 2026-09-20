@@ -196,6 +196,12 @@
 #include "editor/commands/CommandManager.h"
 #include "media/WaveformCache.h"
 #include "render/canvas/BackgroundBlurPresets.h"
+#include "render/canvas/PatternCraftGradients.h"
+#include "export/ExportOptionsResolver.h"
+#include "subtitles/TranscriptionService.h"
+#include "media/TtsVoiceService.h"
+#include "editor/panels/PanelLayoutConfig.h"
+#include "audio/AudioMediaUtils.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -10771,6 +10777,192 @@ void runBackgroundBlurPresetsTests() {
     std::cout << "[PASS] runBackgroundBlurPresetsTests" << std::endl;
 }
 
+void runPatternCraftGradientsTests() {
+    using namespace catchim::render;
+
+    const auto& gradients = PatternCraftGradients::getGradients();
+    TEST_ASSERT(gradients.size() >= 22);
+
+    auto grad0 = PatternCraftGradients::findGradientByIndex(0);
+    TEST_ASSERT(grad0.has_value());
+    TEST_ASSERT(!grad0->empty());
+
+    auto gradOut = PatternCraftGradients::findGradientByIndex(999);
+    TEST_ASSERT(!gradOut.has_value());
+
+    const auto& solids = PatternCraftGradients::getSolidColors();
+    TEST_ASSERT(solids.size() >= 100);
+
+    TEST_ASSERT(PatternCraftGradients::isValidHexColor("#ffffff"));
+    TEST_ASSERT(PatternCraftGradients::isValidHexColor("#000"));
+    TEST_ASSERT(PatternCraftGradients::isValidHexColor("#12345678"));
+    TEST_ASSERT(!PatternCraftGradients::isValidHexColor("ffffff"));
+    TEST_ASSERT(!PatternCraftGradients::isValidHexColor("#xyz"));
+
+    std::cout << "[PASS] runPatternCraftGradientsTests" << std::endl;
+}
+
+void runExportOptionsResolverTests() {
+    using namespace catchim::exporting;
+    using namespace catchim::editor;
+
+    TEST_ASSERT(ExportOptionsResolver::roundToEven(3.1) == 4);
+    TEST_ASSERT(ExportOptionsResolver::roundToEven(4.0) == 4);
+    TEST_ASSERT(ExportOptionsResolver::roundToEven(1.2) == 2);
+
+    TEST_ASSERT(ExportOptionsResolver::getResolutionHeight("1080p") == 1080);
+    TEST_ASSERT(ExportOptionsResolver::getResolutionHeight("720p") == 720);
+    TEST_ASSERT(ExportOptionsResolver::getResolutionHeight("source") == 0);
+
+    CanvasSize source1080{1920, 1080};
+    auto res720 = ExportOptionsResolver::resolveExportCanvasSize(source1080, "720p");
+    TEST_ASSERT(res720.width == 1280);
+    TEST_ASSERT(res720.height == 720);
+
+    auto resSource = ExportOptionsResolver::resolveExportCanvasSize(source1080, "source");
+    TEST_ASSERT(resSource.width == 1920);
+    TEST_ASSERT(resSource.height == 1080);
+
+    TEST_ASSERT(ExportOptionsResolver::getExportMimeType(ExportFormat::MP4) == "video/mp4");
+    TEST_ASSERT(ExportOptionsResolver::getExportMimeType(ExportFormat::WebM) == "video/webm");
+    TEST_ASSERT(ExportOptionsResolver::getExportFileExtension(ExportFormat::MP4) == ".mp4");
+    TEST_ASSERT(ExportOptionsResolver::getExportFileExtension(ExportFormat::WebM) == ".webm");
+
+    const auto& resList = ExportOptionsResolver::getSupportedResolutions();
+    TEST_ASSERT(!resList.empty());
+
+    std::cout << "[PASS] runExportOptionsResolverTests" << std::endl;
+}
+
+void runTranscriptionServiceTests() {
+    using namespace catchim::subtitles;
+
+    TranscriptionService service;
+    TEST_ASSERT(service.currentModel() == "whisper-small");
+
+    service.setModel("whisper-tiny");
+    TEST_ASSERT(service.currentModel() == "whisper-tiny");
+
+    // Empty audio data
+    int progressCalls = 0;
+    auto resultEmpty = service.transcribe({}, "en", "whisper-tiny", [&](const TranscriptionProgress& p) {
+        ++progressCalls;
+        TEST_ASSERT(p.status == TranscriptionStatus::LoadingModel || p.status == TranscriptionStatus::Complete);
+    });
+    TEST_ASSERT(resultEmpty.segments.empty());
+    TEST_ASSERT(progressCalls > 0);
+
+    // Audio data with cancel test
+    service.cancel();
+    TEST_ASSERT(service.isCancelled());
+    auto resultCancel = service.transcribe({0.1f, 0.2f, 0.3f}, "vi", "whisper-small");
+    TEST_ASSERT(resultCancel.segments.empty());
+
+    // Successful transcription simulation
+    service.reset();
+    TEST_ASSERT(!service.isCancelled());
+    std::vector<float> audioData(16000, 0.05f); // 1 second of audio
+    auto result = service.transcribe(audioData, "en", "whisper-small");
+    TEST_ASSERT(!result.text.empty());
+    TEST_ASSERT(result.segments.size() == 1);
+    TEST_ASSERT(result.segments[0].end >= 1.0);
+
+    std::cout << "[PASS] runTranscriptionServiceTests" << std::endl;
+}
+
+void runTtsVoiceServiceTests() {
+    using namespace catchim::media;
+
+    const auto& voices = TtsVoiceService::getAllVoices();
+    TEST_ASSERT(voices.size() >= 5);
+
+    auto viVoices = TtsVoiceService::filterByLanguage("vi");
+    TEST_ASSERT(!viVoices.empty());
+    TEST_ASSERT(viVoices[0].language.rfind("vi", 0) == 0);
+
+    auto femaleVoices = TtsVoiceService::filterByGender("female");
+    TEST_ASSERT(!femaleVoices.empty());
+    TEST_ASSERT(femaleVoices[0].gender == "female");
+
+    auto funVoices = TtsVoiceService::filterByCategory("fun");
+    TEST_ASSERT(!funVoices.empty());
+
+    auto found = TtsVoiceService::findVoiceById("vi-female-sweet");
+    TEST_ASSERT(found.has_value());
+    TEST_ASSERT(!found->name.empty());
+
+    auto notFound = TtsVoiceService::findVoiceById("non-existent-voice");
+    TEST_ASSERT(!notFound.has_value());
+
+    TEST_ASSERT(TtsVoiceService::validateOptions(1.0, 0.0, 1.0));
+    TEST_ASSERT(!TtsVoiceService::validateOptions(0.1, 0.0, 1.0)); // speed too low
+    TEST_ASSERT(!TtsVoiceService::validateOptions(1.0, 100.0, 1.0)); // pitch too high
+    TEST_ASSERT(!TtsVoiceService::validateOptions(1.0, 0.0, 1.5)); // volume too high
+
+    std::cout << "[PASS] runTtsVoiceServiceTests" << std::endl;
+}
+
+void runPanelLayoutConfigTests() {
+    using namespace catchim::editor;
+
+    auto ratios = PanelLayoutConfig::getDefaultRatios();
+    TEST_ASSERT(ratios.tools == 25.0);
+    TEST_ASSERT(ratios.preview == 50.0);
+    TEST_ASSERT(ratios.properties == 25.0);
+    TEST_ASSERT(ratios.mainContent == 50.0);
+    TEST_ASSERT(ratios.timeline == 50.0);
+
+    TEST_ASSERT(PanelLayoutConfig::isValidRatio(25.0));
+    TEST_ASSERT(PanelLayoutConfig::isValidRatio(0.0));
+    TEST_ASSERT(PanelLayoutConfig::isValidRatio(100.0));
+    TEST_ASSERT(!PanelLayoutConfig::isValidRatio(-5.0));
+    TEST_ASSERT(!PanelLayoutConfig::isValidRatio(105.0));
+
+    TEST_ASSERT(PanelLayoutConfig::clampPanelSize(30.0, 10.0, 50.0) == 30.0);
+    TEST_ASSERT(PanelLayoutConfig::clampPanelSize(5.0, 10.0, 50.0) == 10.0);
+    TEST_ASSERT(PanelLayoutConfig::clampPanelSize(60.0, 10.0, 50.0) == 50.0);
+
+    std::cout << "[PASS] runPanelLayoutConfigTests" << std::endl;
+}
+
+void runAudioMediaUtilsTests() {
+    using namespace catchim::audio;
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // Stereo downmixing
+    float left[4] = {1.0f, -0.5f, 0.0f, 0.8f};
+    float right[4] = {0.0f, 0.5f, -0.4f, 0.2f};
+    float out[4] = {0.0f};
+
+    AudioMediaUtils::downmixStereo(left, right, out, 4);
+    TEST_ASSERT(std::abs(out[0] - 0.5f) < 1e-4f);
+    TEST_ASSERT(std::abs(out[1] - 0.0f) < 1e-4f);
+    TEST_ASSERT(std::abs(out[2] - (-0.2f)) < 1e-4f);
+    TEST_ASSERT(std::abs(out[3] - 0.5f) < 1e-4f);
+
+    // dB and linear conversions
+    TEST_ASSERT(std::abs(AudioMediaUtils::dBToLinear(0.0) - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(AudioMediaUtils::dBToLinear(-6.0206) - 0.5) < 1e-3);
+    TEST_ASSERT(std::abs(AudioMediaUtils::linearToDb(1.0) - 0.0) < 1e-4);
+    TEST_ASSERT(std::abs(AudioMediaUtils::linearToDb(0.5) - (-6.0206)) < 1e-3);
+    TEST_ASSERT(AudioMediaUtils::linearToDb(0.0) <= -100.0);
+
+    // Timeline audio presence
+    Timeline emptyTimeline;
+    TEST_ASSERT(!AudioMediaUtils::timelineHasAudio(emptyTimeline));
+
+    auto& track = emptyTimeline.addTrack(TrackType::Audio, "Voiceover");
+    Clip audioClip(ClipId::generate(), ClipType::Audio, "Vocal", TimelineTime(0), TimelineTime::fromSeconds(3.0));
+    emptyTimeline.addClip(track.id(), std::move(audioClip));
+
+    TEST_ASSERT(AudioMediaUtils::timelineHasAudio(emptyTimeline));
+    auto audible = AudioMediaUtils::collectAudibleClips(emptyTimeline);
+    TEST_ASSERT(audible.size() == 1);
+
+    std::cout << "[PASS] runAudioMediaUtilsTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -10954,6 +11146,12 @@ int main() {
     runCommandManagerTests();
     runWaveformCacheTests();
     runBackgroundBlurPresetsTests();
-    std::cout << ">>> ALL 181 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runPatternCraftGradientsTests();
+    runExportOptionsResolverTests();
+    runTranscriptionServiceTests();
+    runTtsVoiceServiceTests();
+    runPanelLayoutConfigTests();
+    runAudioMediaUtilsTests();
+    std::cout << ">>> ALL 187 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
