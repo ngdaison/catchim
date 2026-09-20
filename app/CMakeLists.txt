@@ -75,6 +75,10 @@ add_library(catchim_core STATIC
     src/core/utils/ColorUtils.h
     src/core/i18n/I18nEngine.cpp
     src/core/i18n/I18nEngine.h
+    src/core/utils/UuidGenerator.cpp
+    src/core/utils/UuidGenerator.h
+    src/core/utils/StringUtils.cpp
+    src/core/utils/StringUtils.h
 )
 target_link_libraries(catchim_core PUBLIC nlohmann_json::nlohmann_json)
 
@@ -257,6 +261,10 @@ add_library(catchim_editor STATIC
     src/editor/timeline/TimelineDragData.h
     src/editor/params/ParamChannelLayoutEngine.cpp
     src/editor/params/ParamChannelLayoutEngine.h
+    src/editor/retime/RetimeResolutionEngine.cpp
+    src/editor/retime/RetimeResolutionEngine.h
+    src/editor/scene/SceneHierarchyUtils.cpp
+    src/editor/scene/SceneHierarchyUtils.h
     src/editor/EditorEngine.cpp
     src/editor/EditorEngine.h
 )
@@ -394,6 +402,10 @@ add_library(catchim_render STATIC
     src/render/RenderingParamsResolver.h
     src/render/background/BackgroundPresets.cpp
     src/render/background/BackgroundPresets.h
+    src/render/effects/EffectDefinitionRegistry.cpp
+    src/render/effects/EffectDefinitionRegistry.h
+    src/render/canvas/CanvasSizePresets.cpp
+    src/render/canvas/CanvasSizePresets.h
 )
 target_link_libraries(catchim_render PUBLIC catchim_core catchim_editor catchim_media)
 

@@ -1357,5 +1357,57 @@ Quy ước trạng thái:
 | Multi-Locale Dictionary (en, vi) & Hierarchy Lookup | `web/src/i18n/` | `catchim::core::I18nEngine::t`, `hasKey`, `supportedLocales`, `setLocale` | Verified |
 | Dynamic Template Parameter Interpolation ({name}, {count}) | `web/src/i18n/` | `catchim::core::I18nEngine::interpolate` | Verified |
 
+---
+
+## 140. Retime Resolution Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Retime Rate Bounds Clamping (0.1x - 50.0x) | `web/src/timeline/retime.ts` | `catchim::editor::RetimeResolutionEngine::clampRetimeRate` | Verified |
+| Audio Pitch Maintenance Feasibility Bounds (0.25x - 4.0x) | `web/src/timeline/retime.ts` | `catchim::editor::RetimeResolutionEngine::canMaintainPitch` | Verified |
+| Bidirectional Time & Span Mapping at Retime Rate | `web/src/timeline/retime.ts` | `catchim::editor::RetimeResolutionEngine::getSourceTimeAtClipTime`, `getClipTimeAtSourceTime`, `getTimelineDurationForSourceSpan`, `getSourceSpanAtClipTime` | Verified |
+
+---
+
+## 141. Effect Definition Registry & Gaussian Blur Shaders
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Gaussian Blur Two-Pass Multi-Sample Kernel Resolution | `web/src/effects/definitions/blur.ts` | `catchim::render::EffectDefinitionRegistry::intensityToSigma`, `buildGaussianBlurPasses`, `GAUSSIAN_BLUR_SHADER` | Verified |
+| Effect Definitions Registry & Default Instance Builder | `web/src/effects/index.ts` | `catchim::render::EffectDefinitionRegistry::definitions`, `findDefinition`, `buildDefaultEffectInstance` | Verified |
+| Effect Pass Resolution Pipeline | `web/src/effects/index.ts` | `catchim::render::EffectDefinitionRegistry::resolveEffectPasses` | Verified |
+
+---
+
+## 142. Canvas Size Presets
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Standard Canvas Dimensions Presets (1080p, 9:16, 1:1, 4:3) | `web/src/canvas/sizes.ts` | `catchim::render::CanvasSizePresets::defaultCanvasPresets`, `DEFAULT_CANVAS_SIZE` | Verified |
+| Preset Membership & Aspect Ratio Utilities | `web/src/canvas/sizes.ts` | `catchim::render::CanvasSizePresets::isDefaultPreset`, `getAspectRatio` | Verified |
+
+---
+
+## 143. Scene Hierarchy & Main Scene Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Main Scene Lookup & Invariant Enforcement | `web/src/timeline/scenes.ts` | `catchim::editor::SceneHierarchyUtils::getMainScene`, `ensureMainScene`, `buildDefaultScene` | Verified |
+| Scene Deletion Validation & Fallback Selection | `web/src/timeline/scenes.ts` | `catchim::editor::SceneHierarchyUtils::canDeleteScene`, `getFallbackSceneAfterDelete`, `findCurrentScene` | Verified |
+| Scene Timeline Total Duration Calculation | `web/src/timeline/scenes.ts`, `timeline/index.ts` | `catchim::editor::SceneHierarchyUtils::calculateTotalDuration`, `getProjectDurationFromScenes` | Verified |
+
+---
+
+## 144. RFC 4122 v4 UUID Generator
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| RFC 4122 Version 4 UUID Generation | `web/src/utils/id.ts` | `catchim::core::UuidGenerator::generateUUID` | Verified |
+| UUID Format & Version/Variant Validation | `web/src/utils/id.ts` | `catchim::core::UuidGenerator::isValidUUID` | Verified |
+
+---
+
+## 145. String & Platform Key Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| String Capitalization & Case Transformation | `web/src/utils/string.ts` | `catchim::core::StringUtils::capitalizeFirstLetter`, `uppercase`, `lowercase` | Verified |
+| Platform-Specific Modifier Keys Detection (⌘ / Ctrl, ⌥ / Alt) | `web/src/utils/platform.ts` | `catchim::core::StringUtils::isAppleDevice`, `getPlatformSpecialKey`, `getPlatformAlternateKey` | Verified |
+
+
 
 

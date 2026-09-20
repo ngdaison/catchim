@@ -166,6 +166,12 @@
 #include "render/background/BackgroundPresets.h"
 #include "editor/params/ParamChannelLayoutEngine.h"
 #include "core/i18n/I18nEngine.h"
+#include "editor/retime/RetimeResolutionEngine.h"
+#include "render/effects/EffectDefinitionRegistry.h"
+#include "render/canvas/CanvasSizePresets.h"
+#include "editor/scene/SceneHierarchyUtils.h"
+#include "core/utils/UuidGenerator.h"
+#include "core/utils/StringUtils.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -9362,6 +9368,241 @@ void runI18nEngineTests() {
     std::cout << "[PASS] runI18nEngineTests" << std::endl;
 }
 
+void runRetimeResolutionEngineTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 1. Rate clamping
+    TEST_ASSERT(RetimeResolutionEngine::clampRetimeRate(0.005) == RetimeResolutionEngine::MIN_RATE);
+    TEST_ASSERT(RetimeResolutionEngine::clampRetimeRate(10.0) == RetimeResolutionEngine::MAX_RATE);
+    TEST_ASSERT(RetimeResolutionEngine::clampRetimeRate(2.5) == 2.5);
+    TEST_ASSERT(RetimeResolutionEngine::clampRetimeRate(-1.0) == RetimeResolutionEngine::DEFAULT_RETIME_RATE);
+
+    // 2. Pitch maintenance capability
+    TEST_ASSERT(!RetimeResolutionEngine::canMaintainPitch(0.0));
+    TEST_ASSERT(RetimeResolutionEngine::canMaintainPitch(0.25));
+    TEST_ASSERT(RetimeResolutionEngine::canMaintainPitch(2.0));
+    TEST_ASSERT(RetimeResolutionEngine::shouldMaintainPitch(2.0, true));
+    TEST_ASSERT(!RetimeResolutionEngine::shouldMaintainPitch(2.0, false));
+
+    // 3. Time conversions
+    auto clipTime = TimelineTime::fromSeconds(2.0);
+    auto sourceTimeAt2x = RetimeResolutionEngine::getSourceTimeAtClipTime(clipTime, 2.0);
+    TEST_ASSERT(sourceTimeAt2x == TimelineTime::fromSeconds(4.0));
+
+    auto sourceTimeAtHalf = RetimeResolutionEngine::getSourceTimeAtClipTime(clipTime, 0.5);
+    TEST_ASSERT(sourceTimeAtHalf == TimelineTime::fromSeconds(1.0));
+
+    auto clipTimeFrom4sAt2x = RetimeResolutionEngine::getClipTimeAtSourceTime(TimelineTime::fromSeconds(4.0), 2.0);
+    TEST_ASSERT(clipTimeFrom4sAt2x == TimelineTime::fromSeconds(2.0));
+
+    // 4. Span conversions
+    auto sourceSpan = TimelineTime::fromSeconds(10.0);
+    auto timelineDuration = RetimeResolutionEngine::getTimelineDurationForSourceSpan(sourceSpan, 2.0);
+    TEST_ASSERT(timelineDuration == TimelineTime::fromSeconds(5.0));
+
+    auto span = RetimeResolutionEngine::getSourceSpanAtClipTime(
+        TimelineTime::fromSeconds(2.0), // clipTime
+        2.0                             // rate
+    );
+    TEST_ASSERT(span == TimelineTime::fromSeconds(4.0));
+
+    std::cout << "[PASS] runRetimeResolutionEngineTests" << std::endl;
+}
+
+void runEffectDefinitionRegistryTests() {
+    using namespace catchim::render;
+
+    // 1. Intensity to Sigma
+    TEST_ASSERT(EffectDefinitionRegistry::intensityToSigma(0.0) == 0.0);
+    TEST_ASSERT(EffectDefinitionRegistry::intensityToSigma(15.0) == 3.0);
+    TEST_ASSERT(EffectDefinitionRegistry::intensityToSigma(50.0) == 10.0);
+
+    // 2. Gaussian Blur Passes
+    auto passes = EffectDefinitionRegistry::buildGaussianBlurPasses(3.0, 3.0);
+    TEST_ASSERT(passes.size() == 2);
+    TEST_ASSERT(passes[0].shader == EffectDefinitionRegistry::GAUSSIAN_BLUR_SHADER);
+    TEST_ASSERT(passes[0].direction.first == 1.0f && passes[0].direction.second == 0.0f);
+    TEST_ASSERT(std::abs(passes[0].sigma - 3.0f) < 0.001f);
+    TEST_ASSERT(passes[1].direction.first == 0.0f && passes[1].direction.second == 1.0f);
+    TEST_ASSERT(std::abs(passes[1].sigma - 3.0f) < 0.001f);
+
+    // 3. Registry query
+    const auto& defs = EffectDefinitionRegistry::definitions();
+    TEST_ASSERT(!defs.empty());
+
+    const auto* blurDef = EffectDefinitionRegistry::findDefinition("blur");
+    TEST_ASSERT(blurDef != nullptr);
+    TEST_ASSERT(blurDef->type == "blur");
+    TEST_ASSERT(blurDef->parameters.size() == 1);
+    TEST_ASSERT(blurDef->parameters[0].id == "intensity");
+
+    TEST_ASSERT(EffectDefinitionRegistry::findDefinition("non_existent") == nullptr);
+
+    // 4. Instance & Pass Resolution
+    auto instance = EffectDefinitionRegistry::buildDefaultEffectInstance("blur");
+    TEST_ASSERT(instance.type == "blur");
+    TEST_ASSERT(instance.params["intensity"] == 15.0);
+
+    auto resolved = EffectDefinitionRegistry::resolveEffectPasses(instance, 1920.0, 1080.0);
+    TEST_ASSERT(resolved.size() == 2);
+    TEST_ASSERT(std::abs(resolved[0].sigma - 3.0f) < 0.001f);
+    TEST_ASSERT(std::abs(resolved[1].sigma - 3.0f) < 0.001f);
+
+    std::cout << "[PASS] runEffectDefinitionRegistryTests" << std::endl;
+}
+
+void runCanvasSizePresetsTests() {
+    using namespace catchim::render;
+    using namespace catchim::editor;
+
+    // 1. Default size
+    CanvasSize defaultSize = CanvasSizePresets::DEFAULT_CANVAS_SIZE;
+    TEST_ASSERT(defaultSize.width == 1920);
+    TEST_ASSERT(defaultSize.height == 1080);
+
+    // 2. Presets list
+    const auto& presets = CanvasSizePresets::defaultCanvasPresets();
+    TEST_ASSERT(presets.size() == 4);
+    TEST_ASSERT(presets[0] == CanvasSize(1920, 1080));
+    TEST_ASSERT(presets[1] == CanvasSize(1080, 1920));
+    TEST_ASSERT(presets[2] == CanvasSize(1080, 1080));
+    TEST_ASSERT(presets[3] == CanvasSize(1440, 1080));
+
+    // 3. Preset check
+    TEST_ASSERT(CanvasSizePresets::isDefaultPreset(CanvasSize(1920, 1080)));
+    TEST_ASSERT(CanvasSizePresets::isDefaultPreset(CanvasSize(1080, 1920)));
+    TEST_ASSERT(!CanvasSizePresets::isDefaultPreset(CanvasSize(1280, 720)));
+
+    // 4. Aspect ratio
+    TEST_ASSERT(std::abs(CanvasSizePresets::getAspectRatio(CanvasSize(1920, 1080)) - (16.0 / 9.0)) < 1e-6);
+    TEST_ASSERT(std::abs(CanvasSizePresets::getAspectRatio(CanvasSize(1080, 1920)) - (9.0 / 16.0)) < 1e-6);
+    TEST_ASSERT(std::abs(CanvasSizePresets::getAspectRatio(CanvasSize(1080, 1080)) - 1.0) < 1e-6);
+    TEST_ASSERT(CanvasSizePresets::getAspectRatio(CanvasSize(1920, 0)) == 0.0);
+
+    std::cout << "[PASS] runCanvasSizePresetsTests" << std::endl;
+}
+
+void runSceneHierarchyUtilsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    // 1. buildDefaultScene
+    auto scene1 = SceneHierarchyUtils::buildDefaultScene("Intro", false);
+    TEST_ASSERT(scene1.name() == "Intro");
+    TEST_ASSERT(!scene1.isMain());
+
+    auto scene2 = SceneHierarchyUtils::buildDefaultScene("Main", true);
+    TEST_ASSERT(scene2.name() == "Main");
+    TEST_ASSERT(scene2.isMain());
+
+    // 2. getMainScene & ensureMainScene
+    std::vector<Scene> scenes;
+    TEST_ASSERT(SceneHierarchyUtils::getMainScene(scenes) == nullptr);
+
+    scenes.push_back(std::move(scene1));
+    TEST_ASSERT(SceneHierarchyUtils::getMainScene(scenes) == nullptr);
+
+    SceneHierarchyUtils::ensureMainScene(scenes);
+    TEST_ASSERT(scenes.size() == 2);
+    TEST_ASSERT(scenes[0].isMain());
+    TEST_ASSERT(scenes[0].name() == "Main scene");
+    TEST_ASSERT(SceneHierarchyUtils::getMainScene(scenes) == &scenes[0]);
+
+    // 3. canDeleteScene
+    auto resMain = SceneHierarchyUtils::canDeleteScene(scenes[0]);
+    TEST_ASSERT(!resMain.canDelete);
+    TEST_ASSERT(resMain.reason == "Cannot delete main scene");
+
+    auto resOther = SceneHierarchyUtils::canDeleteScene(scenes[1]);
+    TEST_ASSERT(resOther.canDelete);
+    TEST_ASSERT(resOther.reason.empty());
+
+    // 4. getFallbackSceneAfterDelete
+    auto mainId = scenes[0].id();
+    auto otherId = scenes[1].id();
+    // Deleting other while on other -> fallback to main
+    const auto* fallback = SceneHierarchyUtils::getFallbackSceneAfterDelete(scenes, otherId, otherId);
+    TEST_ASSERT(fallback != nullptr && fallback->id() == mainId);
+
+    // Deleting other while on main -> stays on main
+    fallback = SceneHierarchyUtils::getFallbackSceneAfterDelete(scenes, otherId, mainId);
+    TEST_ASSERT(fallback != nullptr && fallback->id() == mainId);
+
+    // 5. findCurrentScene
+    TEST_ASSERT(SceneHierarchyUtils::findCurrentScene(scenes, otherId) == &scenes[1]);
+    TEST_ASSERT(SceneHierarchyUtils::findCurrentScene(scenes, std::nullopt) == &scenes[0]);
+
+    // 6. calculateTotalDuration & getProjectDurationFromScenes
+    // Add clip to main scene's timeline
+    scenes[0].timeline().mainTrack().clips().push_back(Clip(
+        ClipId::generate(),
+        ClipType::Video,
+        "clip1",
+        TimelineTime::fromSeconds(1.0),
+        TimelineTime::fromSeconds(4.0)
+    ));
+    auto dur = SceneHierarchyUtils::getProjectDurationFromScenes(scenes);
+    TEST_ASSERT(dur == TimelineTime::fromSeconds(5.0));
+
+    std::cout << "[PASS] runSceneHierarchyUtilsTests" << std::endl;
+}
+
+void runUuidGeneratorTests() {
+    using namespace catchim::core;
+
+    // 1. Basic generation and validity
+    auto uuid = UuidGenerator::generateUUID();
+    TEST_ASSERT(uuid.size() == 36);
+    TEST_ASSERT(UuidGenerator::isValidUUID(uuid));
+
+    // 2. Multiple unique UUIDs
+    std::unordered_set<std::string> seen;
+    for (int i = 0; i < 50; ++i) {
+        auto u = UuidGenerator::generateUUID();
+        TEST_ASSERT(UuidGenerator::isValidUUID(u));
+        TEST_ASSERT(seen.insert(u).second);
+    }
+
+    // 3. Validity verification
+    TEST_ASSERT(!UuidGenerator::isValidUUID("not-a-uuid"));
+    TEST_ASSERT(!UuidGenerator::isValidUUID("12345678-1234-1234-1234-123456789abc")); // version != 4
+    TEST_ASSERT(!UuidGenerator::isValidUUID("12345678-1234-4234-0234-123456789abc")); // variant != 8/9/a/b
+    TEST_ASSERT(UuidGenerator::isValidUUID("12345678-1234-4234-8234-123456789abc"));
+    TEST_ASSERT(UuidGenerator::isValidUUID("12345678-1234-4234-9234-123456789abc"));
+    TEST_ASSERT(UuidGenerator::isValidUUID("12345678-1234-4234-a234-123456789abc"));
+    TEST_ASSERT(UuidGenerator::isValidUUID("12345678-1234-4234-b234-123456789abc"));
+
+    std::cout << "[PASS] runUuidGeneratorTests" << std::endl;
+}
+
+void runStringUtilsTests() {
+    using namespace catchim::core;
+
+    // 1. capitalizeFirstLetter
+    TEST_ASSERT(StringUtils::capitalizeFirstLetter("hello") == "Hello");
+    TEST_ASSERT(StringUtils::capitalizeFirstLetter("Hello") == "Hello");
+    TEST_ASSERT(StringUtils::capitalizeFirstLetter("") == "");
+    TEST_ASSERT(StringUtils::capitalizeFirstLetter("a") == "A");
+
+    // 2. uppercase & lowercase
+    TEST_ASSERT(StringUtils::uppercase("hello world") == "HELLO WORLD");
+    TEST_ASSERT(StringUtils::lowercase("HELLO WORLD") == "hello world");
+
+    // 3. Platform keys
+#if defined(__APPLE__)
+    TEST_ASSERT(StringUtils::isAppleDevice());
+    TEST_ASSERT(StringUtils::getPlatformSpecialKey() == "\xE2\x8C\x98");
+    TEST_ASSERT(StringUtils::getPlatformAlternateKey() == "\xE2\x8C\xA5");
+#else
+    TEST_ASSERT(!StringUtils::isAppleDevice());
+    TEST_ASSERT(StringUtils::getPlatformSpecialKey() == "Ctrl");
+    TEST_ASSERT(StringUtils::getPlatformAlternateKey() == "Alt");
+#endif
+
+    std::cout << "[PASS] runStringUtilsTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -9515,7 +9756,13 @@ int main() {
     runBackgroundPresetsTests();
     runParamChannelLayoutEngineTests();
     runI18nEngineTests();
-    std::cout << ">>> ALL 151 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runRetimeResolutionEngineTests();
+    runEffectDefinitionRegistryTests();
+    runCanvasSizePresetsTests();
+    runSceneHierarchyUtilsTests();
+    runUuidGeneratorTests();
+    runStringUtilsTests();
+    std::cout << ">>> ALL 157 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
 
