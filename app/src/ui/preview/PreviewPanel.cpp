@@ -1,6 +1,7 @@
 #include "PreviewPanel.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include "core/time/Timecode.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -44,14 +45,14 @@ void PreviewPanel::setupUi() {
 
     tbLayout->addStretch();
 
-    auto makeTbBtn = [toolbar](const QString& text, const QString& tip) {
-        auto* btn = new QPushButton(text, toolbar);
+    auto makeIconTbBtn = [toolbar](UiIcon icon, const QString& tip) {
+        auto* btn = new QPushButton(toolbar);
         btn->setFixedSize(32, 32);
+        btn->setIcon(UiIcons::get(icon, QColor("#f4f4f5"), 16));
+        btn->setIconSize(QSize(16, 16));
         btn->setToolTip(tip);
         btn->setStyleSheet(R"(
             QPushButton {
-                font-size: 13px;
-                color: #f4f4f5;
                 background-color: #18181b;
                 border: 1px solid #27272a;
                 border-radius: 6px;
@@ -60,20 +61,19 @@ void PreviewPanel::setupUi() {
             QPushButton:hover {
                 background-color: #27272a;
                 border-color: #38bdf8;
-                color: #38bdf8;
             }
         )");
         return btn;
     };
 
-    auto* jumpStartBtn = makeTbBtn("⏮", "Về đầu video (Home)");
+    auto* jumpStartBtn = makeIconTbBtn(UiIcon::SkipBack, "Về đầu video (Home)");
     connect(jumpStartBtn, &QPushButton::clicked, [this]() {
         engine_.seek(core::TimelineTime::zero());
         refresh();
     });
     tbLayout->addWidget(jumpStartBtn);
 
-    auto* prevFrameBtn = makeTbBtn("◀", "Lùi 1 khung hình (Trái)");
+    auto* prevFrameBtn = makeIconTbBtn(UiIcon::StepBack, "Lùi 1 khung hình (Trái)");
     connect(prevFrameBtn, &QPushButton::clicked, [this]() {
         const auto& fps = engine_.project().settings().fps;
         core::TimelineTime cur = engine_.playback().currentTime();
@@ -84,18 +84,17 @@ void PreviewPanel::setupUi() {
     tbLayout->addWidget(prevFrameBtn);
 
     // Play / Pause button
-    playPauseBtn_ = new QPushButton("▶", toolbar);
+    playPauseBtn_ = new QPushButton(toolbar);
     playPauseBtn_->setFixedSize(36, 32);
+    playPauseBtn_->setIcon(UiIcons::get(UiIcon::Play, QColor("#ffffff"), 16));
+    playPauseBtn_->setIconSize(QSize(16, 16));
     playPauseBtn_->setToolTip("Phát / Tạm dừng (Space)");
     playPauseBtn_->setStyleSheet(R"(
         QPushButton {
-            font-size: 14px;
-            color: #ffffff;
             background-color: #0284c7;
             border: 1px solid #0284c7;
             border-radius: 6px;
             padding: 0;
-            font-weight: bold;
         }
         QPushButton:hover {
             background-color: #0369a1;
@@ -105,7 +104,7 @@ void PreviewPanel::setupUi() {
     connect(playPauseBtn_, &QPushButton::clicked, this, &PreviewPanel::onPlayPauseClicked);
     tbLayout->addWidget(playPauseBtn_);
 
-    auto* nextFrameBtn = makeTbBtn("▶", "Tiến 1 khung hình (Phải)");
+    auto* nextFrameBtn = makeIconTbBtn(UiIcon::StepForward, "Tiến 1 khung hình (Phải)");
     connect(nextFrameBtn, &QPushButton::clicked, [this]() {
         const auto& fps = engine_.project().settings().fps;
         core::TimelineTime cur = engine_.playback().currentTime();
@@ -115,7 +114,7 @@ void PreviewPanel::setupUi() {
     });
     tbLayout->addWidget(nextFrameBtn);
 
-    auto* jumpEndBtn = makeTbBtn("⏭", "Đến cuối video (End)");
+    auto* jumpEndBtn = makeIconTbBtn(UiIcon::SkipForward, "Đến cuối video (End)");
     connect(jumpEndBtn, &QPushButton::clicked, [this]() {
         engine_.seek(engine_.project().totalDuration());
         refresh();
@@ -154,7 +153,10 @@ void PreviewPanel::refresh() {
     std::string durTc = core::Timecode::format(dur, core::TimecodeFormat::HH_MM_SS_FF, fps);
 
     timecodeLabel_->setText(QString::fromStdString(curTc + " / " + durTc));
-    playPauseBtn_->setText(engine_.playback().isPlaying() ? "⏸" : "▶");
+    playPauseBtn_->setIcon(engine_.playback().isPlaying() ?
+        UiIcons::get(UiIcon::Pause, QColor("#ffffff"), 16) :
+        UiIcons::get(UiIcon::Play, QColor("#ffffff"), 16));
+    playPauseBtn_->setText("");
     previewWidget_->update();
 }
 

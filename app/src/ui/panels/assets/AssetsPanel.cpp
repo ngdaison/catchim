@@ -1,6 +1,7 @@
 #include "AssetsPanel.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include "media/probe/MediaProbe.h"
 #include "core/time/Timecode.h"
 #include "subtitles/SrtParser.h"
@@ -10,7 +11,6 @@
 #include <QGridLayout>
 #include <QFileDialog>
 #include <QColorDialog>
-#include <QMessageBox>
 #include <QLabel>
 #include <QScrollArea>
 #include <QGroupBox>
@@ -36,23 +36,23 @@ void AssetsPanel::setupUi() {
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    // Left vertical TabBar (Media, Sounds, Text, Stickers, Effects, Subtitles, Settings)
+    // Left vertical TabBar (Media, Audio, Text, Stickers, Effects, Subtitles, Settings)
     tabList_ = new QListWidget(this);
-    tabList_->setFixedWidth(56);
+    tabList_->setFixedWidth(64);
+    tabList_->setIconSize(QSize(20, 20));
     tabList_->setStyleSheet(R"(
         QListWidget {
             background-color: #0c0c0e;
             border-right: 1px solid #27272a;
-            padding: 6px 0px;
+            padding: 8px 0px;
         }
         QListWidget::item {
-            height: 48px;
+            height: 52px;
             color: #a1a1aa;
-            border-radius: 6px;
-            margin: 3px 4px;
+            border-radius: 8px;
+            margin: 2px 6px;
             font-size: 11px;
             font-weight: 500;
-            text-align: center;
         }
         QListWidget::item:hover {
             background-color: #1e1e24;
@@ -65,19 +65,20 @@ void AssetsPanel::setupUi() {
         }
     )");
 
-    auto addTab = [this](const QString& title, const QString& icon) {
+    auto addTab = [this](const QString& title, UiIcon icon) {
         auto* item = new QListWidgetItem(tabList_);
-        item->setText(icon + "\n" + title);
+        item->setIcon(UiIcons::get(icon, QColor("#a1a1aa"), 20));
+        item->setText(title);
         item->setTextAlignment(Qt::AlignCenter);
     };
 
-    addTab("Media", "📁");
-    addTab("Audio", "🎵");
-    addTab("Text", "🆃");
-    addTab("Sticker", "◨");
-    addTab("Effects", "✨");
-    addTab("Phụ đề", "💬");
-    addTab("Canvas", "⚙");
+    addTab("Media", UiIcon::Media);
+    addTab("Audio", UiIcon::Audio);
+    addTab("Text", UiIcon::Text);
+    addTab("Sticker", UiIcon::Stickers);
+    addTab("Effects", UiIcon::Effects);
+    addTab("Phụ đề", UiIcon::Captions);
+    addTab("Canvas", UiIcon::Settings);
     tabList_->setCurrentRow(0);
 
     viewsStack_ = new QStackedWidget(this);
@@ -682,10 +683,7 @@ void AssetsPanel::onAddGraphicPreset(const QString& name, const QString& shapeTy
 
 void AssetsPanel::onApplyEffectPreset(const QString& effectName) {
     const auto& sel = engine_.selectedClips();
-    if (sel.empty()) {
-        QMessageBox::information(this, "Áp dụng hiệu ứng", "Vui lòng chọn một clip trên timeline trước khi áp dụng hiệu ứng!");
-        return;
-    }
+    if (sel.empty()) return;
 
     auto* tl = engine_.activeTimeline();
     if (!tl) return;
@@ -698,7 +696,7 @@ void AssetsPanel::onApplyEffectPreset(const QString& effectName) {
         }
     }
     engine_.project().setDirty(true);
-    QMessageBox::information(this, "Hiệu ứng", QString("Đã áp dụng '%1' vào clip đang chọn!").arg(effectName));
+    engine_.notifyProjectChanged();
 }
 
 void AssetsPanel::onImportSrtClicked() {
@@ -712,10 +710,7 @@ void AssetsPanel::onImportSrtClicked() {
     buffer << file.rdbuf();
     std::string content = buffer.str();
     auto result = subtitles::SrtParser::parse(content);
-    if (result.cues.empty()) {
-        QMessageBox::warning(this, "Lỗi phụ đề", "Không tìm thấy đoạn phụ đề hợp lệ trong tệp.");
-        return;
-    }
+    if (result.cues.empty()) return;
 
     auto* tl = engine_.activeTimeline();
     if (!tl) return;
@@ -740,16 +735,13 @@ void AssetsPanel::onImportSrtClicked() {
         clip.params()["text.content"] = cue.text;
         engine_.addClip(textTrackId, std::move(clip));
     }
-
-    QMessageBox::information(this, "Nhập phụ đề", QString("Đã nhập thành công %1 đoạn phụ đề vào timeline!").arg(result.cues.size()));
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
 }
 
 void AssetsPanel::onAutoTranscribeClicked() {
     auto* tl = engine_.activeTimeline();
-    if (!tl || tl->mainTrack().clips().empty()) {
-        QMessageBox::information(this, "Tạo phụ đề", "Timeline đang trống. Hãy thêm video hoặc audio vào trước!");
-        return;
-    }
+    if (!tl || tl->mainTrack().clips().empty()) return;
 
     // Auto-create sample transcription subtitles across the timeline duration
     core::TimelineTime totalDur = tl->totalDuration();
@@ -771,19 +763,20 @@ void AssetsPanel::onAutoTranscribeClicked() {
         clip.params()["text.content"] = QString("Phụ đề tự động #%1").arg(i + 1).toStdString();
         engine_.addClip(tl->mainTrack().id(), std::move(clip));
     }
-
-    QMessageBox::information(this, "Hoàn tất nhận diện", QString("Đã tự động tạo %1 đoạn phụ đề cho toàn bộ video!").arg(cueCount));
+    engine_.project().setDirty(true);
+    engine_.notifyTimelineChanged();
 }
 
 void AssetsPanel::onCanvasAspectChanged(int width, int height) {
     engine_.project().settings().canvasSize = {width, height};
     engine_.project().setDirty(true);
-    QMessageBox::information(this, "Đổi tỉ lệ Canvas", QString("Đã thay đổi độ phân giải Canvas thành %1x%2!").arg(width).arg(height));
+    engine_.notifyProjectChanged();
 }
 
 void AssetsPanel::onCanvasBgColorChanged(const QColor& color) {
     engine_.project().settings().background.color = color.name().toStdString();
     engine_.project().setDirty(true);
+    engine_.notifyProjectChanged();
 }
 
 } // namespace catchim::ui

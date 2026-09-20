@@ -443,10 +443,18 @@ add_library(catchim_media STATIC
     src/media/MediaTypeUtils.h
     src/media/MediaProcessingPipeline.cpp
     src/media/MediaProcessingPipeline.h
+    src/media/decoder/NativeVideoDecoder.cpp
+    src/media/decoder/NativeVideoDecoder.h
     src/media/MediaUploadToastEngine.cpp
     src/media/MediaUploadToastEngine.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
+if(WIN32)
+    target_link_libraries(catchim_media PUBLIC mfplat mfreadwrite mfuuid propsys)
+endif()
+if(HAVE_QT6)
+    target_link_libraries(catchim_media PUBLIC Qt6::Gui)
+endif()
 
 # Render & Audio libraries
 add_library(catchim_render STATIC
@@ -639,6 +647,8 @@ target_link_libraries(catchim_storage PUBLIC catchim_editor)
 # App target (CLI / Desktop executable)
 if(HAVE_QT6)
     add_library(catchim_ui STATIC
+        src/ui/icons/UiIcons.cpp
+        src/ui/icons/UiIcons.h
         src/ui/theme/Colors.h
         src/ui/theme/Metrics.h
         src/ui/theme/Theme.cpp

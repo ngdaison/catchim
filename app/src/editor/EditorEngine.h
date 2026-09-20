@@ -83,12 +83,11 @@ public:
     void setOnSelectionChanged(std::function<void()> cb) { onSelectionChanged_ = std::move(cb); }
 
     void update();
-
-private:
     void notifyProjectChanged();
     void notifyTimelineChanged();
     void notifySelectionChanged();
 
+private:
     Project project_;
     CommandHistory history_;
     PlaybackController playback_;

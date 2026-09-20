@@ -1,6 +1,7 @@
 #include "EditorHeader.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include "ui/theme/Theme.h"
 #include <QMenu>
 #include <QMessageBox>
@@ -24,12 +25,12 @@ void EditorHeader::setupUi() {
     layout->setSpacing(8);
 
     // Left side: Logo & Project Name
-    auto* logoButton = new QPushButton("✦", this);
+    auto* logoButton = new QPushButton(this);
     logoButton->setFixedSize(32, 32);
+    logoButton->setIcon(UiIcons::get(UiIcon::Media, QColor("#38bdf8"), 18));
+    logoButton->setIconSize(QSize(18, 18));
     logoButton->setStyleSheet(R"(
         QPushButton {
-            font-size: 16px;
-            color: #38bdf8;
             background: #18181b;
             border: 1px solid #27272a;
             border-radius: 6px;
@@ -41,11 +42,11 @@ void EditorHeader::setupUi() {
     )");
 
     auto* logoMenu = new QMenu(logoButton);
-    logoMenu->addAction("📝 Tạo dự án mới", [this]() {
+    logoMenu->addAction("Tạo dự án mới", [this]() {
         engine_.newProject("Dự án mới");
     });
     logoMenu->addSeparator();
-    logoMenu->addAction("⌨ Phím tắt (Shortcuts)", [this]() {
+    logoMenu->addAction("Phím tắt (Shortcuts)", [this]() {
         QMessageBox::information(this, "Phím tắt Catchim",
             "• Space: Phát / Tạm dừng\n"
             "• S: Cắt clip tại đầu đọc\n"
@@ -85,16 +86,44 @@ void EditorHeader::setupUi() {
     layout->addWidget(nameEdit_);
 
     // Undo / Redo Quick Buttons
-    auto* undoBtn = new QPushButton("↩", this);
+    auto* undoBtn = new QPushButton(this);
     undoBtn->setFixedSize(30, 30);
+    undoBtn->setIcon(UiIcons::get(UiIcon::Undo, QColor("#f4f4f5"), 16));
+    undoBtn->setIconSize(QSize(16, 16));
     undoBtn->setToolTip("Hoàn tác (Ctrl+Z)");
+    undoBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 0;
+        }
+        QPushButton:hover {
+            background: #27272a;
+            border-color: #38bdf8;
+        }
+    )");
     connect(undoBtn, &QPushButton::clicked, [this]() {
         engine_.undo();
     });
 
-    auto* redoBtn = new QPushButton("↪", this);
+    auto* redoBtn = new QPushButton(this);
     redoBtn->setFixedSize(30, 30);
+    redoBtn->setIcon(UiIcons::get(UiIcon::Redo, QColor("#f4f4f5"), 16));
+    redoBtn->setIconSize(QSize(16, 16));
     redoBtn->setToolTip("Làm lại (Ctrl+Y)");
+    redoBtn->setStyleSheet(R"(
+        QPushButton {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 0;
+        }
+        QPushButton:hover {
+            background: #27272a;
+            border-color: #38bdf8;
+        }
+    )");
     connect(redoBtn, &QPushButton::clicked, [this]() {
         engine_.redo();
     });
@@ -105,7 +134,9 @@ void EditorHeader::setupUi() {
     layout->addStretch();
 
     // Right side: Export Button & Theme toggle
-    exportButton_ = new QPushButton("🚀 Xuất video", this);
+    exportButton_ = new QPushButton("Xuất video", this);
+    exportButton_->setIcon(UiIcons::get(UiIcon::Export, QColor("#ffffff"), 16));
+    exportButton_->setIconSize(QSize(16, 16));
     exportButton_->setFixedHeight(32);
     exportButton_->setStyleSheet(R"(
         QPushButton {
@@ -123,20 +154,21 @@ void EditorHeader::setupUi() {
     )");
     connect(exportButton_, &QPushButton::clicked, this, &EditorHeader::exportClicked);
 
-    themeButton_ = new QPushButton("◐", this);
+    themeButton_ = new QPushButton(this);
     themeButton_->setFixedSize(32, 32);
-    themeButton_->setToolTip("Chuyển chế độ Sáng / Tối (Theme)");
+    themeButton_->setIcon(UiIcons::get(UiIcon::Settings, QColor("#a1a1aa"), 16));
+    themeButton_->setIconSize(QSize(16, 16));
+    themeButton_->setToolTip("Cài đặt / Giao diện");
     themeButton_->setStyleSheet(R"(
         QPushButton {
-            font-size: 14px;
-            color: #a1a1aa;
             background: #18181b;
             border: 1px solid #27272a;
             border-radius: 6px;
+            padding: 0;
         }
         QPushButton:hover {
             background: #27272a;
-            color: #f4f4f5;
+            border-color: #38bdf8;
         }
     )");
     connect(themeButton_, &QPushButton::clicked, this, &EditorHeader::themeToggleClicked);

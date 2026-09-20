@@ -5,6 +5,16 @@
 #include <QVBoxLayout>
 #include <QKeyEvent>
 #include <QMessageBox>
+#include <QFileDialog>
+#include <QProgressDialog>
+#include <QProcess>
+#include <QCoreApplication>
+#include <QDesktopServices>
+#include <QUrl>
+#include <QFileInfo>
+#include <QFile>
+#include <QPushButton>
+#include <cmath>
 
 namespace catchim::ui {
 
@@ -126,7 +136,162 @@ void MainWindow::onAppTick() {
 }
 
 void MainWindow::onExportRequested() {
-    QMessageBox::information(this, "Xuất video", "Tính năng xuất video MP4 (H.264 + AAC) qua FFmpeg engine đang sẵn sàng!");
+    auto* tl = engine_.activeTimeline();
+    if (!tl || tl->mainTrack().clips().empty()) {
+        QMessageBox::warning(this, "Xuất video", "Dự án đang trống. Vui lòng thêm video, ảnh hoặc âm thanh vào timeline trước khi xuất!");
+        return;
+    }
+
+    core::TimelineTime totalDur = tl->totalDuration();
+    double totalSec = totalDur.toSeconds();
+    if (totalSec <= 0.0) {
+        QMessageBox::warning(this, "Xuất video", "Thời lượng dự án không hợp lệ.");
+        return;
+    }
+
+    QString defaultName = QString::fromStdString(engine_.project().name()) + ".mp4";
+    QString savePath = QFileDialog::getSaveFileName(
+        this,
+        "Xuất video MP4",
+        defaultName,
+        "Video MP4 (*.mp4);;All Files (*.*)"
+    );
+    if (savePath.isEmpty()) return;
+
+    int width = engine_.project().settings().canvasSize.width;
+    int height = engine_.project().settings().canvasSize.height;
+    if (width <= 0 || height <= 0) {
+        width = 1920;
+        height = 1080;
+    }
+
+    const auto& fpsSetting = engine_.project().settings().fps;
+    double fps = (fpsSetting.denominator > 0) ?
+        static_cast<double>(fpsSetting.numerator) / fpsSetting.denominator : 30.0;
+    if (fps <= 0.0) fps = 30.0;
+
+    int totalFrames = static_cast<int>(std::ceil(totalSec * fps));
+    if (totalFrames <= 0) totalFrames = 1;
+
+    // Locate FFmpeg
+    QString ffmpegPath = "ffmpeg";
+    static const QString knownWingetFfmpeg = "C:/Users/sonng/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-9.0.1-full_build/bin/ffmpeg.exe";
+    if (QFile::exists(knownWingetFfmpeg)) {
+        ffmpegPath = knownWingetFfmpeg;
+    }
+
+    QStringList args;
+    args << "-y"
+         << "-f" << "rawvideo"
+         << "-vcodec" << "rawvideo"
+         << "-s" << QString("%1x%2").arg(width).arg(height)
+         << "-pix_fmt" << "rgba"
+         << "-r" << QString::number(fps, 'f', 2)
+         << "-i" << "-"
+         << "-c:v" << "libx264"
+         << "-pix_fmt" << "yuv420p"
+         << "-preset" << "fast"
+         << "-crf" << "22"
+         << savePath;
+
+    QProcess ffmpegProcess;
+    ffmpegProcess.start(ffmpegPath, args);
+    if (!ffmpegProcess.waitForStarted(5000)) {
+        QMessageBox::critical(this, "Lỗi xuất video",
+            "Không thể khởi chạy FFmpeg để kết xuất video.\n"
+            "Vui lòng kiểm tra FFmpeg đã được cài đặt trong hệ thống.");
+        return;
+    }
+
+    QProgressDialog progress("Đang kết xuất video MP4...", "Hủy bỏ", 0, totalFrames, this);
+    progress.setWindowModality(Qt::WindowModal);
+    progress.setMinimumDuration(0);
+    progress.setValue(0);
+    progress.setStyleSheet(R"(
+        QProgressDialog {
+            background-color: #18181b;
+            color: #f4f4f5;
+            border: 1px solid #27272a;
+        }
+        QLabel {
+            color: #f4f4f5;
+            font-size: 13px;
+        }
+        QProgressBar {
+            background-color: #27272a;
+            color: #f4f4f5;
+            border: 1px solid #3f3f46;
+            border-radius: 4px;
+            text-align: center;
+        }
+        QProgressBar::chunk {
+            background-color: #0284c7;
+            border-radius: 4px;
+        }
+        QPushButton {
+            background-color: #27272a;
+            color: #f4f4f5;
+            border: 1px solid #3f3f46;
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+    )");
+
+    renderEngine_.setCanvasSize(width, height);
+
+    bool canceled = false;
+    for (int f = 0; f < totalFrames; ++f) {
+        if (progress.wasCanceled()) {
+            canceled = true;
+            ffmpegProcess.kill();
+            break;
+        }
+
+        double timeSec = static_cast<double>(f) / fps;
+        core::TimelineTime curTime = core::TimelineTime::fromSeconds(timeSec);
+        const auto& frame = renderEngine_.renderFrame(engine_.project(), mediaLibrary_, curTime);
+
+        const char* pixelData = reinterpret_cast<const char*>(frame.rgbaPixels.data());
+        qint64 bytesToWrite = static_cast<qint64>(frame.rgbaPixels.size());
+        qint64 written = 0;
+        while (written < bytesToWrite) {
+            qint64 chunk = ffmpegProcess.write(pixelData + written, bytesToWrite - written);
+            if (chunk < 0) break;
+            written += chunk;
+        }
+
+        if (f % 5 == 0 || f == totalFrames - 1) {
+            progress.setValue(f + 1);
+            QCoreApplication::processEvents();
+        }
+    }
+
+    ffmpegProcess.closeWriteChannel();
+    ffmpegProcess.waitForFinished(60000);
+
+    if (canceled) {
+        QFile::remove(savePath);
+        return;
+    }
+
+    if (ffmpegProcess.exitStatus() == QProcess::NormalExit && ffmpegProcess.exitCode() == 0) {
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle("Xuất video thành công");
+        msgBox.setText(QString("Video đã được xuất thành công tới:\n%1").arg(savePath));
+        QPushButton* openFolderBtn = msgBox.addButton("Mở thư mục", QMessageBox::ActionRole);
+        QPushButton* closeBtn = msgBox.addButton("Đóng", QMessageBox::RejectRole);
+        (void)closeBtn;
+        msgBox.setDefaultButton(openFolderBtn);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == openFolderBtn) {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(QFileInfo(savePath).absolutePath()));
+        }
+    } else {
+        QString errorLog = QString::fromUtf8(ffmpegProcess.readAllStandardError());
+        QMessageBox::critical(this, "Lỗi xuất video",
+            QString("Quá trình xuất video gặp lỗi:\n%1").arg(errorLog.right(300)));
+    }
 }
 
 void MainWindow::onThemeToggleRequested() {

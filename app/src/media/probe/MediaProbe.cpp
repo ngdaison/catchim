@@ -309,78 +309,124 @@ bool probeWindowsMediaFoundation(const std::filesystem::path& path, double& outD
     HRESULT hr = MFStartup(MF_VERSION);
     if (FAILED(hr)) return false;
 
-    IMFSourceResolver* pSourceResolver = nullptr;
-    IUnknown* pSource = nullptr;
-    IMFMediaSource* pMediaSource = nullptr;
-    IMFPresentationDescriptor* pPD = nullptr;
+    std::wstring wpath = path.wstring();
+    for (auto& c : wpath) {
+        if (c == L'/') c = L'\\';
+    }
 
     bool success = false;
-    hr = MFCreateSourceResolver(&pSourceResolver);
-    if (SUCCEEDED(hr)) {
-        MF_OBJECT_TYPE ObjectType = MF_OBJECT_INVALID;
-        std::wstring wpath = path.wstring();
-        hr = pSourceResolver->CreateObjectFromURL(
-            wpath.c_str(),
-            MF_RESOLUTION_MEDIASOURCE,
-            nullptr,
-            &ObjectType,
-            &pSource
-        );
 
-        if (SUCCEEDED(hr) && pSource) {
-            hr = pSource->QueryInterface(IID_PPV_ARGS(&pMediaSource));
-            if (SUCCEEDED(hr) && pMediaSource) {
-                hr = pMediaSource->CreatePresentationDescriptor(&pPD);
-                if (SUCCEEDED(hr) && pPD) {
-                    UINT64 duration100ns = 0;
-                    hr = pPD->GetUINT64(MF_PD_DURATION, &duration100ns);
-                    if (SUCCEEDED(hr) && duration100ns > 0) {
-                        outDuration = static_cast<double>(duration100ns) / 10000000.0;
-                        success = true;
-                    }
-
-                    DWORD streamCount = 0;
-                    pPD->GetStreamDescriptorCount(&streamCount);
-                    for (DWORD i = 0; i < streamCount; ++i) {
-                        BOOL selected = FALSE;
-                        IMFStreamDescriptor* pSD = nullptr;
-                        if (SUCCEEDED(pPD->GetStreamDescriptorByIndex(i, &selected, &pSD)) && pSD) {
-                            IMFMediaTypeHandler* pHandler = nullptr;
-                            if (SUCCEEDED(pSD->GetMediaTypeHandler(&pHandler)) && pHandler) {
-                                GUID majorType = GUID_NULL;
-                                pHandler->GetMajorType(&majorType);
-                                if (majorType == MFMediaType_Video) {
-                                    hasVideo = true;
-                                    IMFMediaType* pMediaType = nullptr;
-                                    if (SUCCEEDED(pHandler->GetCurrentMediaType(&pMediaType)) && pMediaType) {
-                                        UINT32 w = 0, h = 0;
-                                        if (SUCCEEDED(MFGetAttributeSize(pMediaType, MF_MT_FRAME_SIZE, &w, &h))) {
-                                            if (w > 0 && h > 0) {
-                                                outWidth = static_cast<int>(w);
-                                                outHeight = static_cast<int>(h);
-                                            }
-                                        }
-                                        UINT32 num = 0, den = 0;
-                                        if (SUCCEEDED(MFGetAttributeRatio(pMediaType, MF_MT_FRAME_RATE, &num, &den)) && den > 0) {
-                                            outFps = static_cast<double>(num) / den;
-                                        }
-                                        pMediaType->Release();
-                                    }
-                                } else if (majorType == MFMediaType_Audio) {
-                                    hasAudio = true;
-                                }
-                                pHandler->Release();
-                            }
-                            pSD->Release();
-                        }
-                    }
-                    pPD->Release();
-                }
-                pMediaSource->Release();
+    // Try IMFSourceReader first
+    IMFSourceReader* pReader = nullptr;
+    hr = MFCreateSourceReaderFromURL(wpath.c_str(), nullptr, &pReader);
+    if (SUCCEEDED(hr) && pReader) {
+        PROPVARIANT var;
+        PropVariantInit(&var);
+        if (SUCCEEDED(pReader->GetPresentationAttribute(MF_SOURCE_READER_MEDIASOURCE, MF_PD_DURATION, &var))) {
+            if (var.vt == VT_UI8 && var.uhVal.QuadPart > 0) {
+                outDuration = static_cast<double>(var.uhVal.QuadPart) / 10000000.0;
+                success = true;
             }
-            pSource->Release();
+            PropVariantClear(&var);
         }
-        pSourceResolver->Release();
+
+        IMFMediaType* pVideoType = nullptr;
+        if (SUCCEEDED(pReader->GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0, &pVideoType)) && pVideoType) {
+            hasVideo = true;
+            UINT32 w = 0, h = 0;
+            if (SUCCEEDED(MFGetAttributeSize(pVideoType, MF_MT_FRAME_SIZE, &w, &h)) && w > 0 && h > 0) {
+                outWidth = static_cast<int>(w);
+                outHeight = static_cast<int>(h);
+            }
+            UINT32 num = 0, den = 0;
+            if (SUCCEEDED(MFGetAttributeRatio(pVideoType, MF_MT_FRAME_RATE, &num, &den)) && den > 0) {
+                outFps = static_cast<double>(num) / den;
+            }
+            pVideoType->Release();
+        }
+
+        IMFMediaType* pAudioType = nullptr;
+        if (SUCCEEDED(pReader->GetNativeMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &pAudioType)) && pAudioType) {
+            hasAudio = true;
+            pAudioType->Release();
+        }
+
+        pReader->Release();
+    }
+
+    if (!success) {
+        // Fallback: MFCreateSourceResolver
+        IMFSourceResolver* pSourceResolver = nullptr;
+        IUnknown* pSource = nullptr;
+        IMFMediaSource* pMediaSource = nullptr;
+        IMFPresentationDescriptor* pPD = nullptr;
+
+        hr = MFCreateSourceResolver(&pSourceResolver);
+        if (SUCCEEDED(hr)) {
+            MF_OBJECT_TYPE ObjectType = MF_OBJECT_INVALID;
+            hr = pSourceResolver->CreateObjectFromURL(
+                wpath.c_str(),
+                MF_RESOLUTION_MEDIASOURCE,
+                nullptr,
+                &ObjectType,
+                &pSource
+            );
+
+            if (SUCCEEDED(hr) && pSource) {
+                hr = pSource->QueryInterface(IID_PPV_ARGS(&pMediaSource));
+                if (SUCCEEDED(hr) && pMediaSource) {
+                    hr = pMediaSource->CreatePresentationDescriptor(&pPD);
+                    if (SUCCEEDED(hr) && pPD) {
+                        UINT64 duration100ns = 0;
+                        hr = pPD->GetUINT64(MF_PD_DURATION, &duration100ns);
+                        if (SUCCEEDED(hr) && duration100ns > 0) {
+                            outDuration = static_cast<double>(duration100ns) / 10000000.0;
+                            success = true;
+                        }
+
+                        DWORD streamCount = 0;
+                        pPD->GetStreamDescriptorCount(&streamCount);
+                        for (DWORD i = 0; i < streamCount; ++i) {
+                            BOOL selected = FALSE;
+                            IMFStreamDescriptor* pSD = nullptr;
+                            if (SUCCEEDED(pPD->GetStreamDescriptorByIndex(i, &selected, &pSD)) && pSD) {
+                                IMFMediaTypeHandler* pHandler = nullptr;
+                                if (SUCCEEDED(pSD->GetMediaTypeHandler(&pHandler)) && pHandler) {
+                                    GUID majorType = GUID_NULL;
+                                    pHandler->GetMajorType(&majorType);
+                                    if (majorType == MFMediaType_Video) {
+                                        hasVideo = true;
+                                        IMFMediaType* pMediaType = nullptr;
+                                        if (SUCCEEDED(pHandler->GetCurrentMediaType(&pMediaType)) && pMediaType) {
+                                            UINT32 w = 0, h = 0;
+                                            if (SUCCEEDED(MFGetAttributeSize(pMediaType, MF_MT_FRAME_SIZE, &w, &h))) {
+                                                if (w > 0 && h > 0) {
+                                                    outWidth = static_cast<int>(w);
+                                                    outHeight = static_cast<int>(h);
+                                                }
+                                            }
+                                            UINT32 num = 0, den = 0;
+                                            if (SUCCEEDED(MFGetAttributeRatio(pMediaType, MF_MT_FRAME_RATE, &num, &den)) && den > 0) {
+                                                outFps = static_cast<double>(num) / den;
+                                            }
+                                            pMediaType->Release();
+                                        }
+                                    } else if (majorType == MFMediaType_Audio) {
+                                        hasAudio = true;
+                                    }
+                                    pHandler->Release();
+                                }
+                                pSD->Release();
+                            }
+                        }
+                        pPD->Release();
+                    }
+                    pMediaSource->Release();
+                }
+                pSource->Release();
+            }
+            pSourceResolver->Release();
+        }
     }
 
     MFShutdown();

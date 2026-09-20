@@ -1,6 +1,7 @@
 #include "TimelineToolbar.h"
 
 #if defined(HAVE_QT6)
+#include "ui/icons/UiIcons.h"
 #include <QHBoxLayout>
 #include <QMenu>
 
@@ -22,15 +23,15 @@ void TimelineToolbar::setupUi() {
     layout->setContentsMargins(10, 4, 10, 4);
     layout->setSpacing(6);
 
-    auto makeBtn = [this](const QString& text, const QString& tip) {
-        auto* btn = new QPushButton(text, this);
+    auto makeIconBtn = [this](UiIcon icon, const QString& tip) {
+        auto* btn = new QPushButton(this);
         btn->setFixedSize(30, 28);
+        btn->setIcon(UiIcons::get(icon, QColor("#f4f4f5"), 16));
+        btn->setIconSize(QSize(16, 16));
         btn->setToolTip(tip);
         btn->setStyleSheet(R"(
             QPushButton {
                 background: #18181b;
-                color: #f4f4f5;
-                font-size: 13px;
                 border: 1px solid #27272a;
                 border-radius: 6px;
                 padding: 0;
@@ -38,28 +39,26 @@ void TimelineToolbar::setupUi() {
             QPushButton:hover {
                 background: #27272a;
                 border-color: #38bdf8;
-                color: #38bdf8;
             }
             QPushButton:checked {
                 background: #0284c7;
                 border-color: #38bdf8;
-                color: #ffffff;
             }
         )");
         return btn;
     };
 
     // Left tools
-    splitBtn_ = makeBtn("✂", "Cắt phần tử tại con trỏ (S)");
+    splitBtn_ = makeIconBtn(UiIcon::Split, "Cắt phần tử tại con trỏ (S)");
     connect(splitBtn_, &QPushButton::clicked, this, &TimelineToolbar::onSplitClicked);
 
-    dupBtn_ = makeBtn("❐", "Nhân bản phần tử (Ctrl+D)");
+    dupBtn_ = makeIconBtn(UiIcon::Duplicate, "Nhân bản phần tử (Ctrl+D)");
     connect(dupBtn_, &QPushButton::clicked, this, &TimelineToolbar::onDuplicateClicked);
 
-    deleteBtn_ = makeBtn("🗑", "Xóa phần tử đang chọn (Delete)");
+    deleteBtn_ = makeIconBtn(UiIcon::Delete, "Xóa phần tử đang chọn (Delete)");
     connect(deleteBtn_, &QPushButton::clicked, this, &TimelineToolbar::onDeleteClicked);
 
-    bookmarkBtn_ = makeBtn("🔖", "Đánh dấu (Bookmark/Marker - M)");
+    bookmarkBtn_ = makeIconBtn(UiIcon::Text, "Đánh dấu (Bookmark/Marker - M)");
     connect(bookmarkBtn_, &QPushButton::clicked, [this]() {
         auto* tl = engine_.activeTimeline();
         if (tl) {
@@ -127,13 +126,12 @@ void TimelineToolbar::setupUi() {
 
     layout->addStretch();
 
-    // Right tools
-    snapBtn_ = makeBtn("🧲", "Tự động hít nam châm (N)");
+    snapBtn_ = makeIconBtn(UiIcon::Magnet, "Tự động hít nam châm (N)");
     snapBtn_->setCheckable(true);
     snapBtn_->setChecked(engine_.isSnappingEnabled());
     connect(snapBtn_, &QPushButton::clicked, this, &TimelineToolbar::onSnappingToggled);
 
-    rippleBtn_ = makeBtn("🌊", "Chế độ Ripple Editing");
+    rippleBtn_ = makeIconBtn(UiIcon::Transitions, "Chế độ Ripple Editing");
     rippleBtn_->setCheckable(true);
     rippleBtn_->setChecked(engine_.isRippleEnabled());
     connect(rippleBtn_, &QPushButton::clicked, this, &TimelineToolbar::onRippleToggled);
@@ -142,8 +140,8 @@ void TimelineToolbar::setupUi() {
     layout->addWidget(rippleBtn_);
 
     // Zoom slider
-    auto* zoomOutBtn = makeBtn("－", "Thu nhỏ");
-    auto* zoomInBtn = makeBtn("＋", "Phóng to");
+    auto* zoomOutBtn = makeIconBtn(UiIcon::ZoomOut, "Thu nhỏ");
+    auto* zoomInBtn = makeIconBtn(UiIcon::ZoomIn, "Phóng to");
 
     zoomSlider_ = new QSlider(Qt::Horizontal, this);
     zoomSlider_->setFixedWidth(100);
