@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include "core/time/Timecode.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -29,16 +30,16 @@ void PropertiesPanel::setupUi() {
     // 1. Empty View
     emptyView_ = new QWidget(this);
     auto* evLayout = new QVBoxLayout(emptyView_);
-    auto* evIcon = new QLabel(emptyView_);
-    evIcon->setPixmap(UiIcons::getPixmap(UiIcon::Target, QColor("#52525b"), 36));
-    evIcon->setAlignment(Qt::AlignCenter);
-    auto* evLabel = new QLabel("Chưa chọn phần tử nào\nHãy nhấp vào một clip trên timeline để xem và chỉnh sửa thuộc tính", emptyView_);
-    evLabel->setAlignment(Qt::AlignCenter);
-    evLabel->setStyleSheet("color: #71717a; font-size: 12px; line-height: 1.4;");
+    emptyIcon_ = new QLabel(emptyView_);
+    emptyIcon_->setPixmap(UiIcons::getPixmap(UiIcon::Target, Theme::instance().palette().textSecondary, 36));
+    emptyIcon_->setAlignment(Qt::AlignCenter);
+    emptyLabel_ = new QLabel("Chưa chọn phần tử nào\nHãy nhấp vào một clip trên timeline để xem và chỉnh sửa thuộc tính", emptyView_);
+    emptyLabel_->setAlignment(Qt::AlignCenter);
+    emptyLabel_->setProperty("class", "SecondaryLabel");
     evLayout->addStretch();
-    evLayout->addWidget(evIcon);
+    evLayout->addWidget(emptyIcon_);
     evLayout->addSpacing(8);
-    evLayout->addWidget(evLabel);
+    evLayout->addWidget(emptyLabel_);
     evLayout->addStretch();
     rootLayout->addWidget(emptyView_);
 
@@ -54,15 +55,15 @@ void PropertiesPanel::setupUi() {
 
     // Header info card
     auto* headerCard = new QWidget(inspectorView_);
+    headerCard->setProperty("class", "cardWidget");
     auto* hLayout = new QHBoxLayout(headerCard);
     hLayout->setContentsMargins(8, 8, 8, 8);
     clipTypeBadge_ = new QLabel("VIDEO", headerCard);
     clipTypeBadge_->setStyleSheet("background: #0284c7; color: #ffffff; font-weight: 700; font-size: 10px; padding: 2px 6px; border-radius: 4px;");
     clipNameHeader_ = new QLabel("Clip Name", headerCard);
-    clipNameHeader_->setStyleSheet("font-weight: 600; font-size: 13px; color: #f4f4f5;");
+    clipNameHeader_->setProperty("class", "SectionTitle");
     hLayout->addWidget(clipTypeBadge_);
     hLayout->addWidget(clipNameHeader_, 1);
-    headerCard->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
     insLayout->addWidget(headerCard);
 
     auto makeSpin = [this](double minVal, double maxVal, double step, double defaultVal) {
@@ -70,7 +71,6 @@ void PropertiesPanel::setupUi() {
         sb->setRange(minVal, maxVal);
         sb->setSingleStep(step);
         sb->setValue(defaultVal);
-        sb->setStyleSheet("background: #18181b; color: #f4f4f5; border: 1px solid #27272a; border-radius: 6px; padding: 4px 8px; font-weight: 500;");
         return sb;
     };
 
@@ -244,9 +244,9 @@ void PropertiesPanel::setupUi() {
     auto* effLayout = new QVBoxLayout(activeEffectsGroup_);
     effLayout->setSpacing(6);
     activeEffectLabel_ = new QLabel("Hiệu ứng: Không có", activeEffectsGroup_);
-    activeEffectLabel_->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    activeEffectLabel_->setProperty("class", "SecondaryLabel");
     activeTransitionLabel_ = new QLabel("Chuyển cảnh: Không có", activeEffectsGroup_);
-    activeTransitionLabel_->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    activeTransitionLabel_->setProperty("class", "SecondaryLabel");
     effLayout->addWidget(activeEffectLabel_);
     effLayout->addWidget(activeTransitionLabel_);
     insLayout->addWidget(activeEffectsGroup_);
@@ -257,6 +257,10 @@ void PropertiesPanel::setupUi() {
 }
 
 void PropertiesPanel::refresh() {
+    if (emptyIcon_) {
+        emptyIcon_->setPixmap(UiIcons::getPixmap(UiIcon::Target, Theme::instance().palette().textSecondary, 36));
+    }
+
     const auto& sel = engine_.selectedClips();
     if (sel.empty()) {
         emptyView_->setVisible(true);

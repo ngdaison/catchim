@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -14,20 +15,22 @@ namespace catchim::ui {
 ShortcutsDialog::ShortcutsDialog(QWidget* parent)
     : QDialog(parent)
 {
+    const auto& pal = Theme::instance().palette();
     setWindowTitle("Phím tắt Catchim");
     setModal(true);
     setFixedSize(580, 520);
-    setStyleSheet(R"(
+    setStyleSheet(QString(R"(
         QDialog {
-            background-color: #0e0e11;
-            border: 1px solid #27272a;
+            background-color: %1;
+            border: 1px solid %2;
             border-radius: 10px;
         }
-    )");
+    )").arg(pal.background.name()).arg(pal.border.name()));
     setupUi();
 }
 
 void ShortcutsDialog::setupUi() {
+    const auto& pal = Theme::instance().palette();
     auto* rootLayout = new QVBoxLayout(this);
     rootLayout->setContentsMargins(20, 16, 20, 16);
     rootLayout->setSpacing(12);
@@ -35,30 +38,30 @@ void ShortcutsDialog::setupUi() {
     // Header
     auto* headerLayout = new QHBoxLayout();
     auto* iconLabel = new QLabel(this);
-    iconLabel->setPixmap(UiIcons::getPixmap(UiIcon::Keyboard, QColor("#38bdf8"), 20));
+    iconLabel->setPixmap(UiIcons::getPixmap(UiIcon::Keyboard, pal.primaryAccent, 20));
     headerLayout->addWidget(iconLabel);
 
     auto* titleLabel = new QLabel("Phím tắt ứng dụng (Keyboard Shortcuts)", this);
-    titleLabel->setStyleSheet("font-size: 15px; font-weight: 700; color: #f4f4f5;");
+    titleLabel->setStyleSheet(QString("font-size: 15px; font-weight: 700; color: %1;").arg(pal.textPrimary.name()));
     headerLayout->addWidget(titleLabel);
     headerLayout->addStretch();
 
     auto* closeBtn = new QPushButton("✕", this);
     closeBtn->setFixedSize(28, 28);
-    closeBtn->setStyleSheet(R"(
+    closeBtn->setStyleSheet(QString(R"(
         QPushButton {
             background: transparent;
-            color: #a1a1aa;
+            color: %1;
             font-size: 14px;
             font-weight: 600;
             border: none;
             border-radius: 4px;
         }
         QPushButton:hover {
-            background: #27272a;
-            color: #f4f4f5;
+            background: %2;
+            color: %3;
         }
-    )");
+    )").arg(pal.textSecondary.name()).arg(pal.border.name()).arg(pal.textPrimary.name()));
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::accept);
     headerLayout->addWidget(closeBtn);
     rootLayout->addLayout(headerLayout);
@@ -66,7 +69,7 @@ void ShortcutsDialog::setupUi() {
     // Separator line
     auto* sep = new QFrame(this);
     sep->setFrameShape(QFrame::HLine);
-    sep->setStyleSheet("color: #27272a;");
+    sep->setStyleSheet(QString("color: %1;").arg(pal.border.name()));
     rootLayout->addWidget(sep);
 
     // Scroll Area
@@ -137,39 +140,40 @@ void ShortcutsDialog::setupUi() {
 
     for (const auto& cat : categories) {
         auto* catHeader = new QLabel(cat.name, container);
-        catHeader->setStyleSheet("font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px;");
+        catHeader->setStyleSheet(QString("font-size: 11px; font-weight: 700; color: %1; text-transform: uppercase; letter-spacing: 0.5px; padding-top: 4px;").arg(pal.primaryAccent.name()));
         cLayout->addWidget(catHeader);
 
         auto* catBox = new QWidget(container);
         auto* boxLayout = new QVBoxLayout(catBox);
         boxLayout->setContentsMargins(10, 8, 10, 8);
         boxLayout->setSpacing(8);
-        catBox->setStyleSheet("background-color: #141417; border: 1px solid #27272a; border-radius: 6px;");
+        catBox->setStyleSheet(QString("background-color: %1; border: 1px solid %2; border-radius: 6px;")
+            .arg(pal.panelBackground.name()).arg(pal.border.name()));
 
         for (const auto& item : cat.shortcuts) {
             auto* row = new QHBoxLayout();
             row->setContentsMargins(0, 0, 0, 0);
 
             auto* descLabel = new QLabel(item.action, catBox);
-            descLabel->setStyleSheet("font-size: 12px; color: #e4e4e7; font-weight: 500;");
+            descLabel->setStyleSheet(QString("font-size: 12px; color: %1; font-weight: 500;").arg(pal.textPrimary.name()));
             row->addWidget(descLabel);
 
             row->addStretch();
 
             // Render key badge
             auto* kbdLabel = new QLabel(item.keys, catBox);
-            kbdLabel->setStyleSheet(R"(
+            kbdLabel->setStyleSheet(QString(R"(
                 QLabel {
-                    background-color: #27272a;
-                    color: #f4f4f5;
+                    background-color: %1;
+                    color: %2;
                     font-family: 'Cascadia Code', Consolas, monospace;
                     font-size: 11px;
                     font-weight: 600;
                     padding: 3px 8px;
-                    border: 1px solid #3f3f46;
+                    border: 1px solid %3;
                     border-radius: 4px;
                 }
-            )");
+            )").arg(pal.secondary.name()).arg(pal.textPrimary.name()).arg(pal.border.name()));
             row->addWidget(kbdLabel);
 
             boxLayout->addLayout(row);

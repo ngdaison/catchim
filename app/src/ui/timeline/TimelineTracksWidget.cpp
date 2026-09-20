@@ -110,7 +110,7 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
     const auto& palette = Theme::instance().palette();
 
     // Background tracks container
-    painter.fillRect(rect(), QColor("#0c0c0e"));
+    painter.fillRect(rect(), palette.background);
 
     auto* tl = engine_.activeTimeline();
     if (!tl) return;
@@ -125,8 +125,8 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 
         // Track lane background
         QRect trackRect(Metrics::trackLabelsWidth, yOffset, width() - Metrics::trackLabelsWidth, trackHeight);
-        painter.fillRect(trackRect, QColor("#141417"));
-        painter.setPen(QColor("#1f1f23"));
+        painter.fillRect(trackRect, palette.panelBackground);
+        painter.setPen(palette.border);
         painter.drawLine(trackRect.bottomLeft(), trackRect.bottomRight());
 
         // Draw clips on this track
@@ -192,7 +192,9 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
                 double volDb = (volLinear > 0.0001) ? (20.0 * std::log10(volLinear)) : -60.0;
                 double linePosPercent = audio::AudioVolumeLineEngine::getLinePositionPercent(volDb);
                 int lineY = yOffset + 6 + static_cast<int>((linePosPercent / 100.0) * (trackHeight - 12));
-                painter.setPen(QPen(QColor(255, 255, 255, 130), 1.0, Qt::DashLine));
+                QColor volLineColor = (Theme::instance().mode() == ThemeMode::Dark)
+                    ? QColor(255, 255, 255, 130) : QColor(0, 0, 0, 130);
+                painter.setPen(QPen(volLineColor, 1.0, Qt::DashLine));
                 painter.drawLine(clipX, lineY, clipX + clipW, lineY);
             }
 
@@ -208,8 +210,8 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 
     // 2. Draw Track Labels Column on the left (112px, fixed overlay)
     QRect labelsCol(0, 0, Metrics::trackLabelsWidth, height());
-    painter.fillRect(labelsCol, QColor("#111114"));
-    painter.setPen(QColor("#27272a"));
+    painter.fillRect(labelsCol, palette.secondary);
+    painter.setPen(palette.border);
     painter.drawLine(Metrics::trackLabelsWidth - 1, 0, Metrics::trackLabelsWidth - 1, height());
 
     yOffset = Metrics::timelineContentTopPadding - scrollY_;
@@ -219,12 +221,12 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
         else if (track->type() != editor::TrackType::Video) trackHeight = Metrics::trackHeightText;
 
         QRect labelCell(0, yOffset, Metrics::trackLabelsWidth - 1, trackHeight);
-        painter.setPen(QColor("#1f1f23"));
+        painter.setPen(palette.border);
         painter.drawLine(labelCell.bottomLeft(), labelCell.bottomRight());
 
         // Track Icon & Name
         painter.setFont(QFont("Inter", 8, QFont::DemiBold));
-        painter.setPen(QColor("#f4f4f5"));
+        painter.setPen(palette.textPrimary);
 
         UiIcon tIcon = UiIcon::Media;
         if (track->type() == editor::TrackType::Audio) tIcon = UiIcon::Audio;
@@ -233,16 +235,16 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
         else if (track->type() == editor::TrackType::Effect) tIcon = UiIcon::Effects;
 
         int iconY = yOffset + (trackHeight - 14) / 2;
-        painter.drawPixmap(8, iconY, UiIcons::getPixmap(tIcon, QColor("#a1a1aa"), 14));
+        painter.drawPixmap(8, iconY, UiIcons::getPixmap(tIcon, palette.textSecondary, 14));
         painter.drawText(26, yOffset + (trackHeight + 8) / 2, QString::fromStdString(track->name()));
 
         // Mute / Visibility indicators (Vector SVG)
         UiIcon muteIcon = track->isMuted() ? UiIcon::VolumeMute : UiIcon::Volume;
-        QColor muteCol = track->isMuted() ? palette.destructive : QColor("#71717a");
+        QColor muteCol = track->isMuted() ? palette.destructive : palette.textSecondary;
         painter.drawPixmap(Metrics::trackLabelsWidth - 38, iconY, UiIcons::getPixmap(muteIcon, muteCol, 14));
 
         UiIcon eyeIcon = track->isHidden() ? UiIcon::EyeOff : UiIcon::Eye;
-        QColor eyeCol = track->isHidden() ? palette.destructive : QColor("#71717a");
+        QColor eyeCol = track->isHidden() ? palette.destructive : palette.textSecondary;
         painter.drawPixmap(Metrics::trackLabelsWidth - 20, iconY, UiIcons::getPixmap(eyeIcon, eyeCol, 14));
 
         yOffset += trackHeight + Metrics::trackGap;
@@ -257,7 +259,7 @@ void TimelineTracksWidget::paintEvent(QPaintEvent* /* event */) {
 
     // 4. Draw Snap Indicator Guideline if snapping is active
     if (snapIndicatorX_ >= Metrics::trackLabelsWidth && snapIndicatorX_ < width()) {
-        painter.setPen(QPen(QColor("#38bdf8"), 1.5, Qt::DashLine));
+        painter.setPen(QPen(palette.primaryAccent, 1.5, Qt::DashLine));
         painter.drawLine(snapIndicatorX_, 0, snapIndicatorX_, height());
     }
 }

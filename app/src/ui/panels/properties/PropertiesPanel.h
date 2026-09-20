@@ -39,6 +39,8 @@ private:
     editor::EditorEngine& engine_;
 
     QWidget* emptyView_{nullptr};
+    QLabel* emptyIcon_{nullptr};
+    QLabel* emptyLabel_{nullptr};
     QWidget* inspectorView_{nullptr};
 
     QLabel* clipNameHeader_{nullptr};

@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 
 #if defined(HAVE_QT6)
+#include "app/AppConfig.h"
 #include "ui/theme/Theme.h"
 #include "ui/export/ExportDialog.h"
 #include <QVBoxLayout>
@@ -35,10 +36,27 @@ MainWindow::MainWindow(
     setupUi();
     setupEngineCallbacks();
 
+    // Listen to theme changes to refresh all sub-panels
+    Theme::instance().addListener("MainWindow", [this](ThemeMode /*mode*/) {
+        if (header_) header_->refresh();
+        if (assetsPanel_) assetsPanel_->refresh();
+        if (previewPanel_) previewPanel_->refresh();
+        if (timelinePanel_) timelinePanel_->refresh();
+        if (propertiesPanel_) propertiesPanel_->refresh();
+        if (centralWidget()) centralWidget()->update();
+        if (verticalSplitter_) verticalSplitter_->update();
+        if (horizontalSplitter_) horizontalSplitter_->update();
+        update();
+    });
+
     // 60fps tick timer for playback and rendering
     tickTimer_ = new QTimer(this);
     connect(tickTimer_, &QTimer::timeout, this, &MainWindow::onAppTick);
     tickTimer_->start(16); // ~60 Hz
+}
+
+MainWindow::~MainWindow() {
+    Theme::instance().removeListener("MainWindow");
 }
 
 void MainWindow::setupUi() {
@@ -158,7 +176,12 @@ void MainWindow::onExportRequested() {
 
 void MainWindow::onThemeToggleRequested() {
     auto currentMode = Theme::instance().mode();
-    Theme::instance().setTheme(currentMode == ThemeMode::Dark ? ThemeMode::Light : ThemeMode::Dark);
+    auto newMode = (currentMode == ThemeMode::Dark ? ThemeMode::Light : ThemeMode::Dark);
+    Theme::instance().setTheme(newMode);
+
+    auto cfg = app::AppConfig::load();
+    cfg.theme = (newMode == ThemeMode::Dark ? "dark" : "light");
+    cfg.save();
 }
 
 void MainWindow::keyPressEvent(QKeyEvent* event) {

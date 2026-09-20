@@ -24,17 +24,18 @@ core::TimelineTime TimelineRulerWidget::pixelToTime(int pixelX) const {
 
 void TimelineRulerWidget::paintEvent(QPaintEvent* /* event */) {
     QPainter painter(this);
-    painter.fillRect(rect(), QColor("#141414"));
+    const auto& palette = Theme::instance().palette();
+    painter.fillRect(rect(), palette.secondary);
 
     double pixelsPerSecond = 50.0 * zoomFactor_;
     int w = width();
 
     // Draw bottom border
-    painter.setPen(QColor("#292929"));
+    painter.setPen(palette.border);
     painter.drawLine(0, height() - 1, w, height() - 1);
 
     // Draw ruler tick marks
-    painter.setPen(QColor("#808080"));
+    painter.setPen(palette.textSecondary);
     painter.setFont(QFont("Inter", 8));
 
     double startSec = std::max(0.0, static_cast<double>(scrollOffset_) / pixelsPerSecond);
@@ -54,6 +55,7 @@ void TimelineRulerWidget::paintEvent(QPaintEvent* /* event */) {
         if (x < 0 || x >= w) continue;
 
         // Major tick
+        painter.setPen(palette.textSecondary);
         painter.drawLine(x, 10, x, Metrics::timelineRulerHeight);
 
         // Time label (e.g. 0s, 1s, 2s, or 00:01)
@@ -63,6 +65,7 @@ void TimelineRulerWidget::paintEvent(QPaintEvent* /* event */) {
             ? QString("%1:%2").arg(minutes).arg(seconds, 2, 10, QChar('0'))
             : QString("%1s").arg(seconds);
 
+        painter.setPen(palette.textPrimary);
         painter.drawText(x + 3, 16, text);
     }
 
@@ -75,7 +78,7 @@ void TimelineRulerWidget::paintEvent(QPaintEvent* /* event */) {
             int x = static_cast<int>(sec * pixelsPerSecond) - scrollOffset_;
             if (x >= -8 && x < w + 8) {
                 // Draw small diamond bookmark marker
-                painter.setBrush(QColor("#009DFF"));
+                painter.setBrush(palette.primaryAccent);
                 painter.setPen(Qt::NoPen);
                 QPolygon poly;
                 poly << QPoint(x, bmY)
@@ -91,7 +94,7 @@ void TimelineRulerWidget::paintEvent(QPaintEvent* /* event */) {
     core::TimelineTime cur = engine_.playback().currentTime();
     int playheadX = static_cast<int>(cur.toSeconds() * pixelsPerSecond) - scrollOffset_;
     if (playheadX >= -5 && playheadX < w + 5) {
-        painter.setBrush(QColor("#16A9F3"));
+        painter.setBrush(palette.primaryAccent);
         painter.setPen(Qt::NoPen);
         QPolygon head;
         head << QPoint(playheadX - 5, 0)

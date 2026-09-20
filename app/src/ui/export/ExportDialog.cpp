@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -22,39 +23,44 @@ ExportDialog::ExportDialog(
     , mediaLibrary_(mediaLibrary)
     , renderEngine_(renderEngine)
 {
+    const auto& pal = Theme::instance().palette();
     setWindowTitle("Xuất dự án (Export)");
     setFixedSize(440, 360);
-    setStyleSheet(R"(
+    setStyleSheet(QString(R"(
         QDialog {
-            background-color: #0c0c0e;
-            color: #f4f4f5;
+            background-color: %1;
+            color: %2;
         }
         QLabel {
-            color: #f4f4f5;
+            color: %2;
             font-size: 13px;
         }
         QComboBox {
-            background-color: #18181b;
-            color: #f4f4f5;
-            border: 1px solid #27272a;
+            background-color: %3;
+            color: %2;
+            border: 1px solid %4;
             border-radius: 6px;
             padding: 6px 10px;
             font-size: 13px;
         }
         QComboBox:hover {
-            border-color: #38bdf8;
+            border-color: %5;
         }
         QComboBox::drop-down {
             border: none;
         }
         QComboBox QAbstractItemView {
-            background-color: #18181b;
-            color: #f4f4f5;
-            border: 1px solid #27272a;
-            selection-background-color: #27272a;
-            selection-color: #38bdf8;
+            background-color: %3;
+            color: %2;
+            border: 1px solid %4;
+            selection-background-color: %4;
+            selection-color: %5;
         }
-    )");
+    )").arg(pal.background.name())
+       .arg(pal.textPrimary.name())
+       .arg(pal.panelBackground.name())
+       .arg(pal.border.name())
+       .arg(pal.primaryAccent.name()));
 
     setupUi();
     updateInfoLabel();
@@ -68,6 +74,7 @@ ExportDialog::~ExportDialog() {
 }
 
 void ExportDialog::setupUi() {
+    const auto& pal = Theme::instance().palette();
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(20, 20, 20, 20);
     mainLayout->setSpacing(16);
@@ -75,9 +82,9 @@ void ExportDialog::setupUi() {
     // Title & Icon
     auto* headerLayout = new QHBoxLayout();
     auto* titleIcon = new QLabel(this);
-    titleIcon->setPixmap(UiIcons::getPixmap(UiIcon::Export, QColor("#38bdf8"), 24));
+    titleIcon->setPixmap(UiIcons::getPixmap(UiIcon::Export, pal.primaryAccent, 24));
     auto* titleLabel = new QLabel("Cấu hình kết xuất video", this);
-    titleLabel->setStyleSheet("font-size: 16px; font-weight: 700; color: #f4f4f5;");
+    titleLabel->setStyleSheet(QString("font-size: 16px; font-weight: 700; color: %1;").arg(pal.textPrimary.name()));
     headerLayout->addWidget(titleIcon);
     headerLayout->addWidget(titleLabel);
     headerLayout->addStretch();
@@ -121,7 +128,7 @@ void ExportDialog::setupUi() {
 
     // Info Label
     infoLabel_ = new QLabel(this);
-    infoLabel_->setStyleSheet("color: #71717a; font-size: 12px;");
+    infoLabel_->setStyleSheet(QString("color: %1; font-size: 12px;").arg(pal.textSecondary.name()));
     mainLayout->addWidget(infoLabel_);
 
     // Progress Area (hidden by default)
@@ -131,28 +138,31 @@ void ExportDialog::setupUi() {
     progLayout->setSpacing(8);
 
     progressStatusLabel_ = new QLabel("Đang chuẩn bị kết xuất...", progressWidget_);
-    progressStatusLabel_->setStyleSheet("font-size: 12px; color: #a1a1aa;");
+    progressStatusLabel_->setStyleSheet(QString("font-size: 12px; color: %1;").arg(pal.textSecondary.name()));
     progLayout->addWidget(progressStatusLabel_);
 
     progressBar_ = new QProgressBar(progressWidget_);
     progressBar_->setRange(0, 100);
     progressBar_->setValue(0);
     progressBar_->setFixedHeight(18);
-    progressBar_->setStyleSheet(R"(
+    progressBar_->setStyleSheet(QString(R"(
         QProgressBar {
-            background-color: #18181b;
-            border: 1px solid #27272a;
+            background-color: %1;
+            border: 1px solid %2;
             border-radius: 4px;
             text-align: center;
-            color: #f4f4f5;
+            color: %3;
             font-size: 11px;
             font-weight: 600;
         }
         QProgressBar::chunk {
-            background-color: #0284c7;
+            background-color: %4;
             border-radius: 3px;
         }
-    )");
+    )").arg(pal.panelBackground.name())
+       .arg(pal.border.name())
+       .arg(pal.textPrimary.name())
+       .arg(pal.primaryAccent.name()));
     progLayout->addWidget(progressBar_);
     progressWidget_->hide();
     mainLayout->addWidget(progressWidget_);
@@ -171,19 +181,21 @@ void ExportDialog::setupUi() {
 
     cancelBtn_ = new QPushButton("Đóng", this);
     cancelBtn_->setFixedHeight(34);
-    cancelBtn_->setStyleSheet(R"(
+    cancelBtn_->setStyleSheet(QString(R"(
         QPushButton {
-            background: #18181b;
-            color: #f4f4f5;
-            border: 1px solid #27272a;
+            background: %1;
+            color: %2;
+            border: 1px solid %3;
             border-radius: 6px;
             padding: 0 16px;
             font-weight: 600;
         }
         QPushButton:hover {
-            background: #27272a;
+            background: %3;
         }
-    )");
+    )").arg(pal.panelBackground.name())
+       .arg(pal.textPrimary.name())
+       .arg(pal.border.name()));
     connect(cancelBtn_, &QPushButton::clicked, this, &ExportDialog::onCancelExport);
     btnLayout->addWidget(cancelBtn_);
 
@@ -399,12 +411,19 @@ void ExportDialog::onStartExport() {
 void ExportDialog::showStatusMessage(const QString& msg, const QString& type) {
     if (!statusBanner_) return;
     statusBanner_->setText(msg);
+    bool isDark = (Theme::instance().mode() == ThemeMode::Dark);
     if (type == "error") {
-        statusBanner_->setStyleSheet("background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
+        statusBanner_->setStyleSheet(isDark
+            ? "background: #450a0a; border: 1px solid #b91c1c; color: #fca5a5; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;"
+            : "background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
     } else if (type == "warning") {
-        statusBanner_->setStyleSheet("background: #422006; border: 1px solid #d97706; color: #fde68a; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
+        statusBanner_->setStyleSheet(isDark
+            ? "background: #422006; border: 1px solid #d97706; color: #fde68a; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;"
+            : "background: #fffbeb; border: 1px solid #fde68a; color: #b45309; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;");
     } else {
-        statusBanner_->setStyleSheet("background: #052e16; border: 1px solid #16a34a; color: #86efac; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;");
+        statusBanner_->setStyleSheet(isDark
+            ? "background: #052e16; border: 1px solid #16a34a; color: #86efac; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;"
+            : "background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600;");
     }
     statusBanner_->setVisible(true);
 }

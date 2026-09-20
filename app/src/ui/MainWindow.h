@@ -24,7 +24,7 @@ public:
         render::RenderEngine& renderEngine,
         QWidget* parent = nullptr
     );
-    ~MainWindow() override = default;
+    ~MainWindow() override;
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;

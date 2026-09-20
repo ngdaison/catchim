@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include <QHBoxLayout>
 #include <QMenu>
 
@@ -12,8 +13,8 @@ TimelineToolbar::TimelineToolbar(editor::EditorEngine& engine, QWidget* parent)
     , engine_(engine)
 {
     setAttribute(Qt::WA_StyledBackground, true);
+    setObjectName("timelineToolbar");
     setFixedHeight(40);
-    setStyleSheet("background-color: #0e0e11; border-bottom: 1px solid #27272a;");
     setupUi();
     refresh();
 }
@@ -23,28 +24,13 @@ void TimelineToolbar::setupUi() {
     layout->setContentsMargins(10, 4, 10, 4);
     layout->setSpacing(6);
 
-    auto makeIconBtn = [this](UiIcon icon, const QString& tip) {
+    const auto& pal = Theme::instance().palette();
+    auto makeIconBtn = [this, pal](UiIcon icon, const QString& tip) {
         auto* btn = new QPushButton(this);
         btn->setFixedSize(30, 28);
-        btn->setIcon(UiIcons::get(icon, QColor("#f4f4f5"), 16));
+        btn->setIcon(UiIcons::get(icon, pal.textPrimary, 16));
         btn->setIconSize(QSize(16, 16));
         btn->setToolTip(tip);
-        btn->setStyleSheet(R"(
-            QPushButton {
-                background: #18181b;
-                border: 1px solid #27272a;
-                border-radius: 6px;
-                padding: 0;
-            }
-            QPushButton:hover {
-                background: #27272a;
-                border-color: #38bdf8;
-            }
-            QPushButton:checked {
-                background: #0284c7;
-                border-color: #38bdf8;
-            }
-        )");
         return btn;
     };
 
@@ -84,25 +70,9 @@ void TimelineToolbar::setupUi() {
 
     // Add Track Menu Button
     auto* addTrackBtn = new QPushButton("Track", this);
-    addTrackBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 14));
+    addTrackBtn->setIcon(UiIcons::get(UiIcon::Plus, pal.textPrimary, 14));
     addTrackBtn->setIconSize(QSize(14, 14));
     addTrackBtn->setFixedHeight(28);
-    addTrackBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #18181b;
-            color: #f4f4f5;
-            font-size: 11px;
-            font-weight: 600;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 0px 8px;
-        }
-        QPushButton:hover {
-            background: #27272a;
-            border-color: #38bdf8;
-            color: #38bdf8;
-        }
-    )");
 
     auto* trackMenu = new QMenu(addTrackBtn);
     trackMenu->addAction(UiIcons::get(UiIcon::Media), "Thêm Video Track", [this]() {
@@ -141,7 +111,7 @@ void TimelineToolbar::setupUi() {
 
     // Center Scene selector
     auto* sceneLabel = new QLabel("Cảnh chính (Main scene)", this);
-    sceneLabel->setStyleSheet("color: #f4f4f5; font-weight: 600; font-size: 12px; padding: 4px 12px; background: #141417; border: 1px solid #27272a; border-radius: 6px;");
+    sceneLabel->setObjectName("sceneLabel");
     layout->addWidget(sceneLabel);
 
     layout->addStretch();
@@ -184,6 +154,16 @@ void TimelineToolbar::setupUi() {
 void TimelineToolbar::refresh() {
     snapBtn_->setChecked(engine_.isSnappingEnabled());
     rippleBtn_->setChecked(engine_.isRippleEnabled());
+    const auto& pal = Theme::instance().palette();
+    if (splitLeftBtn_) splitLeftBtn_->setIcon(UiIcons::get(UiIcon::SplitLeft, pal.textPrimary, 16));
+    if (splitBtn_) splitBtn_->setIcon(UiIcons::get(UiIcon::Split, pal.textPrimary, 16));
+    if (splitRightBtn_) splitRightBtn_->setIcon(UiIcons::get(UiIcon::SplitRight, pal.textPrimary, 16));
+    if (unlinkBtn_) unlinkBtn_->setIcon(UiIcons::get(UiIcon::Unlink, pal.textPrimary, 16));
+    if (dupBtn_) dupBtn_->setIcon(UiIcons::get(UiIcon::Duplicate, pal.textPrimary, 16));
+    if (deleteBtn_) deleteBtn_->setIcon(UiIcons::get(UiIcon::Delete, pal.textPrimary, 16));
+    if (bookmarkBtn_) bookmarkBtn_->setIcon(UiIcons::get(UiIcon::Text, pal.textPrimary, 16));
+    if (snapBtn_) snapBtn_->setIcon(UiIcons::get(UiIcon::Magnet, snapBtn_->isChecked() ? QColor("#ffffff") : pal.textPrimary, 16));
+    if (rippleBtn_) rippleBtn_->setIcon(UiIcons::get(UiIcon::Transitions, rippleBtn_->isChecked() ? QColor("#ffffff") : pal.textPrimary, 16));
 }
 
 void TimelineToolbar::onSplitClicked() {

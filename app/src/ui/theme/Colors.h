@@ -37,10 +37,10 @@ inline Palette getDarkPalette() {
     p.textPrimary = QColor("#f4f4f5");      // zinc-100
     p.textSecondary = QColor("#a1a1aa");    // zinc-400
     p.primaryAccent = QColor("#38bdf8");    // sky-400
-    p.secondary = QColor("#27272a");        // zinc-800
+    p.secondary = QColor("#18181b");        // zinc-900
     p.border = QColor("#27272a");           // zinc-800
     p.panelBorder = QColor("#27272a");      // zinc-800
-    p.hover = QColor("#1e1e24");            // zinc-800 hover
+    p.hover = QColor("#27272a");            // zinc-800 hover
     p.selected = QColor("#0284c7");         // sky-600
     p.destructive = QColor("#ef4444");      // red-500
 
@@ -57,25 +57,25 @@ inline Palette getDarkPalette() {
 
 inline Palette getLightPalette() {
     Palette p;
-    p.background = QColor("#f8fafc");
-    p.panelBackground = QColor("#ffffff");
-    p.textPrimary = QColor("#0f172a");
-    p.textSecondary = QColor("#64748b");
-    p.primaryAccent = QColor("#0284c7");
-    p.secondary = QColor("#f1f5f9");
-    p.border = QColor("#e2e8f0");
-    p.panelBorder = QColor("#cbd5e1");
-    p.hover = QColor("#f1f5f9");
-    p.selected = QColor("#e0f2fe");
-    p.destructive = QColor("#ef4444");
+    p.background = QColor("#f4f4f5");       // zinc-100
+    p.panelBackground = QColor("#ffffff");  // white surface
+    p.textPrimary = QColor("#09090b");      // zinc-950
+    p.textSecondary = QColor("#71717a");    // zinc-500
+    p.primaryAccent = QColor("#0284c7");    // sky-600
+    p.secondary = QColor("#f4f4f5");        // zinc-100
+    p.border = QColor("#e4e4e7");           // zinc-200
+    p.panelBorder = QColor("#e4e4e7");      // zinc-200
+    p.hover = QColor("#e4e4e7");            // zinc-200 hover
+    p.selected = QColor("#e0f2fe");         // sky-100
+    p.destructive = QColor("#ef4444");      // red-500
 
-    p.clipVideo = QColor("#94a3b8");
-    p.clipAudio = QColor("#c084fc");
-    p.clipText = QColor("#6ee7b7");
-    p.clipGraphic = QColor("#f472b6");
-    p.clipEffect = QColor("#60a5fa");
-    p.clipBookmark = QColor("#0284c7");
-    p.waveformColor = QColor(0, 0, 0, 180);
+    p.clipVideo = QColor("#2563eb");        // blue-600
+    p.clipAudio = QColor("#7c3aed");        // violet-600
+    p.clipText = QColor("#059669");         // emerald-600
+    p.clipGraphic = QColor("#db2777");      // pink-600
+    p.clipEffect = QColor("#0284c7");       // sky-600
+    p.clipBookmark = QColor("#0284c7");     // sky-600
+    p.waveformColor = QColor(255, 255, 255, 220);
     return p;
 }
 #endif

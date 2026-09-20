@@ -14,7 +14,6 @@ EditorHeader::EditorHeader(editor::EditorEngine& engine, QWidget* parent)
 {
     setAttribute(Qt::WA_StyledBackground, true);
     setFixedHeight(Metrics::headerHeight);
-    setStyleSheet("background-color: #0c0c0e; border-bottom: 1px solid #27272a;");
     setupUi();
     refresh();
 }
@@ -25,27 +24,12 @@ void EditorHeader::setupUi() {
     layout->setSpacing(8);
 
     // Left side: Logo & Project Name
-    auto* logoButton = new QPushButton(this);
-    logoButton->setFixedSize(32, 32);
-    logoButton->setIcon(UiIcons::get(UiIcon::Media, QColor("#38bdf8"), 18));
-    logoButton->setIconSize(QSize(18, 18));
-    logoButton->setStyleSheet(R"(
-        QPushButton {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-        }
-        QPushButton:hover {
-            background: #27272a;
-            border-color: #38bdf8;
-        }
-        QPushButton::menu-indicator {
-            image: none;
-            width: 0px;
-        }
-    )");
+    logoButton_ = new QPushButton(this);
+    logoButton_->setFixedSize(32, 32);
+    logoButton_->setIconSize(QSize(18, 18));
+    logoButton_->setStyleSheet("QPushButton::menu-indicator { image: none; width: 0px; }");
 
-    auto* logoMenu = new QMenu(logoButton);
+    auto* logoMenu = new QMenu(logoButton_);
     logoMenu->addAction("Tạo dự án mới", [this]() {
         engine_.newProject("Dự án mới");
     });
@@ -54,79 +38,34 @@ void EditorHeader::setupUi() {
         ShortcutsDialog dlg(this);
         dlg.exec();
     });
-    logoButton->setMenu(logoMenu);
+    logoButton_->setMenu(logoMenu);
 
     nameEdit_ = new QLineEdit(this);
     nameEdit_->setFixedHeight(32);
-    nameEdit_->setStyleSheet(R"(
-        QLineEdit {
-            background: transparent;
-            color: #f4f4f5;
-            font-weight: 600;
-            font-size: 13px;
-            padding: 0px 8px;
-            border-radius: 6px;
-            border: 1px solid transparent;
-        }
-        QLineEdit:hover {
-            background: #18181b;
-            border: 1px solid #27272a;
-        }
-        QLineEdit:focus {
-            background: #18181b;
-            border: 1px solid #38bdf8;
-        }
-    )");
     connect(nameEdit_, &QLineEdit::editingFinished, this, &EditorHeader::onNameEditingFinished);
 
-    layout->addWidget(logoButton);
+    layout->addWidget(logoButton_);
     layout->addWidget(nameEdit_);
 
     // Undo / Redo Quick Buttons
-    auto* undoBtn = new QPushButton(this);
-    undoBtn->setFixedSize(30, 30);
-    undoBtn->setIcon(UiIcons::get(UiIcon::Undo, QColor("#f4f4f5"), 16));
-    undoBtn->setIconSize(QSize(16, 16));
-    undoBtn->setToolTip("Hoàn tác (Ctrl+Z)");
-    undoBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 0;
-        }
-        QPushButton:hover {
-            background: #27272a;
-            border-color: #38bdf8;
-        }
-    )");
-    connect(undoBtn, &QPushButton::clicked, [this]() {
+    undoBtn_ = new QPushButton(this);
+    undoBtn_->setFixedSize(30, 30);
+    undoBtn_->setIconSize(QSize(16, 16));
+    undoBtn_->setToolTip("Hoàn tác (Ctrl+Z)");
+    connect(undoBtn_, &QPushButton::clicked, [this]() {
         engine_.undo();
     });
 
-    auto* redoBtn = new QPushButton(this);
-    redoBtn->setFixedSize(30, 30);
-    redoBtn->setIcon(UiIcons::get(UiIcon::Redo, QColor("#f4f4f5"), 16));
-    redoBtn->setIconSize(QSize(16, 16));
-    redoBtn->setToolTip("Làm lại (Ctrl+Y)");
-    redoBtn->setStyleSheet(R"(
-        QPushButton {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 0;
-        }
-        QPushButton:hover {
-            background: #27272a;
-            border-color: #38bdf8;
-        }
-    )");
-    connect(redoBtn, &QPushButton::clicked, [this]() {
+    redoBtn_ = new QPushButton(this);
+    redoBtn_->setFixedSize(30, 30);
+    redoBtn_->setIconSize(QSize(16, 16));
+    redoBtn_->setToolTip("Làm lại (Ctrl+Y)");
+    connect(redoBtn_, &QPushButton::clicked, [this]() {
         engine_.redo();
     });
 
-    layout->addWidget(undoBtn);
-    layout->addWidget(redoBtn);
+    layout->addWidget(undoBtn_);
+    layout->addWidget(redoBtn_);
 
     layout->addStretch();
 
@@ -153,21 +92,7 @@ void EditorHeader::setupUi() {
 
     themeButton_ = new QPushButton(this);
     themeButton_->setFixedSize(32, 32);
-    themeButton_->setIcon(UiIcons::get(UiIcon::Settings, QColor("#a1a1aa"), 16));
     themeButton_->setIconSize(QSize(16, 16));
-    themeButton_->setToolTip("Cài đặt / Giao diện");
-    themeButton_->setStyleSheet(R"(
-        QPushButton {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 0;
-        }
-        QPushButton:hover {
-            background: #27272a;
-            border-color: #38bdf8;
-        }
-    )");
     connect(themeButton_, &QPushButton::clicked, this, &EditorHeader::themeToggleClicked);
 
     layout->addWidget(exportButton_);
@@ -176,6 +101,21 @@ void EditorHeader::setupUi() {
 
 void EditorHeader::refresh() {
     nameEdit_->setText(QString::fromStdString(engine_.project().name()));
+    const auto& pal = Theme::instance().palette();
+    bool isDark = (Theme::instance().mode() == ThemeMode::Dark);
+    if (themeButton_) {
+        themeButton_->setIcon(UiIcons::get(UiIcon::Sun, pal.textSecondary, 16));
+        themeButton_->setToolTip(isDark ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối");
+    }
+    if (undoBtn_) {
+        undoBtn_->setIcon(UiIcons::get(UiIcon::Undo, pal.textPrimary, 16));
+    }
+    if (redoBtn_) {
+        redoBtn_->setIcon(UiIcons::get(UiIcon::Redo, pal.textPrimary, 16));
+    }
+    if (logoButton_) {
+        logoButton_->setIcon(UiIcons::get(UiIcon::Media, pal.primaryAccent, 18));
+    }
 }
 
 void EditorHeader::onNameEditingFinished() {

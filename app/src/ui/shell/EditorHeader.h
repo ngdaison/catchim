@@ -29,6 +29,9 @@ private:
 
     editor::EditorEngine& engine_;
     QLineEdit* nameEdit_{nullptr};
+    QPushButton* logoButton_{nullptr};
+    QPushButton* undoBtn_{nullptr};
+    QPushButton* redoBtn_{nullptr};
     QPushButton* exportButton_{nullptr};
     QPushButton* themeButton_{nullptr};
 };

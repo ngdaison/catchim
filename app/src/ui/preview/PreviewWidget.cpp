@@ -1,6 +1,7 @@
 #include "PreviewWidget.h"
 
 #if defined(HAVE_QT6)
+#include "ui/theme/Theme.h"
 #include <QPainter>
 #include <QMouseEvent>
 #include <QColor>
@@ -55,9 +56,10 @@ void PreviewWidget::paintEvent(QPaintEvent* /* event */) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    const auto& pal = Theme::instance().palette();
 
     // Viewport background
-    painter.fillRect(rect(), QColor("#09090b"));
+    painter.fillRect(rect(), pal.background);
 
     int canvasW = engine_.project().settings().canvasSize.width;
     int canvasH = engine_.project().settings().canvasSize.height;
@@ -101,7 +103,7 @@ void PreviewWidget::paintEvent(QPaintEvent* /* event */) {
     }
 
     // 3. Draw Canvas outer border
-    painter.setPen(QPen(QColor("#27272a"), 1.0));
+    painter.setPen(QPen(pal.border, 1.0));
     painter.drawRect(canvasRect);
 
     // 4. Draw Safe Zones & Guides (Action Safe 90%, Title Safe 80%, Center Crosshair)

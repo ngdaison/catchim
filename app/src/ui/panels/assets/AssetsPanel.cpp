@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include "media/probe/MediaProbe.h"
 #include "core/time/Timecode.h"
 #include "subtitles/SrtParser.h"
@@ -33,6 +34,18 @@
 
 namespace catchim::ui {
 
+static const std::vector<std::pair<QString, UiIcon>> kTabDefs = {
+    {"Tệp đa phương tiện (Media)", UiIcon::Media},
+    {"Âm thanh & SFX (Audio)", UiIcon::Audio},
+    {"Văn bản & Tiêu đề (Text)", UiIcon::Text},
+    {"Nhãn dán (Stickers)", UiIcon::Stickers},
+    {"Hiệu ứng video (Effects)", UiIcon::Effects},
+    {"Chuyển tiếp (Transitions)", UiIcon::Transitions},
+    {"Phụ đề & Tự động nhận diện (Captions)", UiIcon::Captions},
+    {"Lớp điều chỉnh màu (Adjustment)", UiIcon::Adjustment},
+    {"Cài đặt khung hình (Canvas Settings)", UiIcon::Settings}
+};
+
 AssetsPanel::AssetsPanel(editor::EditorEngine& engine, media::MediaLibrary& mediaLibrary, QWidget* parent)
     : QWidget(parent)
     , engine_(engine)
@@ -51,47 +64,17 @@ void AssetsPanel::setupUi() {
 
     // Left vertical TabBar (Media, Audio, Text, Stickers, Effects, Subtitles, Settings)
     tabList_ = new QListWidget(this);
+    tabList_->setObjectName("tabList");
     tabList_->setFixedWidth(44);
     tabList_->setIconSize(QSize(20, 20));
     tabList_->setFocusPolicy(Qt::NoFocus);
     tabList_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     tabList_->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    tabList_->setStyleSheet(R"(
-        QListWidget {
-            background-color: #0c0c0e;
-            border: none;
-            border-right: 1px solid #27272a;
-            padding: 6px 0px;
-        }
-        QListWidget::item {
-            height: 36px;
-            width: 36px;
-            border-radius: 6px;
-            margin: 2px 4px;
-        }
-        QListWidget::item:hover {
-            background-color: #1e1e24;
-        }
-        QListWidget::item:selected {
-            background-color: #27272a;
-        }
-    )");
 
-    static const std::vector<std::pair<QString, UiIcon>> kTabDefs = {
-        {"Tệp đa phương tiện (Media)", UiIcon::Media},
-        {"Âm thanh & SFX (Audio)", UiIcon::Audio},
-        {"Văn bản & Tiêu đề (Text)", UiIcon::Text},
-        {"Nhãn dán (Stickers)", UiIcon::Stickers},
-        {"Hiệu ứng video (Effects)", UiIcon::Effects},
-        {"Chuyển tiếp (Transitions)", UiIcon::Transitions},
-        {"Phụ đề & Tự động nhận diện (Captions)", UiIcon::Captions},
-        {"Lớp điều chỉnh màu (Adjustment)", UiIcon::Adjustment},
-        {"Cài đặt khung hình (Canvas Settings)", UiIcon::Settings}
-    };
-
+    const auto& pal = Theme::instance().palette();
     for (size_t i = 0; i < kTabDefs.size(); ++i) {
         auto* item = new QListWidgetItem(tabList_);
-        item->setIcon(UiIcons::get(kTabDefs[i].second, (i == 0) ? QColor("#38bdf8") : QColor("#a1a1aa"), 20));
+        item->setIcon(UiIcons::get(kTabDefs[i].second, (i == 0) ? pal.primaryAccent : pal.textSecondary, 20));
         item->setToolTip(kTabDefs[i].first);
         item->setSizeHint(QSize(36, 36));
         item->setTextAlignment(Qt::AlignCenter);
@@ -111,10 +94,11 @@ void AssetsPanel::setupUi() {
 
     connect(tabList_, &QListWidget::currentRowChanged, [this](int row) {
         viewsStack_->setCurrentIndex(row);
+        const auto& curPal = Theme::instance().palette();
         for (int i = 0; i < tabList_->count(); ++i) {
             auto* it = tabList_->item(i);
             if (it && i < static_cast<int>(kTabDefs.size())) {
-                QColor col = (i == row) ? QColor("#38bdf8") : QColor("#a1a1aa");
+                QColor col = (i == row) ? curPal.primaryAccent : curPal.textSecondary;
                 it->setIcon(UiIcons::get(kTabDefs[i].second, col, 20));
             }
         }
@@ -131,50 +115,23 @@ QWidget* AssetsPanel::createMediaView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Tệp đa phương tiện", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     // Import button
     auto* importBtn = new QPushButton("Nhập tệp (Video / Audio / Ảnh)", view);
+    importBtn->setObjectName("importBtn");
     importBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#38bdf8"), 16));
     importBtn->setIconSize(QSize(16, 16));
     importBtn->setFixedHeight(38);
-    importBtn->setStyleSheet(R"(
-        QPushButton {
-            background-color: #1e1e24;
-            color: #f4f4f5;
-            border: 1px dashed #3f3f46;
-            border-radius: 6px;
-            font-weight: 600;
-            font-size: 12px;
-            padding: 0px 12px;
-        }
-        QPushButton:hover {
-            background-color: #27272a;
-            border-color: #38bdf8;
-            color: #38bdf8;
-        }
-    )");
     connect(importBtn, &QPushButton::clicked, this, &AssetsPanel::onImportClicked);
     layout->addWidget(importBtn);
 
     // Search bar
     mediaSearchInput_ = new QLineEdit(view);
+    mediaSearchInput_->setObjectName("mediaSearchInput");
     mediaSearchInput_->setPlaceholderText("Tìm kiếm tệp trong dự án...");
     mediaSearchInput_->setFixedHeight(34);
-    mediaSearchInput_->setStyleSheet(R"(
-        QLineEdit {
-            background-color: #141417;
-            color: #f4f4f5;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 4px 10px;
-            font-size: 12px;
-        }
-        QLineEdit:focus {
-            border-color: #38bdf8;
-        }
-    )");
     connect(mediaSearchInput_, &QLineEdit::textChanged, [this](const QString& q) {
         for (int i = 0; i < mediaListWidget_->count(); ++i) {
             auto* item = mediaListWidget_->item(i);
@@ -185,35 +142,13 @@ QWidget* AssetsPanel::createMediaView() {
 
     // Media list
     mediaListWidget_ = new QListWidget(view);
+    mediaListWidget_->setObjectName("mediaListWidget");
     mediaListWidget_->setAcceptDrops(false);
-    mediaListWidget_->setStyleSheet(R"(
-        QListWidget {
-            background: transparent;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 4px;
-        }
-        QListWidget::item {
-            height: 52px;
-            padding: 6px 10px;
-            border-bottom: 1px solid #1f1f23;
-            color: #f4f4f5;
-            font-size: 12px;
-        }
-        QListWidget::item:hover {
-            background: #1e1e24;
-            border-radius: 4px;
-        }
-        QListWidget::item:selected {
-            background: #27272a;
-            color: #38bdf8;
-        }
-    )");
     connect(mediaListWidget_, &QListWidget::itemDoubleClicked, this, &AssetsPanel::onMediaItemDoubleClicked);
     layout->addWidget(mediaListWidget_, 1);
 
     auto* hintLabel = new QLabel("Nhấp đúp vào tệp để thêm vào Timeline", view);
-    hintLabel->setStyleSheet("color: #71717a; font-size: 11px;");
+    hintLabel->setProperty("class", "SecondaryLabel");
     layout->addWidget(hintLabel);
 
     return view;
@@ -226,7 +161,7 @@ QWidget* AssetsPanel::createAudioView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Thư viện Âm thanh & SFX", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* sfxScroll = new QScrollArea(view);
@@ -255,23 +190,25 @@ QWidget* AssetsPanel::createAudioView() {
         {"Laser Swoosh", "Sci-Fi", 1.0}
     };
 
+    const auto& pal = Theme::instance().palette();
     for (const auto& sfx : sfxList) {
         auto* row = new QWidget(sfxContainer);
+        row->setProperty("class", "cardWidget");
         auto* rLayout = new QHBoxLayout(row);
         rLayout->setContentsMargins(8, 6, 8, 6);
 
         auto* ic = new QLabel(row);
-        ic->setPixmap(UiIcons::getPixmap(UiIcon::Audio, QColor("#38bdf8"), 16));
+        ic->setPixmap(UiIcons::getPixmap(UiIcon::Audio, pal.primaryAccent, 16));
         ic->setFixedSize(20, 20);
         rLayout->addWidget(ic);
 
-        auto* nameLabel = new QLabel(QString("<b>%1</b><br><span style='color:#71717a;'>%2 • %3s</span>")
-            .arg(sfx.name).arg(sfx.category).arg(sfx.duration, 0, 'f', 1), row);
+        auto* nameLabel = new QLabel(QString("<b>%1</b><br><span style='color:%2;'>%3 • %4s</span>")
+            .arg(sfx.name).arg(pal.textSecondary.name()).arg(sfx.category).arg(sfx.duration, 0, 'f', 1), row);
         nameLabel->setTextFormat(Qt::RichText);
         rLayout->addWidget(nameLabel, 1);
 
         auto* addBtn = new QPushButton("Thêm", row);
-        addBtn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 12));
+        addBtn->setIcon(UiIcons::get(UiIcon::Plus, pal.textPrimary, 12));
         addBtn->setIconSize(QSize(12, 12));
         addBtn->setFixedSize(68, 28);
         connect(addBtn, &QPushButton::clicked, [this, sfx]() {
@@ -279,7 +216,6 @@ QWidget* AssetsPanel::createAudioView() {
         });
         rLayout->addWidget(addBtn);
 
-        row->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
         sfxLayout->addWidget(row);
     }
     sfxLayout->addStretch();
@@ -296,12 +232,11 @@ QWidget* AssetsPanel::createTextView() {
     layout->setSpacing(8);
 
     auto* titleLabel = new QLabel("Mẫu chữ & Giọng đọc AI (Text / TTS)", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* scroll = new QScrollArea(view);
     scroll->setWidgetResizable(true);
-    scroll->setStyleSheet("QScrollArea { border: none; background: transparent; }");
 
     auto* container = new QWidget(scroll);
     auto* cLayout = new QVBoxLayout(container);
@@ -328,18 +263,20 @@ QWidget* AssetsPanel::createTextView() {
         {"Chữ viết tay nghệ thuật", "cursive", "Phong cách tự nhiên nhẹ nhàng"}
     };
 
+    const auto& pal = Theme::instance().palette();
     for (const auto& p : presets) {
         auto* card = new QWidget(container);
+        card->setProperty("class", "cardWidget");
         auto* cardLayout = new QHBoxLayout(card);
         cardLayout->setContentsMargins(10, 8, 10, 8);
 
-        auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
-            .arg(p.title).arg(p.desc), card);
+        auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:%2; font-size:11px;'>%3</span>")
+            .arg(p.title).arg(pal.textSecondary.name()).arg(p.desc), card);
         lbl->setTextFormat(Qt::RichText);
         cardLayout->addWidget(lbl, 1);
 
         auto* btn = new QPushButton("Thêm", card);
-        btn->setIcon(UiIcons::get(UiIcon::Plus, QColor("#f4f4f5"), 12));
+        btn->setIcon(UiIcons::get(UiIcon::Plus, pal.textPrimary, 12));
         btn->setIconSize(QSize(12, 12));
         btn->setFixedSize(68, 28);
         connect(btn, &QPushButton::clicked, [this, p]() {
@@ -347,7 +284,6 @@ QWidget* AssetsPanel::createTextView() {
         });
         cardLayout->addWidget(btn);
 
-        card->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
         cLayout->addWidget(card);
     }
 
@@ -357,20 +293,18 @@ QWidget* AssetsPanel::createTextView() {
     cLayout->addWidget(ttsHeader);
 
     auto* ttsCard = new QWidget(container);
+    ttsCard->setProperty("class", "cardWidget");
     auto* ttsLayout = new QVBoxLayout(ttsCard);
     ttsLayout->setContentsMargins(10, 10, 10, 10);
     ttsLayout->setSpacing(8);
-    ttsCard->setStyleSheet("background: #141417; border: 1px solid #27272a; border-radius: 6px;");
 
     auto* ttsInput = new QTextEdit(ttsCard);
     ttsInput->setPlaceholderText("Nhập văn bản cần đọc thành tiếng...");
     ttsInput->setPlainText("Chào mừng bạn đến với trình chỉnh sửa video Catchim.");
     ttsInput->setFixedHeight(65);
-    ttsInput->setStyleSheet("background: #1e1e24; color: #f4f4f5; border: 1px solid #27272a; border-radius: 4px; font-size: 12px; padding: 4px;");
     ttsLayout->addWidget(ttsInput);
 
     auto* voiceCombo = new QComboBox(ttsCard);
-    voiceCombo->setStyleSheet("background: #1e1e24; color: #f4f4f5; border: 1px solid #27272a; border-radius: 4px; padding: 4px 8px; font-size: 11px;");
     for (const auto& v : audio::TtsEngine::instance().voices()) {
         QString label = QString::fromStdString(v.name + " (" + v.gender + " - " + v.language + ")");
         voiceCombo->addItem(label, QString::fromStdString(v.id));
@@ -379,7 +313,7 @@ QWidget* AssetsPanel::createTextView() {
 
     auto* rateLayout = new QHBoxLayout();
     auto* rateTitle = new QLabel("Tốc độ đọc:", ttsCard);
-    rateTitle->setStyleSheet("color: #a1a1aa; font-size: 11px;");
+    rateTitle->setProperty("class", "SecondaryLabel");
     rateLayout->addWidget(rateTitle);
 
     auto* rateSlider = new QSlider(Qt::Horizontal, ttsCard);
@@ -389,7 +323,6 @@ QWidget* AssetsPanel::createTextView() {
 
     auto* rateLabel = new QLabel("1.0x", ttsCard);
     rateLabel->setFixedWidth(30);
-    rateLabel->setStyleSheet("color: #f4f4f5; font-size: 11px; font-weight: 600;");
     rateLayout->addWidget(rateLabel);
     connect(rateSlider, &QSlider::valueChanged, [rateLabel](int val) {
         rateLabel->setText(QString("%1x").arg(val / 100.0, 0, 'f', 1));
@@ -522,7 +455,7 @@ QWidget* AssetsPanel::createStickersView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Hình khối & Stickers", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* gridContainer = new QWidget(view);
@@ -557,22 +490,6 @@ QWidget* AssetsPanel::createStickersView() {
         btn->setIconSize(QSize(20, 20));
         btn->setText(it.name);
         btn->setFixedHeight(50);
-        btn->setStyleSheet(R"(
-            QPushButton {
-                background-color: #141417;
-                border: 1px solid #27272a;
-                border-radius: 6px;
-                font-size: 11px;
-                color: #f4f4f5;
-                text-align: center;
-                padding-left: 4px;
-            }
-            QPushButton:hover {
-                background-color: #1e1e24;
-                border-color: #38bdf8;
-                color: #38bdf8;
-            }
-        )");
         connect(btn, &QPushButton::clicked, [this, it]() {
             onAddGraphicPreset(it.name, it.shape);
         });
@@ -596,7 +513,7 @@ QWidget* AssetsPanel::createEffectsView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Hiệu ứng Video (Video Effects)", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     struct EffectItem {
@@ -616,18 +533,20 @@ QWidget* AssetsPanel::createEffectsView() {
         {"Độ nét (Sharpen)", "Bộ lọc Filter", UiIcon::Sliders}
     };
 
+    const auto& pal = Theme::instance().palette();
     for (const auto& eff : effects) {
         auto* card = new QWidget(view);
+        card->setProperty("class", "cardWidget");
         auto* cLayout = new QHBoxLayout(card);
         cLayout->setContentsMargins(10, 8, 10, 8);
 
         auto* ic = new QLabel(card);
-        ic->setPixmap(UiIcons::getPixmap(eff.icon, QColor("#38bdf8"), 18));
+        ic->setPixmap(UiIcons::getPixmap(eff.icon, pal.primaryAccent, 18));
         ic->setFixedSize(22, 22);
         cLayout->addWidget(ic);
 
-        auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
-            .arg(eff.name).arg(eff.category), card);
+        auto* lbl = new QLabel(QString("<b>%1</b><br><span style='color:%2; font-size:11px;'>%3</span>")
+            .arg(eff.name).arg(pal.textSecondary.name()).arg(eff.category), card);
         lbl->setTextFormat(Qt::RichText);
         cLayout->addWidget(lbl, 1);
 
@@ -638,7 +557,6 @@ QWidget* AssetsPanel::createEffectsView() {
         });
         cLayout->addWidget(btn);
 
-        card->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
         layout->addWidget(card);
     }
     layout->addStretch();
@@ -653,7 +571,7 @@ QWidget* AssetsPanel::createTransitionsView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Hiệu ứng chuyển cảnh (Transitions)", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* durBox = new QGroupBox("Thời lượng chuyển cảnh", view);
@@ -696,17 +614,19 @@ QWidget* AssetsPanel::createTransitionsView() {
         {"Wipe", "Quét chuyển cảnh ngang sắc nét", UiIcon::Sliders}
     };
 
+    const auto& tPal = Theme::instance().palette();
     for (const auto& tr : transList) {
         auto* card = new QWidget(container);
+        card->setProperty("class", "cardWidget");
         auto* rowLayout = new QHBoxLayout(card);
         rowLayout->setContentsMargins(8, 8, 8, 8);
 
         auto* icLabel = new QLabel(card);
-        icLabel->setPixmap(UiIcons::getPixmap(tr.icon, QColor("#38bdf8"), 20));
+        icLabel->setPixmap(UiIcons::getPixmap(tr.icon, tPal.primaryAccent, 20));
         rowLayout->addWidget(icLabel);
 
-        auto* infoLabel = new QLabel(QString("<b>%1</b><br><span style='color:#71717a; font-size:11px;'>%2</span>")
-            .arg(tr.name).arg(tr.desc), card);
+        auto* infoLabel = new QLabel(QString("<b>%1</b><br><span style='color:%2; font-size:11px;'>%3</span>")
+            .arg(tr.name).arg(tPal.textSecondary.name()).arg(tr.desc), card);
         infoLabel->setTextFormat(Qt::RichText);
         rowLayout->addWidget(infoLabel, 1);
 
@@ -718,7 +638,6 @@ QWidget* AssetsPanel::createTransitionsView() {
         });
         rowLayout->addWidget(applyBtn);
 
-        card->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
         cLayout->addWidget(card);
     }
     cLayout->addStretch();
@@ -735,7 +654,7 @@ QWidget* AssetsPanel::createSubtitlesView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Phụ đề & Nhận diện giọng nói", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* langBox = new QGroupBox("Ngôn ngữ nhận diện", view);
@@ -766,7 +685,7 @@ QWidget* AssetsPanel::createSubtitlesView() {
     layout->addWidget(autoBtn);
 
     auto* importSrtBtn = new QPushButton("Nhập tệp phụ đề .SRT / .VTT", view);
-    importSrtBtn->setIcon(UiIcons::get(UiIcon::Text, QColor("#f4f4f5"), 16));
+    importSrtBtn->setIcon(UiIcons::get(UiIcon::Text, Theme::instance().palette().textPrimary, 16));
     importSrtBtn->setFixedHeight(34);
     connect(importSrtBtn, &QPushButton::clicked, this, &AssetsPanel::onImportSrtClicked);
     layout->addWidget(importSrtBtn);
@@ -783,7 +702,7 @@ QWidget* AssetsPanel::createAdjustmentView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Lớp điều chỉnh & Chỉnh màu (Adjustment)", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* scroll = new QScrollArea(view);
@@ -795,12 +714,13 @@ QWidget* AssetsPanel::createAdjustmentView() {
 
     auto makeSliderRow = [container](const QString& title, int min, int max, int def) -> std::pair<QSlider*, QLabel*> {
         auto* box = new QWidget(container);
+        box->setProperty("class", "cardWidget");
         auto* bLayout = new QVBoxLayout(box);
         bLayout->setContentsMargins(8, 6, 8, 6);
 
         auto* topRow = new QHBoxLayout();
         auto* lbl = new QLabel(title, box);
-        lbl->setStyleSheet("color: #f4f4f5; font-size: 12px; font-weight: 500;");
+        lbl->setStyleSheet("font-size: 12px; font-weight: 500;");
         auto* valLbl = new QLabel(QString::number(def), box);
         valLbl->setStyleSheet("color: #38bdf8; font-weight: 600; font-size: 12px;");
         topRow->addWidget(lbl);
@@ -815,7 +735,6 @@ QWidget* AssetsPanel::createAdjustmentView() {
             valLbl->setText(QString::number(v));
         });
         bLayout->addWidget(slider);
-        box->setStyleSheet("QWidget { background: #141417; border: 1px solid #27272a; border-radius: 6px; }");
         return {slider, valLbl};
     };
 
@@ -887,7 +806,7 @@ QWidget* AssetsPanel::createSettingsView() {
     layout->setSpacing(10);
 
     auto* titleLabel = new QLabel("Cài đặt Khung vẽ & Tỉ lệ (Canvas)", view);
-    titleLabel->setStyleSheet("font-weight: 600; font-size: 14px; color: #f4f4f5;");
+    titleLabel->setProperty("class", "SectionTitle");
     layout->addWidget(titleLabel);
 
     auto* aspectGroup = new QGroupBox("Tỉ lệ khung hình (Aspect Ratio)", view);
@@ -951,6 +870,16 @@ QWidget* AssetsPanel::createSettingsView() {
 }
 
 void AssetsPanel::refresh() {
+    const auto& pal = Theme::instance().palette();
+    int curRow = tabList_->currentRow();
+    for (int i = 0; i < tabList_->count(); ++i) {
+        auto* it = tabList_->item(i);
+        if (it && i < static_cast<int>(kTabDefs.size())) {
+            QColor col = (i == curRow) ? pal.primaryAccent : pal.textSecondary;
+            it->setIcon(UiIcons::get(kTabDefs[i].second, col, 20));
+        }
+    }
+
     mediaListWidget_->clear();
     for (const auto& asset : mediaLibrary_.assets()) {
         auto* item = new QListWidgetItem(mediaListWidget_);
@@ -958,13 +887,20 @@ void AssetsPanel::refresh() {
         std::string durStr = core::Timecode::format(asset->duration(), core::TimecodeFormat::MM_SS);
         UiIcon iconType = (asset->type() == media::MediaType::Video) ? UiIcon::Media :
                           (asset->type() == media::MediaType::Audio) ? UiIcon::Audio : UiIcon::Media;
-        item->setIcon(UiIcons::get(iconType, QColor("#38bdf8"), 24));
+        item->setIcon(UiIcons::get(iconType, pal.primaryAccent, 24));
 
-        QString label = QString("%1\n<span style='color:#71717a;'>%2x%3 • %4</span>")
-            .arg(QString::fromStdString(asset->fileName()))
-            .arg(asset->width())
-            .arg(asset->height())
-            .arg(QString::fromStdString(durStr));
+        QString label;
+        if (asset->type() == media::MediaType::Video) {
+            label = QString("%1\n%2x%3 • %4")
+                .arg(QString::fromStdString(asset->fileName()))
+                .arg(asset->width())
+                .arg(asset->height())
+                .arg(QString::fromStdString(durStr));
+        } else {
+            label = QString("%1\n%2")
+                .arg(QString::fromStdString(asset->fileName()))
+                .arg(QString::fromStdString(durStr));
+        }
 
         item->setText(label);
         item->setData(Qt::UserRole, QString::fromStdString(asset->id().str()));

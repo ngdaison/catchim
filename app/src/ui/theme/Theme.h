@@ -6,6 +6,9 @@
 #if defined(HAVE_QT6)
 #include <QFont>
 #include <QString>
+#include <functional>
+#include <unordered_map>
+#include <string>
 
 namespace catchim::ui {
 
@@ -29,11 +32,16 @@ public:
 
     QString buildGlobalStyleSheet() const;
 
+    using ThemeListener = std::function<void(ThemeMode)>;
+    void addListener(const std::string& key, ThemeListener listener);
+    void removeListener(const std::string& key);
+
 private:
     Theme();
     ThemeMode mode_{ThemeMode::Dark};
     Palette palette_;
     Metrics metrics_;
+    std::unordered_map<std::string, ThemeListener> listeners_;
 };
 
 } // namespace catchim::ui

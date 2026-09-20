@@ -124,25 +124,8 @@ int Application::run() {
     // Enforce Fusion clean dark style
     qtApp.setStyle("Fusion");
 
-    QPalette pal;
-    pal.setColor(QPalette::Window, QColor("#09090b"));
-    pal.setColor(QPalette::WindowText, QColor("#f4f4f5"));
-    pal.setColor(QPalette::Base, QColor("#121215"));
-    pal.setColor(QPalette::AlternateBase, QColor("#18181b"));
-    pal.setColor(QPalette::ToolTipBase, QColor("#18181b"));
-    pal.setColor(QPalette::ToolTipText, QColor("#f4f4f5"));
-    pal.setColor(QPalette::Text, QColor("#f4f4f5"));
-    pal.setColor(QPalette::Button, QColor("#18181b"));
-    pal.setColor(QPalette::ButtonText, QColor("#f4f4f5"));
-    pal.setColor(QPalette::BrightText, QColor("#ef4444"));
-    pal.setColor(QPalette::Link, QColor("#38bdf8"));
-    pal.setColor(QPalette::Highlight, QColor("#0284c7"));
-    pal.setColor(QPalette::HighlightedText, QColor("#ffffff"));
-    qtApp.setPalette(pal);
-
-    // Apply global stylesheet
+    // Apply theme & palette from configuration
     ui::Theme::instance().setTheme(config_.theme == "light" ? ui::ThemeMode::Light : ui::ThemeMode::Dark);
-    qtApp.setStyleSheet(ui::Theme::instance().buildGlobalStyleSheet());
 
     ui::MainWindow mainWindow(*editorEngine_, *mediaLibrary_, *renderEngine_);
     mainWindow.resize(config_.windowWidth, config_.windowHeight);

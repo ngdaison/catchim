@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include "ui/icons/UiIcons.h"
+#include "ui/theme/Theme.h"
 #include "core/time/Timecode.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -32,37 +33,26 @@ void PreviewPanel::setupUi() {
 
     // Preview Toolbar
     auto* toolbar = new QWidget(this);
+    toolbar->setObjectName("previewToolbar");
     toolbar->setFixedHeight(44);
-    toolbar->setStyleSheet("background-color: #0e0e11; border-top: 1px solid #27272a;");
     auto* tbLayout = new QHBoxLayout(toolbar);
     tbLayout->setContentsMargins(12, 4, 12, 4);
     tbLayout->setSpacing(8);
 
     // Timecode display
     timecodeLabel_ = new QLabel("00:00:00:00 / 00:00:00:00", toolbar);
-    timecodeLabel_->setStyleSheet("font-family: 'Cascadia Code', monospace; color: #f4f4f5; font-size: 12px; font-weight: 600; padding: 4px 8px; background: #18181b; border-radius: 4px;");
+    timecodeLabel_->setObjectName("timecodeLabel");
     tbLayout->addWidget(timecodeLabel_);
 
     tbLayout->addStretch();
 
-    auto makeIconTbBtn = [toolbar](UiIcon icon, const QString& tip) {
+    const auto& pal = Theme::instance().palette();
+    auto makeIconTbBtn = [toolbar, pal](UiIcon icon, const QString& tip) {
         auto* btn = new QPushButton(toolbar);
         btn->setFixedSize(32, 32);
-        btn->setIcon(UiIcons::get(icon, QColor("#f4f4f5"), 16));
+        btn->setIcon(UiIcons::get(icon, pal.textPrimary, 16));
         btn->setIconSize(QSize(16, 16));
         btn->setToolTip(tip);
-        btn->setStyleSheet(R"(
-            QPushButton {
-                background-color: #18181b;
-                border: 1px solid #27272a;
-                border-radius: 6px;
-                padding: 0;
-            }
-            QPushButton:hover {
-                background-color: #27272a;
-                border-color: #38bdf8;
-            }
-        )");
         return btn;
     };
 
@@ -127,17 +117,6 @@ void PreviewPanel::setupUi() {
     zoomCombo_ = new QComboBox(toolbar);
     zoomCombo_->addItems({"Fit", "25%", "50%", "75%", "100%", "150%", "200%"});
     zoomCombo_->setFixedWidth(84);
-    zoomCombo_->setStyleSheet(R"(
-        QComboBox {
-            background-color: #18181b;
-            color: #f4f4f5;
-            border: 1px solid #27272a;
-            border-radius: 6px;
-            padding: 4px 8px;
-            font-size: 11px;
-            font-weight: 500;
-        }
-    )");
     connect(zoomCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &PreviewPanel::onZoomChanged);
     tbLayout->addWidget(zoomCombo_);
 
@@ -179,7 +158,6 @@ void PreviewPanel::refresh() {
     playPauseBtn_->setIcon(engine_.playback().isPlaying() ?
         UiIcons::get(UiIcon::Pause, QColor("#ffffff"), 16) :
         UiIcons::get(UiIcon::Play, QColor("#ffffff"), 16));
-    playPauseBtn_->setText("");
     previewWidget_->update();
 }
 

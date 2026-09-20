@@ -2,6 +2,7 @@
 
 #if defined(HAVE_QT6)
 #include <QApplication>
+#include <QPalette>
 
 namespace catchim::ui {
 
@@ -19,8 +20,34 @@ void Theme::setTheme(ThemeMode mode) {
     mode_ = mode;
     palette_ = (mode == ThemeMode::Dark) ? getDarkPalette() : getLightPalette();
     if (qApp) {
+        QPalette pal;
+        pal.setColor(QPalette::Window, palette_.background);
+        pal.setColor(QPalette::WindowText, palette_.textPrimary);
+        pal.setColor(QPalette::Base, palette_.panelBackground);
+        pal.setColor(QPalette::AlternateBase, palette_.secondary);
+        pal.setColor(QPalette::ToolTipBase, palette_.panelBackground);
+        pal.setColor(QPalette::ToolTipText, palette_.textPrimary);
+        pal.setColor(QPalette::Text, palette_.textPrimary);
+        pal.setColor(QPalette::Button, palette_.secondary);
+        pal.setColor(QPalette::ButtonText, palette_.textPrimary);
+        pal.setColor(QPalette::BrightText, palette_.destructive);
+        pal.setColor(QPalette::Link, palette_.primaryAccent);
+        pal.setColor(QPalette::Highlight, palette_.primaryAccent);
+        pal.setColor(QPalette::HighlightedText, QColor("#ffffff"));
+        qApp->setPalette(pal);
         qApp->setStyleSheet(buildGlobalStyleSheet());
     }
+    for (const auto& [k, cb] : listeners_) {
+        if (cb) cb(mode_);
+    }
+}
+
+void Theme::addListener(const std::string& key, ThemeListener listener) {
+    listeners_[key] = std::move(listener);
+}
+
+void Theme::removeListener(const std::string& key) {
+    listeners_.erase(key);
 }
 
 QFont Theme::fontSans(int pointSize, int weight) const {
@@ -37,7 +64,7 @@ QFont Theme::fontMono(int pointSize) const {
 
 QString Theme::buildGlobalStyleSheet() const {
     QString qss = QString(R"(
-        /* Global Window & Widgets */
+        /* Global Window & Central Widget */
         QMainWindow, QWidget#centralWidget {
             background-color: %1;
             color: %2;
@@ -46,7 +73,6 @@ QString Theme::buildGlobalStyleSheet() const {
         }
 
         QWidget {
-            background-color: %1;
             color: %2;
             outline: none;
         }
@@ -56,11 +82,168 @@ QString Theme::buildGlobalStyleSheet() const {
             color: %2;
         }
 
+        QLabel[class="SecondaryLabel"] {
+            color: %5;
+            font-size: 11px;
+        }
+
+        QLabel[class="SectionTitle"] {
+            font-weight: 600;
+            font-size: 14px;
+            color: %2;
+        }
+
         /* Panels & Frames */
-        .Panel, QFrame#panelFrame, QWidget#assetsPanel, QWidget#previewPanel, QWidget#propertiesPanel, QWidget#timelinePanel {
+        .Panel, QWidget[class="Panel"], QFrame#panelFrame, QWidget#assetsPanel, QWidget#previewPanel, QWidget#propertiesPanel, QWidget#timelinePanel {
             background-color: %3;
             border: 1px solid %4;
             border-radius: 8px;
+        }
+
+        /* Editor Header */
+        #editorHeader {
+            background-color: %3;
+            border-bottom: 1px solid %4;
+        }
+        #editorHeader QPushButton {
+            background-color: %6;
+            color: %2;
+            border: 1px solid %4;
+            border-radius: 6px;
+            padding: 0px;
+        }
+        #editorHeader QPushButton:hover {
+            background-color: %7;
+            border-color: %8;
+        }
+        #editorHeader QLineEdit {
+            background: transparent;
+            color: %2;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 0px 8px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }
+        #editorHeader QLineEdit:hover {
+            background: %6;
+            border: 1px solid %4;
+        }
+        #editorHeader QLineEdit:focus {
+            background: %6;
+            border: 1px solid %8;
+        }
+
+        /* Left TabList in AssetsPanel */
+        #tabList {
+            background-color: %3;
+            border: none;
+            border-right: 1px solid %4;
+            padding: 6px 0px;
+            outline: none;
+        }
+        #tabList::item {
+            height: 36px;
+            width: 36px;
+            border-radius: 6px;
+            margin: 2px 4px;
+        }
+        #tabList::item:hover {
+            background-color: %7;
+        }
+        #tabList::item:selected {
+            background-color: %6;
+        }
+
+        /* Toolbars */
+        #previewToolbar {
+            background-color: %3;
+            border-top: 1px solid %4;
+        }
+        #timelineToolbar {
+            background-color: %3;
+            border-bottom: 1px solid %4;
+        }
+        #previewToolbar QPushButton, #timelineToolbar QPushButton {
+            background-color: %6;
+            color: %2;
+            border: 1px solid %4;
+            border-radius: 6px;
+            padding: 0px;
+        }
+        #previewToolbar QPushButton:hover, #timelineToolbar QPushButton:hover {
+            background-color: %7;
+            border-color: %8;
+        }
+        #previewToolbar QPushButton:checked, #timelineToolbar QPushButton:checked {
+            background-color: %8;
+            color: #ffffff;
+            border-color: %8;
+        }
+
+        #sceneLabel {
+            color: %2;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 4px 12px;
+            background-color: %6;
+            border: 1px solid %4;
+            border-radius: 6px;
+        }
+
+        #timecodeLabel {
+            font-family: 'Cascadia Code', monospace;
+            color: %2;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            background-color: %6;
+            border-radius: 4px;
+            border: 1px solid %4;
+        }
+
+        /* Card Widgets */
+        QWidget[class="cardWidget"] {
+            background-color: %6;
+            border: 1px solid %4;
+            border-radius: 6px;
+        }
+
+        /* Import Button */
+        #importBtn {
+            background-color: %6;
+            color: %2;
+            border: 1px dashed %4;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            padding: 0px 12px;
+        }
+        #importBtn:hover {
+            background-color: %7;
+            border-color: %8;
+            color: %8;
+        }
+
+        /* Media List Widget */
+        #mediaListWidget {
+            background: transparent;
+            border: 1px solid %4;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        #mediaListWidget::item {
+            height: 52px;
+            padding: 6px 10px;
+            border-bottom: 1px solid %4;
+            color: %2;
+        }
+        #mediaListWidget::item:hover {
+            background-color: %7;
+        }
+        #mediaListWidget::item:selected {
+            background-color: %8;
+            color: #ffffff;
         }
 
         /* QSplitter */
@@ -75,9 +258,16 @@ QString Theme::buildGlobalStyleSheet() const {
         }
 
         /* Scroll Areas */
-        QScrollArea, QScrollArea > QWidget, QScrollArea > QWidget > QWidget {
-            background-color: %3;
+        QScrollArea {
+            background-color: transparent;
             border: none;
+        }
+        QScrollArea > QWidget > QWidget {
+            background-color: transparent;
+        }
+        #timelineScrollArea {
+            border: none;
+            background-color: %1;
         }
 
         /* Buttons */
@@ -282,7 +472,7 @@ QString Theme::buildGlobalStyleSheet() const {
         QScrollBar::handle:vertical:hover {
             background: %5;
         }
-        QScrollBar:horizontal {
+        QScrollBar::horizontal {
             background: transparent;
             height: 8px;
             margin: 0px;
