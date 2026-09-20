@@ -1886,6 +1886,61 @@ Quy ước trạng thái:
 | Offscreen 2D Canvas Surface Allocation | `web/src/services/renderer/canvas-utils.ts` | `catchim::render::MaskFeatherEngine::createSurface` | Verified |
 | Feather Radius Geometry Clamping | `web/src/services/renderer/mask-feather.ts` | `catchim::render::MaskFeatherEngine::clampFeather` | Verified |
 
+---
+
+## 200. Native Timeline C-Core Bindings
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Native Ticks, Frame Snapping & Seeking | `web/src/native/opencut-core.ts` | `catchim::native::OpencutNativeCoreBindings::ticksPerSecond`, `roundToFrame`, `snappedSeek` | Verified |
+| Native Fade & Mask Alpha Evaluation | `web/src/native/opencut-core.ts` | `catchim::native::OpencutNativeCoreBindings::evaluateFade`, `evaluateMaskAlpha` | Verified |
+| Native Buffer Clearing, Gain Ramp & Stereo Downmix | `web/src/native/opencut-core.ts` | `catchim::native::OpencutNativeCoreBindings::clearBufferRgba`, `applyGainRamp`, `downmixStereo` | Verified |
+
+---
+
+## 201. Panel Store & Persistence Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Panel Sizes State (Tools, Preview, Properties, Main, Timeline) | `web/src/editor/panel-store.ts` | `catchim::editor::PanelStoreEngine::getPanels`, `setPanel` | Verified |
+| Panel Sizes Schema Migration (v1 -> v2) | `web/src/editor/panel-store.ts` | `catchim::editor::PanelStoreEngine::fromJson` | Verified |
+| Panel Store JSON Serialization & Reset | `web/src/editor/panel-store.ts` | `catchim::editor::PanelStoreEngine::toJson`, `resetPanels` | Verified |
+
+---
+
+## 202. Text Element Measurement & Animated Background Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Text Background Parameter Extraction & Corner Clamping | `web/src/text/background.ts` | `catchim::render::TextElementMeasurementEngine::buildTextBackgroundFromParams` | Verified |
+| Keyframed Background Property Resolution at Time | `web/src/text/measure-element.ts` | `catchim::render::TextElementMeasurementEngine::resolveBackgroundAtTime` | Verified |
+| Visual Bounding Rect Calculation with Padding & Offset | `web/src/text/measure-element.ts` | `catchim::render::TextElementMeasurementEngine::calculateVisualRect`, `measureElement` | Verified |
+
+---
+
+## 203. Editable Timecode Controller
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Timecode Edit Lifecycle (Start, Input, Cancel, Apply) | `web/src/components/editable-timecode.tsx` | `catchim::editor::EditableTimecodeController::startEditing`, `applyEdit` | Verified |
+| Input Syntax Validation & Error State Flag | `web/src/components/editable-timecode.tsx` | `catchim::editor::EditableTimecodeController::hasError` | Verified |
+| Frame Snapping & Duration Clamping | `web/src/components/editable-timecode.tsx` | `catchim::editor::EditableTimecodeController::applyEdit` | Verified |
+
+---
+
+## 204. Project Organization & Duplication Plan Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Project Filtering & Multi-Criteria Sorting | `web/src/core/managers/project-manager.ts` | `catchim::core::ProjectOrganizationEngine::filterAndSortProjects` | Verified |
+| Auto-Increment Duplicate Naming `(N) Name` | `web/src/core/managers/project-manager.ts` | `catchim::core::ProjectOrganizationEngine::generateDuplicateName` | Verified |
+| Audio Buffer Stripping for Lightweight Project Storage | `web/src/core/managers/project-manager.ts` | `catchim::core::ProjectOrganizationEngine::stripAudioBuffers` | Verified |
+
+---
+
+## 205. Storage Service Multi-Database Coordinator
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Multi-Database Names & Version Coordination | `web/src/services/storage/types.ts` | `catchim::storage::StorageServiceCoordinator::defaultConfig`, `getProjectMediaStoreName` | Verified |
+| Bookmark Normalization (Ticks & Object Representation) | `web/src/services/storage/service.ts` | `catchim::storage::StorageServiceCoordinator::normalizeBookmarks` | Verified |
+| Storage Quota Exceeded Error Detection | `web/src/services/storage/quota.ts` | `catchim::storage::StorageServiceCoordinator::isQuotaExceededError` | Verified |
+
+
 
 
 

@@ -226,6 +226,12 @@
 #include "editor/preview/controllers/TransformHandleController.h"
 #include "editor/preview/controllers/PreviewInteractionGestureController.h"
 #include "render/effects/MaskFeatherEngine.h"
+#include "native/OpencutNativeCoreBindings.h"
+#include "editor/panels/PanelStoreEngine.h"
+#include "render/text/TextElementMeasurementEngine.h"
+#include "editor/timecode/EditableTimecodeController.h"
+#include "core/project/ProjectOrganizationEngine.h"
+#include "storage/StorageServiceCoordinator.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -11906,6 +11912,288 @@ void runMaskFeatherEngineTests() {
     std::cout << "[PASS] runMaskFeatherEngineTests" << std::endl;
 }
 
+void runOpencutNativeCoreBindingsTests() {
+    using namespace catchim::native;
+    using namespace catchim::core;
+
+    int64_t ticksSec = OpencutNativeCoreBindings::ticksPerSecond();
+    TEST_ASSERT(ticksSec == 120000);
+
+    int64_t ticks = OpencutNativeCoreBindings::fromSeconds(1.5);
+    TEST_ASSERT(ticks == 180000);
+    double sec = OpencutNativeCoreBindings::toSeconds(180000);
+    TEST_ASSERT(std::abs(sec - 1.5) < 0.0001);
+
+    int64_t rounded = OpencutNativeCoreBindings::roundToFrame(1000, 30, 1);
+    TEST_ASSERT(rounded == 0);
+    int64_t floored = OpencutNativeCoreBindings::floorToFrame(4500, 30, 1);
+    TEST_ASSERT(floored == 4000);
+    int64_t last = OpencutNativeCoreBindings::lastFrame(120000, 30, 1);
+    TEST_ASSERT(last == 116000);
+
+    double fadeMid = OpencutNativeCoreBindings::evaluateFade(1.0, 5.0, 2.0, 2.0);
+    TEST_ASSERT(std::abs(fadeMid - 0.5) < 0.001);
+
+    double maskRectAlpha = OpencutNativeCoreBindings::evaluateMaskAlpha(
+        0.0, 0.0, 0, 0.0, 0.0, 100.0, 100.0, 0.0, 0.0, false
+    );
+    TEST_ASSERT(maskRectAlpha == 1.0);
+
+    double bezierVal = OpencutNativeCoreBindings::solveBezier(0.5, 0.0, 0.0, 1.0, 1.0);
+    TEST_ASSERT(std::abs(bezierVal - 0.5) < 0.01);
+
+    double p = OpencutNativeCoreBindings::evaluateBezierPoint(0.5, 0.0, 0.0, 1.0, 1.0);
+    TEST_ASSERT(std::abs(p - 0.5) < 0.01);
+
+    uint8_t buffer[16] = {0};
+    OpencutNativeCoreBindings::clearBufferRgba(buffer, 2, 2, 255, 128, 64, 255);
+    TEST_ASSERT(buffer[0] == 255);
+    TEST_ASSERT(buffer[1] == 128);
+    TEST_ASSERT(buffer[2] == 64);
+    TEST_ASSERT(buffer[3] == 255);
+
+    TEST_ASSERT(OpencutNativeCoreBindings::pointInRotatedRect(0.0, 0.0, 0.0, 0.0, 50.0, 50.0, 45.0));
+    TEST_ASSERT(!OpencutNativeCoreBindings::pointInRotatedRect(100.0, 100.0, 0.0, 0.0, 50.0, 50.0, 0.0));
+
+    float audioSamples[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    OpencutNativeCoreBindings::applyGainRamp(audioSamples, 4, 0.0f, 1.0f);
+    TEST_ASSERT(audioSamples[0] == 0.0f);
+    TEST_ASSERT(audioSamples[3] == 1.0f);
+
+    float dest[2] = {0.5f, 0.5f};
+    float src[2] = {1.0f, 1.0f};
+    OpencutNativeCoreBindings::mixAudioBuffers(dest, src, 2, 0.5f);
+    TEST_ASSERT(std::abs(dest[0] - 1.0f) < 0.001f);
+
+    float peak = OpencutNativeCoreBindings::computeBufferPeak(dest, 2);
+    TEST_ASSERT(std::abs(peak - 1.0f) < 0.001f);
+
+    OpencutNativeCoreBindings::clampBufferSamples(dest, 2, 0.8f);
+    TEST_ASSERT(std::abs(dest[0] - 0.8f) < 0.001f);
+
+    float left[2] = {0.2f, 0.6f};
+    float right[2] = {0.4f, 0.8f};
+    float outStereo[2] = {0.0f, 0.0f};
+    OpencutNativeCoreBindings::downmixStereo(left, right, outStereo, 2);
+    TEST_ASSERT(std::abs(outStereo[0] - 0.3f) < 0.001f);
+    TEST_ASSERT(std::abs(outStereo[1] - 0.7f) < 0.001f);
+
+    std::cout << "[PASS] runOpencutNativeCoreBindingsTests" << std::endl;
+}
+
+void runPanelStoreEngineTests() {
+    using namespace catchim::editor;
+
+    PanelStoreEngine store;
+    TEST_ASSERT(store.getPanels().tools == 25.0);
+    TEST_ASSERT(store.getPanels().preview == 50.0);
+
+    store.setPanel(PanelId::Tools, 30.0);
+    TEST_ASSERT(store.getPanels().tools == 30.0);
+
+    store.setPanel("preview", 45.0);
+    TEST_ASSERT(store.getPanels().preview == 45.0);
+
+    store.setPanels(20.0, 55.0);
+    TEST_ASSERT(store.getPanels().tools == 20.0);
+    TEST_ASSERT(store.getPanels().preview == 55.0);
+
+    store.resetPanels();
+    TEST_ASSERT(store.getPanels().tools == 25.0);
+
+    auto json = store.toJson();
+    TEST_ASSERT(json["version"] == 2);
+    TEST_ASSERT(json["panels"]["tools"] == 25.0);
+
+    // v1 schema migration test
+    nlohmann::json v1Json = {
+        {"toolsPanel", 18.0},
+        {"previewPanel", 62.0},
+        {"propertiesPanel", 20.0}
+    };
+    auto migrated = PanelStoreEngine::fromJson(v1Json);
+    TEST_ASSERT(migrated.getPanels().tools == 18.0);
+    TEST_ASSERT(migrated.getPanels().preview == 62.0);
+    TEST_ASSERT(migrated.getPanels().properties == 20.0);
+
+    TEST_ASSERT(PanelStoreEngine::panelIdToString(PanelId::Timeline) == "timeline");
+    auto pOpt = PanelStoreEngine::panelIdFromString("mainContent");
+    TEST_ASSERT(pOpt.has_value() && *pOpt == PanelId::MainContent);
+
+    std::cout << "[PASS] runPanelStoreEngineTests" << std::endl;
+}
+
+void runTextElementMeasurementEngineTests() {
+    using namespace catchim::render;
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    std::unordered_map<std::string, std::string> params = {
+        {"background.enabled", "true"},
+        {"background.color", "#ff0000"},
+        {"background.cornerRadius", "12.0"},
+        {"background.paddingX", "10.0"},
+        {"background.paddingY", "6.0"},
+        {"background.offsetX", "2.0"},
+        {"background.offsetY", "-1.0"}
+    };
+
+    auto bg = TextElementMeasurementEngine::buildTextBackgroundFromParams(params);
+    TEST_ASSERT(bg.enabled);
+    TEST_ASSERT(bg.color == "#ff0000");
+    TEST_ASSERT(bg.cornerRadius == 12.0);
+    TEST_ASSERT(bg.paddingX == 10.0);
+    TEST_ASSERT(bg.paddingY == 6.0);
+
+    Clip clip(ClipId("c-text"), ClipType::Text, "Text", TimelineTime(0), TimelineTime::fromSeconds(5.0));
+    clip.getOrCreateAnimationChannel("background.paddingX", 10.0);
+    clip.findAnimationChannel("background.paddingX")->addOrUpdateKeyframe(Keyframe(TimelineTime(0), 10.0));
+    clip.findAnimationChannel("background.paddingX")->addOrUpdateKeyframe(Keyframe(TimelineTime::fromSeconds(2.0), 20.0));
+
+    auto resolved = TextElementMeasurementEngine::resolveBackgroundAtTime(bg, &clip, TimelineTime::fromSeconds(1.0));
+    TEST_ASSERT(resolved.enabled);
+    TEST_ASSERT(std::abs(resolved.paddingX - 15.0) < 0.01);
+
+    auto measured = TextElementMeasurementEngine::measureElement(params, nullptr, TimelineTime(0), 100.0, 40.0);
+    TEST_ASSERT(measured.textWidth == 100.0);
+    TEST_ASSERT(measured.textHeight == 40.0);
+    TEST_ASSERT(measured.visualRect.width == 100.0 + 20.0);
+    TEST_ASSERT(measured.visualRect.height == 40.0 + 12.0);
+
+    std::cout << "[PASS] runTextElementMeasurementEngineTests" << std::endl;
+}
+
+void runEditableTimecodeControllerTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    EditableTimecodeController controller;
+    TEST_ASSERT(!controller.isEditing());
+    TEST_ASSERT(!controller.hasError());
+
+    controller.startEditing("00:00:01:00");
+    TEST_ASSERT(controller.isEditing());
+    TEST_ASSERT(controller.inputValue() == "00:00:01:00");
+
+    controller.setInputValue("00:00:02:15");
+    TEST_ASSERT(controller.inputValue() == "00:00:02:15");
+
+    auto applied = controller.applyEdit(TimecodeFormat::HH_MM_SS_FF, FrameRate{30, 1}, TimelineTime::fromSeconds(10.0));
+    TEST_ASSERT(applied.has_value());
+    TEST_ASSERT(!controller.hasError());
+    TEST_ASSERT(!controller.isEditing());
+    TEST_ASSERT(applied->toSeconds() == 2.5);
+
+    // Invalid input
+    controller.startEditing("invalid:timecode");
+    auto invalidApplied = controller.applyEdit(TimecodeFormat::HH_MM_SS_FF, FrameRate{30, 1});
+    TEST_ASSERT(!invalidApplied.has_value());
+    TEST_ASSERT(controller.hasError());
+
+    controller.cancelEditing();
+    TEST_ASSERT(!controller.isEditing());
+    TEST_ASSERT(!controller.hasError());
+
+    std::string formatted = EditableTimecodeController::formatTime(TimelineTime::fromSeconds(1.0), TimecodeFormat::HH_MM_SS_FF, FrameRate{30, 1});
+    TEST_ASSERT(!formatted.empty());
+
+    std::cout << "[PASS] runEditableTimecodeControllerTests" << std::endl;
+}
+
+void runProjectOrganizationEngineTests() {
+    using namespace catchim::core;
+
+    TEST_ASSERT(ProjectOrganizationEngine::sortOptionToString(ProjectSortOption::NameAsc) == "name-asc");
+    auto opt = ProjectOrganizationEngine::sortOptionFromString("createdAt-desc");
+    TEST_ASSERT(opt.has_value() && *opt == ProjectSortOption::CreatedAtDesc);
+
+    std::vector<ProjectSummary> projects = {
+        {"1", "Beta Project", 100, 300, 10.0, ""},
+        {"2", "Alpha Project", 200, 100, 20.0, ""},
+        {"3", "Gamma Project", 300, 200, 30.0, ""}
+    };
+
+    auto sortedByName = ProjectOrganizationEngine::filterAndSortProjects(projects, "", ProjectSortOption::NameAsc);
+    TEST_ASSERT(sortedByName.size() == 3);
+    TEST_ASSERT(sortedByName[0].name == "Alpha Project");
+
+    auto filtered = ProjectOrganizationEngine::filterAndSortProjects(projects, "beta", ProjectSortOption::NameAsc);
+    TEST_ASSERT(filtered.size() == 1);
+    TEST_ASSERT(filtered[0].id == "1");
+
+    // Duplicate name parsing and generation
+    auto [base, num] = ProjectOrganizationEngine::parseDuplicateBaseName("(2) My Video");
+    TEST_ASSERT(base == "My Video");
+    TEST_ASSERT(num.has_value() && *num == 2);
+
+    std::vector<std::string> existing = {"My Video", "(1) My Video", "(2) My Video"};
+    std::string dupName = ProjectOrganizationEngine::generateDuplicateName("My Video", existing);
+    TEST_ASSERT(dupName == "(3) My Video");
+
+    // Audio buffer stripping
+    nlohmann::json projJson = {
+        {"scenes", nlohmann::json::array({
+            {
+                {"tracks", {
+                    {"audio", nlohmann::json::array({
+                        {
+                            {"elements", nlohmann::json::array({
+                                {
+                                    {"id", "el-1"},
+                                    {"buffer", {1, 2, 3}}
+                                }
+                            })}
+                        }
+                    })}
+                }}
+            }
+        })}
+    };
+    ProjectOrganizationEngine::stripAudioBuffers(projJson);
+    TEST_ASSERT(!projJson["scenes"][0]["tracks"]["audio"][0]["elements"][0].contains("buffer"));
+
+    std::cout << "[PASS] runProjectOrganizationEngineTests" << std::endl;
+}
+
+void runStorageServiceCoordinatorTests() {
+    using namespace catchim::storage;
+    using namespace catchim::core;
+
+    const auto& defCfg = StorageServiceCoordinator::defaultConfig();
+    TEST_ASSERT(defCfg.version == 1);
+    TEST_ASSERT(defCfg.projectsDb == "video-editor-projects");
+
+    std::string mediaStore = StorageServiceCoordinator::getProjectMediaStoreName("proj-123");
+    TEST_ASSERT(mediaStore == "video-editor-media-proj-123");
+
+    std::string folder = StorageServiceCoordinator::getProjectMediaFilesFolder("proj-123");
+    TEST_ASSERT(folder == "media-files-proj-123");
+
+    // Bookmark normalization
+    nlohmann::json bmArray = nlohmann::json::array({
+        120000,
+        {
+            {"time", 240000},
+            {"note", "Intro marker"},
+            {"color", "#ffaa00"},
+            {"duration", 60000}
+        }
+    });
+
+    auto bookmarks = StorageServiceCoordinator::normalizeBookmarks(bmArray);
+    TEST_ASSERT(bookmarks.size() == 2);
+    TEST_ASSERT(bookmarks[0].time.ticks() == 120000);
+    TEST_ASSERT(!bookmarks[0].note.has_value());
+    TEST_ASSERT(bookmarks[1].time.ticks() == 240000);
+    TEST_ASSERT(bookmarks[1].note.has_value() && *bookmarks[1].note == "Intro marker");
+    TEST_ASSERT(bookmarks[1].duration.has_value() && bookmarks[1].duration->ticks() == 60000);
+
+    TEST_ASSERT(StorageServiceCoordinator::isQuotaExceededError("QuotaExceededError: storage is full"));
+    TEST_ASSERT(!StorageServiceCoordinator::isQuotaExceededError("Network timeout"));
+
+    std::cout << "[PASS] runStorageServiceCoordinatorTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -12119,6 +12407,12 @@ int main() {
     runTransformHandleControllerTests();
     runPreviewInteractionGestureControllerTests();
     runMaskFeatherEngineTests();
-    std::cout << ">>> ALL 211 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runOpencutNativeCoreBindingsTests();
+    runPanelStoreEngineTests();
+    runTextElementMeasurementEngineTests();
+    runEditableTimecodeControllerTests();
+    runProjectOrganizationEngineTests();
+    runStorageServiceCoordinatorTests();
+    std::cout << ">>> ALL 217 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

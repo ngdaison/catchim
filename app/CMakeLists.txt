@@ -83,6 +83,12 @@ add_library(catchim_core STATIC
     src/core/utils/GeometryUtils.h
     src/core/utils/DateUtils.cpp
     src/core/utils/DateUtils.h
+    src/native/OpencutNativeCoreBindings.cpp
+    src/native/OpencutNativeCoreBindings.h
+    src/core/project/ProjectOrganizationEngine.cpp
+    src/core/project/ProjectOrganizationEngine.h
+    src/storage/StorageServiceCoordinator.cpp
+    src/storage/StorageServiceCoordinator.h
 )
 target_link_libraries(catchim_core PUBLIC nlohmann_json::nlohmann_json)
 
@@ -335,6 +341,10 @@ add_library(catchim_editor STATIC
     src/editor/preview/controllers/TransformHandleController.h
     src/editor/preview/controllers/PreviewInteractionGestureController.cpp
     src/editor/preview/controllers/PreviewInteractionGestureController.h
+    src/editor/panels/PanelStoreEngine.cpp
+    src/editor/panels/PanelStoreEngine.h
+    src/editor/timecode/EditableTimecodeController.cpp
+    src/editor/timecode/EditableTimecodeController.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -434,6 +444,8 @@ add_library(catchim_render STATIC
     src/render/graphics/GraphicGeometry.h
     src/render/text/TextLayoutEngine.cpp
     src/render/text/TextLayoutEngine.h
+    src/render/text/TextElementMeasurementEngine.cpp
+    src/render/text/TextElementMeasurementEngine.h
     src/render/masks/FreeformMaskGeometry.cpp
     src/render/masks/FreeformMaskGeometry.h
     src/render/masks/BuiltinMaskGeometry.cpp
