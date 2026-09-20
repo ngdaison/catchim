@@ -89,6 +89,8 @@ add_library(catchim_core STATIC
     src/core/project/ProjectOrganizationEngine.h
     src/storage/StorageServiceCoordinator.cpp
     src/storage/StorageServiceCoordinator.h
+    src/utils/PlatformBrowserUtils.cpp
+    src/utils/PlatformBrowserUtils.h
 )
 target_link_libraries(catchim_core PUBLIC nlohmann_json::nlohmann_json)
 
@@ -359,6 +361,12 @@ add_library(catchim_editor STATIC
     src/editor/panels/PropertiesPanelStoreEngine.h
     src/editor/retime/SpeedInputController.cpp
     src/editor/retime/SpeedInputController.h
+    src/editor/timeline/TimelineEdgeScrollEngine.cpp
+    src/editor/timeline/TimelineEdgeScrollEngine.h
+    src/editor/timeline/TimelineSnapIndicatorEngine.cpp
+    src/editor/timeline/TimelineSnapIndicatorEngine.h
+    src/editor/actions/KeybindingPersistenceEngine.cpp
+    src/editor/actions/KeybindingPersistenceEngine.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -420,6 +428,10 @@ add_library(catchim_media STATIC
     src/media/WaveformCache.h
     src/media/TtsVoiceService.cpp
     src/media/TtsVoiceService.h
+    src/media/MediaTypeUtils.cpp
+    src/media/MediaTypeUtils.h
+    src/media/MediaProcessingPipeline.cpp
+    src/media/MediaProcessingPipeline.h
 )
 target_link_libraries(catchim_media PUBLIC catchim_core catchim_editor catchim_storage)
 

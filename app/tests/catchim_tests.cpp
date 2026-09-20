@@ -244,6 +244,12 @@
 #include "editor/panels/PropertiesPanelStoreEngine.h"
 #include "editor/retime/SpeedInputController.h"
 #include "storage/NativeFileSystemStorageAdapter.h"
+#include "editor/timeline/TimelineEdgeScrollEngine.h"
+#include "editor/timeline/TimelineSnapIndicatorEngine.h"
+#include "media/MediaTypeUtils.h"
+#include "utils/PlatformBrowserUtils.h"
+#include "media/MediaProcessingPipeline.h"
+#include "editor/actions/KeybindingPersistenceEngine.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -12605,6 +12611,203 @@ void runNativeFileSystemStorageAdapterTests() {
     std::cout << "[PASS] runNativeFileSystemStorageAdapterTests" << std::endl;
 }
 
+void runTimelineEdgeScrollEngineTests() {
+    using namespace catchim::editor::timeline;
+
+    EdgeScrollParams p;
+    p.viewportWidth = 1000.0;
+    p.scrollLeft = 200.0;
+    p.scrollMax = 2000.0;
+    p.edgeThreshold = 100.0;
+    p.maxScrollSpeed = 15.0;
+
+    // Middle of viewport -> no scroll
+    p.mouseXRelative = 500.0;
+    TEST_ASSERT(computeEdgeScrollDelta(p) == 0.0);
+
+    // Left edge (x = 50, half threshold) -> -7.5
+    p.mouseXRelative = 50.0;
+    double leftDelta = computeEdgeScrollDelta(p);
+    TEST_ASSERT(std::abs(leftDelta - (-7.5)) < 1e-4);
+
+    // Left edge when scrollLeft == 0 -> delta is 0 (cannot scroll left further)
+    p.scrollLeft = 0.0;
+    TEST_ASSERT(computeEdgeScrollDelta(p) == 0.0);
+    p.scrollLeft = 200.0;
+
+    // Right edge (x = 950, half threshold from right) -> +7.5
+    p.mouseXRelative = 950.0;
+    double rightDelta = computeEdgeScrollDelta(p);
+    TEST_ASSERT(std::abs(rightDelta - 7.5) < 1e-4);
+
+    // Right edge when scrollLeft == scrollMax -> delta is 0
+    p.scrollLeft = 2000.0;
+    TEST_ASSERT(computeEdgeScrollDelta(p) == 0.0);
+
+    // Clamping
+    TEST_ASSERT(applyScrollDelta(10.0, -20.0, 500.0) == 0.0);
+    TEST_ASSERT(applyScrollDelta(490.0, 20.0, 500.0) == 500.0);
+    TEST_ASSERT(applyScrollDelta(100.0, 25.0, 500.0) == 125.0);
+
+    std::cout << "[PASS] runTimelineEdgeScrollEngineTests" << std::endl;
+}
+
+void runTimelineSnapIndicatorEngineTests() {
+    using namespace catchim::editor::timeline;
+
+    SnapIndicatorParams p;
+    p.snapTimeTicks = catchim::core::TimelineTime::fromSeconds(1.0).ticks(); // 1 second
+    p.hasSnapPoint = true;
+    p.zoomLevel = 1.0;
+    p.scrollLeft = 20.0;
+    p.containerHeight = 400.0;
+    p.edgePaddingPx = 8.0;
+
+    auto pos = computeSnapIndicatorPosition(p);
+    // At zoom 1.0, 1 sec = 50px. Track labels = 140px. Total left = 140 + 50 - 20 = 170px.
+    TEST_ASSERT(std::abs(pos.leftPosition - 170.0) < 1e-4);
+    TEST_ASSERT(pos.topPosition == 0.0);
+    TEST_ASSERT(pos.height == 392.0);
+
+    // Default container height fallback
+    p.containerHeight = 0.0;
+    auto posDef = computeSnapIndicatorPosition(p);
+    TEST_ASSERT(posDef.height == 392.0);
+
+    // No snap point -> time is 0
+    p.hasSnapPoint = false;
+    auto posNoSnap = computeSnapIndicatorPosition(p);
+    // time 0 -> 0px. Total left = 140 + 0 - 20 = 120px.
+    TEST_ASSERT(std::abs(posNoSnap.leftPosition - 120.0) < 1e-4);
+
+    std::cout << "[PASS] runTimelineSnapIndicatorEngineTests" << std::endl;
+}
+
+void runMediaTypeUtilsTests() {
+    using namespace catchim::media;
+
+    TEST_ASSERT(mediaSupportsAudio(MediaType::Audio));
+    TEST_ASSERT(mediaSupportsAudio(MediaType::Video));
+    TEST_ASSERT(!mediaSupportsAudio(MediaType::Image));
+
+    TEST_ASSERT(mediaSupportsAudioOpt(MediaType::Audio));
+    TEST_ASSERT(!mediaSupportsAudioOpt(std::nullopt));
+
+    TEST_ASSERT(getMediaTypeFromMime("image/png") == MediaType::Image);
+    TEST_ASSERT(getMediaTypeFromMime("image/jpeg") == MediaType::Image);
+    TEST_ASSERT(getMediaTypeFromMime("video/mp4") == MediaType::Video);
+    TEST_ASSERT(getMediaTypeFromMime("video/webm") == MediaType::Video);
+    TEST_ASSERT(getMediaTypeFromMime("audio/mpeg") == MediaType::Audio);
+    TEST_ASSERT(getMediaTypeFromMime("audio/wav") == MediaType::Audio);
+    TEST_ASSERT(!getMediaTypeFromMime("application/pdf").has_value());
+
+    std::cout << "[PASS] runMediaTypeUtilsTests" << std::endl;
+}
+
+void runPlatformBrowserUtilsTests() {
+    using namespace catchim::utils;
+
+#if defined(_WIN32)
+    TEST_ASSERT(!isAppleDevice());
+    TEST_ASSERT(getPlatformSpecialKey() == "Ctrl");
+    TEST_ASSERT(getPlatformAlternateKey() == "Alt");
+#endif
+
+    TEST_ASSERT(isTypableDOMElement(DOMElementTag::ContentEditable));
+    TEST_ASSERT(isTypableDOMElement(DOMElementTag::Input, false));
+    TEST_ASSERT(!isTypableDOMElement(DOMElementTag::Input, true));
+    TEST_ASSERT(isTypableDOMElement(DOMElementTag::Textarea, false));
+    TEST_ASSERT(!isTypableDOMElement(DOMElementTag::Textarea, true));
+    TEST_ASSERT(!isTypableDOMElement(DOMElementTag::Other));
+
+    TEST_ASSERT(isScrollableOverflow("auto", "visible"));
+    TEST_ASSERT(isScrollableOverflow("hidden", "scroll"));
+    TEST_ASSERT(!isScrollableOverflow("hidden", "hidden"));
+
+    std::cout << "[PASS] runPlatformBrowserUtilsTests" << std::endl;
+}
+
+void runMediaProcessingPipelineTests() {
+    using namespace catchim::media;
+
+    std::string descHevc = MediaProcessingPipeline::getUnsupportedVideoDescription("hevc");
+    TEST_ASSERT(descHevc.find("Safari") != std::string::npos);
+    TEST_ASSERT(descHevc.find("HEVC") != std::string::npos);
+
+    std::string descOther = MediaProcessingPipeline::getUnsupportedVideoDescription("prores");
+    TEST_ASSERT(descOther.find("PRORES") != std::string::npos);
+    TEST_ASSERT(descOther.find("Safari") == std::string::npos);
+
+    std::string limitDesc = MediaProcessingPipeline::getStorageLimitDescription(1024 * 1024, 512 * 1024);
+    TEST_ASSERT(limitDesc.find("MB") != std::string::npos);
+    TEST_ASSERT(limitDesc.find("512 KB") != std::string::npos);
+
+    TEST_ASSERT(MediaProcessingPipeline::isVideoCodecSupported("h264"));
+    TEST_ASSERT(MediaProcessingPipeline::isVideoCodecSupported("av1"));
+    TEST_ASSERT(!MediaProcessingPipeline::isVideoCodecSupported("hevc"));
+
+    // validateAndPrepare with unsupported mime
+    auto badMime = MediaProcessingPipeline::validateAndPrepare("test.bin", "application/octet-stream", 100, 1000);
+    TEST_ASSERT(!badMime.success);
+
+    // validateAndPrepare quota exceeded
+    auto quotaExceeded = MediaProcessingPipeline::validateAndPrepare("clip.mp4", "video/mp4", 5000, 1000);
+    TEST_ASSERT(!quotaExceeded.success);
+
+    // validateAndPrepare valid
+    auto valid = MediaProcessingPipeline::validateAndPrepare("clip.mp4", "video/mp4", 500, 1000);
+    TEST_ASSERT(valid.success);
+    TEST_ASSERT(valid.asset.has_value());
+    TEST_ASSERT(valid.asset->type == MediaType::Video);
+    TEST_ASSERT(valid.asset->name == "clip.mp4");
+
+    std::cout << "[PASS] runMediaProcessingPipelineTests" << std::endl;
+}
+
+void runKeybindingPersistenceEngineTests() {
+    using namespace catchim::editor;
+
+    DecodedKeybindingsState state;
+    state.isCustomized = true;
+    state.keybindings["ctrl+s"] = "save_project";
+    state.keybindings["ctrl+z"] = "undo";
+
+    auto jsonVal = KeybindingPersistenceEngine::serializeKeybindingsState(state);
+    TEST_ASSERT(jsonVal["isCustomized"] == true);
+    TEST_ASSERT(jsonVal["keybindings"]["ctrl+s"] == "save_project");
+
+    auto decoded = KeybindingPersistenceEngine::decodePersistedKeybindingsState(jsonVal);
+    TEST_ASSERT(decoded.has_value());
+    TEST_ASSERT(decoded->isCustomized == true);
+    TEST_ASSERT(decoded->keybindings.size() == 2);
+    TEST_ASSERT(decoded->keybindings["ctrl+s"] == "save_project");
+
+    // Invalid json decode (missing expected fields)
+    nlohmann::json invalidJson = nlohmann::json::array();
+    auto badDecoded = KeybindingPersistenceEngine::decodePersistedKeybindingsState(invalidJson);
+    TEST_ASSERT(!badDecoded.has_value());
+
+    // Strict import parsing
+    nlohmann::json validConfig;
+    validConfig["ctrl+c"] = "copy";
+    validConfig["ctrl+v"] = "paste";
+    auto imported = KeybindingPersistenceEngine::parseImportedKeybindings(validConfig);
+    TEST_ASSERT(imported.size() == 2);
+    TEST_ASSERT(imported["ctrl+c"] == "copy");
+
+    // Strict import parsing error
+    bool caught = false;
+    try {
+        nlohmann::json nonObject = "not_an_object";
+        KeybindingPersistenceEngine::parseImportedKeybindings(nonObject);
+    } catch (const std::runtime_error&) {
+        caught = true;
+    }
+    TEST_ASSERT(caught);
+
+    std::cout << "[PASS] runKeybindingPersistenceEngineTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -12836,6 +13039,12 @@ int main() {
     runPropertiesPanelStoreEngineTests();
     runSpeedInputControllerTests();
     runNativeFileSystemStorageAdapterTests();
-    std::cout << ">>> ALL 229 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runTimelineEdgeScrollEngineTests();
+    runTimelineSnapIndicatorEngineTests();
+    runMediaTypeUtilsTests();
+    runPlatformBrowserUtilsTests();
+    runMediaProcessingPipelineTests();
+    runKeybindingPersistenceEngineTests();
+    std::cout << ">>> ALL 235 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }

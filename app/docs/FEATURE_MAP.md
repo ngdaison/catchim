@@ -2048,6 +2048,61 @@ Quy ước trạng thái:
 | Key-Based File Removal & Partition Clearing | `web/src/services/storage/opfs-adapter.ts` | `catchim::storage::NativeFileSystemStorageAdapter::remove`, `clear` | Verified |
 | Directory Key Enumeration & File Size Queries | `web/src/services/storage/opfs-adapter.ts` | `catchim::storage::NativeFileSystemStorageAdapter::list`, `size` | Verified |
 
+---
+
+## 218. Timeline Edge Auto-Scroll Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Edge Zone Threshold & Velocity Ramp Math | `web/src/timeline/hooks/use-edge-auto-scroll.ts` | `catchim::editor::timeline::computeEdgeScrollDelta` | Verified |
+| Left/Right Viewport Boundary Delta Limiting | `web/src/timeline/hooks/use-edge-auto-scroll.ts` | `catchim::editor::timeline::applyScrollDelta` | Verified |
+| Synchronized Timeline & Track Scroll Offset | `web/src/timeline/hooks/use-edge-auto-scroll.ts` | `catchim::editor::timeline::EdgeScrollParams` | Verified |
+
+---
+
+## 219. Timeline Snap Indicator Overlay Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Snap Point Time to Viewport Screen Coordinate | `web/src/timeline/hooks/use-snap-indicator-position.ts` | `catchim::editor::timeline::computeSnapIndicatorPosition` | Verified |
+| Track Labels Column Offset Integration (140px) | `web/src/timeline/hooks/use-snap-indicator-position.ts` | `catchim::editor::timeline::computeSnapIndicatorPosition` | Verified |
+| Dynamic Container Height & Padding Trimming | `web/src/timeline/hooks/use-snap-indicator-position.ts` | `catchim::editor::timeline::computeSnapIndicatorPosition` | Verified |
+
+---
+
+## 220. Media Type & Audio Capability Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Audio-Supported Media Types Assessment | `web/src/media/media-utils.ts` | `catchim::media::mediaSupportsAudio` | Verified |
+| Optional Media Asset Type Resolution | `web/src/media/media-utils.ts` | `catchim::media::mediaSupportsAudioOpt` | Verified |
+| MIME Type to MediaType Auto-Detection | `web/src/media/media-utils.ts` | `catchim::media::getMediaTypeFromMime` | Verified |
+
+---
+
+## 221. Platform & Browser Interop Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Apple/Non-Apple Platform Detection | `web/src/utils/platform.ts` | `catchim::utils::isAppleDevice` | Verified |
+| Modifier Key Label Resolution (Cmd vs Ctrl, Opt vs Alt) | `web/src/utils/platform.ts` | `catchim::utils::getPlatformSpecialKey`, `getPlatformAlternateKey` | Verified |
+| Typable DOM Element Classification & Scrollable Overflow Check | `web/src/utils/browser.ts` | `catchim::utils::isTypableDOMElement`, `isScrollableOverflow` | Verified |
+
+---
+
+## 222. Media Asset Processing & Ingestion Pipeline
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Unsupported Codec Diagnostic Description Formatting | `web/src/media/processing.ts` | `catchim::media::MediaProcessingPipeline::getUnsupportedVideoDescription` | Verified |
+| Storage Capacity Quota Diagnostic Formatter | `web/src/media/processing.ts` | `catchim::media::MediaProcessingPipeline::getStorageLimitDescription` | Verified |
+| Codec Compatibility & Ingestion Validation | `web/src/media/processing.ts` | `catchim::media::MediaProcessingPipeline::validateAndPrepare` | Verified |
+
+---
+
+## 223. Keybinding Persistence & Schema Migration Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Keybinding State JSON Serialization | `web/src/actions/keybindings/persistence.ts` | `catchim::editor::KeybindingPersistenceEngine::serializeKeybindingsState` | Verified |
+| Lossy Persisted State Decoding & Error Dropping | `web/src/actions/keybindings/persistence.ts` | `catchim::editor::KeybindingPersistenceEngine::decodePersistedKeybindingsState` | Verified |
+| Strict User Configuration Import Validator | `web/src/actions/keybindings/persistence.ts` | `catchim::editor::KeybindingPersistenceEngine::parseImportedKeybindings` | Verified |
+
+
 
 
 
