@@ -345,6 +345,10 @@ add_library(catchim_editor STATIC
     src/editor/panels/PanelStoreEngine.h
     src/editor/timecode/EditableTimecodeController.cpp
     src/editor/timecode/EditableTimecodeController.h
+    src/editor/scene/TimelineSceneUtils.cpp
+    src/editor/scene/TimelineSceneUtils.h
+    src/editor/timeline/TimelineToolbarEngine.cpp
+    src/editor/timeline/TimelineToolbarEngine.h
 )
 target_link_libraries(catchim_editor PUBLIC catchim_core catchim_subtitles)
 
@@ -551,6 +555,14 @@ add_library(catchim_audio STATIC
     src/audio/AudioManager.h
     src/audio/AudioMediaUtils.cpp
     src/audio/AudioMediaUtils.h
+    src/audio/AudioVolumeLineEngine.cpp
+    src/audio/AudioVolumeLineEngine.h
+    src/audio/AudioWaveformBarEngine.cpp
+    src/audio/AudioWaveformBarEngine.h
+    src/audio/TtsServiceEngine.cpp
+    src/audio/TtsServiceEngine.h
+    src/audio/AudibleCandidateCollector.cpp
+    src/audio/AudibleCandidateCollector.h
 )
 target_link_libraries(catchim_audio PUBLIC catchim_core catchim_editor)
 

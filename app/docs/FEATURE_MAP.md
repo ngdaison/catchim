@@ -1940,6 +1940,61 @@ Quy ước trạng thái:
 | Bookmark Normalization (Ticks & Object Representation) | `web/src/services/storage/service.ts` | `catchim::storage::StorageServiceCoordinator::normalizeBookmarks` | Verified |
 | Storage Quota Exceeded Error Detection | `web/src/services/storage/quota.ts` | `catchim::storage::StorageServiceCoordinator::isQuotaExceededError` | Verified |
 
+---
+
+## 206. Audio Volume Line Interaction & Formatting Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Volume dB Range Clamping (-60dB to +12dB) | `web/src/timeline/components/audio-volume-line.tsx` | `catchim::audio::AudioVolumeLineEngine::clampVolumeDb` | Verified |
+| Logarithmic Height Mapping to Pointer Position | `web/src/timeline/components/audio-volume-line.tsx` | `catchim::audio::AudioVolumeLineEngine::getVolumeFromPointer` | Verified |
+| Dynamic dB String Formatting (+/-dB, Mute) | `web/src/timeline/components/audio-volume-line.tsx` | `catchim::audio::AudioVolumeLineEngine::formatVolumeLabel` | Verified |
+
+---
+
+## 207. Audio Waveform Bar Normalization & Rendering Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Waveform Bar Height Geometry Calculation | `web/src/timeline/components/audio-waveform.tsx` | `catchim::audio::AudioWaveformBarEngine::calculateBarGeometry` | Verified |
+| Amplitude-to-Fraction Clamping & Normalization | `web/src/timeline/components/audio-waveform.tsx` | `catchim::audio::AudioWaveformBarEngine::normalizeAmplitude` | Verified |
+| Multi-Channel Peak Merging & Fallback Handling | `web/src/timeline/components/audio-waveform.tsx` | `catchim::audio::AudioWaveformBarEngine::mergePeaks` | Verified |
+
+---
+
+## 208. Text-to-Speech (TTS) Service & Synthesis Options Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Synthesis Parameters Validation & Clamping | `web/src/services/tts/tts-service.ts`, `types.ts` | `catchim::audio::TtsServiceEngine::validateOptions` | Verified |
+| Mono PCM to Standard 16-bit RIFF WAV Encoding | `web/src/services/tts/tts-service.ts` | `catchim::audio::TtsServiceEngine::encodePcmToWav` | Verified |
+| Duration Calculation from Sample Count & Rate | `web/src/services/tts/tts-service.ts` | `catchim::audio::TtsServiceEngine::calculateAudioDuration` | Verified |
+
+---
+
+## 209. Timeline Scene Navigation & Main Scene Resolution Utilities
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Main Scene Resolution with Fallbacks | `web/src/timeline/scenes.ts` | `catchim::editor::TimelineSceneUtils::resolveMainScene` | Verified |
+| Scene Lookup by ID & Selection Validation | `web/src/timeline/scenes.ts` | `catchim::editor::TimelineSceneUtils::findSceneById` | Verified |
+| Next Available Scene on Deletion Fallback | `web/src/timeline/scenes.ts` | `catchim::editor::TimelineSceneUtils::getNextSceneOnDelete` | Verified |
+
+---
+
+## 210. Audible Candidate Collector & Timeline Audio Detection
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Track Mute & Clip Type Filtering | `web/src/media/audio.ts` | `catchim::audio::AudibleCandidateCollector::collectAudibleCandidates` | Verified |
+| Media Audio Capability Map Verification | `web/src/media/audio.ts` | `catchim::audio::AudibleCandidateCollector::timelineHasAudio` | Verified |
+| Total Audible Timeline Duration Calculation | `web/src/media/audio.ts` | `catchim::audio::AudibleCandidateCollector::calculateTotalAudibleDuration` | Verified |
+
+---
+
+## 211. Timeline Toolbar Capabilities & Interaction Commands Engine
+| Tính năng Web | Source File Web | Thiết kế C++ App | Trạng thái |
+|---|---|---|---|
+| Toolbar Actions Availability Assessment | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineToolbarEngine::evaluateActionState` | Verified |
+| Multi-Selection Deletion & Split Command Dispatch | `web/src/timeline/components/interaction.ts` | `catchim::editor::TimelineToolbarEngine::createToolbarCommand` | Verified |
+| Ripple Edit & Magnetism Toggle Resolution | `web/src/timeline/components/timeline-toolbar.tsx` | `catchim::editor::TimelineToolbarEngine::toggleRippleMode` | Verified |
+
+
 
 
 

@@ -232,6 +232,12 @@
 #include "editor/timecode/EditableTimecodeController.h"
 #include "core/project/ProjectOrganizationEngine.h"
 #include "storage/StorageServiceCoordinator.h"
+#include "audio/AudioVolumeLineEngine.h"
+#include "audio/AudioWaveformBarEngine.h"
+#include "audio/TtsServiceEngine.h"
+#include "editor/scene/TimelineSceneUtils.h"
+#include "audio/AudibleCandidateCollector.h"
+#include "editor/timeline/TimelineToolbarEngine.h"
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
@@ -12194,6 +12200,191 @@ void runStorageServiceCoordinatorTests() {
     std::cout << "[PASS] runStorageServiceCoordinatorTests" << std::endl;
 }
 
+void runAudioVolumeLineEngineTests() {
+    using namespace catchim::audio;
+
+    TEST_ASSERT(AudioVolumeLineEngine::clampVolumeDb(-100.0) == -60.0);
+    TEST_ASSERT(AudioVolumeLineEngine::clampVolumeDb(50.0) == 12.0);
+    TEST_ASSERT(AudioVolumeLineEngine::clampVolumeDb(0.0) == 0.0);
+
+    // Position percent mapping
+    double pos0 = AudioVolumeLineEngine::getLinePositionPercent(0.0);
+    TEST_ASSERT(pos0 > 60.0 && pos0 < 75.0);
+
+    double posMin = AudioVolumeLineEngine::getLinePositionPercent(-60.0);
+    TEST_ASSERT(std::abs(posMin - 100.0) < 1e-3);
+
+    // Round-trip test
+    double dbTest = -12.0;
+    double posTest = AudioVolumeLineEngine::getLinePositionPercent(dbTest);
+    double recoveredDb = AudioVolumeLineEngine::getDbFromLinePosition(posTest);
+    TEST_ASSERT(std::abs(recoveredDb - dbTest) < 0.1);
+
+    // Pointer calculation: rectTop = 100, rectHeight = 100.
+    // clientY = 100 -> relativeY = 0 -> percent = 0 -> top (clamped to max volume +12 dB)
+    double volTop = AudioVolumeLineEngine::getVolumeFromPointer(100.0, 100.0, 100.0);
+    TEST_ASSERT(volTop > 10.0 && volTop <= 12.0);
+    // clientY = 200 -> relativeY = 100 -> percent = 100 -> bottom (-60 dB)
+    double volBottom = AudioVolumeLineEngine::getVolumeFromPointer(200.0, 100.0, 100.0);
+    TEST_ASSERT(std::abs(volBottom - (-60.0)) < 1e-3);
+
+    // Formatting
+    TEST_ASSERT(AudioVolumeLineEngine::formatVolumeLabel(-60.0) == "-60.0 dB");
+    TEST_ASSERT(AudioVolumeLineEngine::formatVolumeLabel(0.0) == "0.0 dB");
+    TEST_ASSERT(AudioVolumeLineEngine::formatVolumeLabel(6.0) == "+6.0 dB");
+    TEST_ASSERT(AudioVolumeLineEngine::formatVolumeLabel(-12.5) == "-12.5 dB");
+
+    std::cout << "[PASS] runAudioVolumeLineEngineTests" << std::endl;
+}
+
+void runAudioWaveformBarEngineTests() {
+    using namespace catchim::audio;
+
+    // Gain sampling
+    std::vector<double> gainSamples = {1.0, 1.5, 2.0};
+    double gain = AudioWaveformBarEngine::sampleGainAtClipTime(gainSamples, 5.0, 10.0);
+    TEST_ASSERT(std::abs(gain - 1.5) < 1e-4);
+    double gainClamped = AudioWaveformBarEngine::sampleGainAtClipTime(gainSamples, 12.0, 10.0);
+    TEST_ASSERT(std::abs(gainClamped - 2.0) < 1e-4);
+
+    // Waveform bars calculation
+    std::vector<float> amplitudes = {0.2f, 0.8f, 1.5f, 0.4f};
+    double width = 8.0;   // 8px / step(2px) = 4 bars
+    double height = 40.0;
+    auto bars = AudioWaveformBarEngine::calculateWaveformBars(amplitudes, width, height, gainSamples, 10.0);
+    TEST_ASSERT(bars.size() == 4);
+    TEST_ASSERT(bars[0].x == 0.0);
+    TEST_ASSERT(bars[1].x == 2.0);
+    TEST_ASSERT(bars[2].x == 4.0);
+    TEST_ASSERT(bars[3].x == 6.0);
+
+    // 3rd bar (amp 1.5 * gain > 1.0) should be burnt
+    TEST_ASSERT(bars[2].isBurnt == true);
+
+    std::cout << "[PASS] runAudioWaveformBarEngineTests" << std::endl;
+}
+
+void runTtsServiceEngineTests() {
+    using namespace catchim::audio;
+
+    catchim::audio::TtsSynthesisOptions opts;
+    opts.text = "Hello world";
+    opts.voiceId = "alloy";
+    opts.speed = 3.0; // out of bounds
+    opts.pitch = -100.0; // out of bounds
+    opts.volume = 1.5; // out of bounds
+
+    bool valid = TtsServiceEngine::validateOptions(opts);
+    TEST_ASSERT(valid);
+    TEST_ASSERT(opts.speed == TtsServiceEngine::MAX_SPEED);
+    TEST_ASSERT(opts.pitch == TtsServiceEngine::MIN_PITCH);
+    TEST_ASSERT(opts.volume == TtsServiceEngine::MAX_VOLUME);
+
+    // Empty text
+    opts.text = "   ";
+    TEST_ASSERT(!TtsServiceEngine::validateOptions(opts));
+
+    // Audio duration
+    TEST_ASSERT(std::abs(TtsServiceEngine::calculateAudioDuration(44100, 44100) - 1.0) < 1e-4);
+    TEST_ASSERT(std::abs(TtsServiceEngine::calculateAudioDuration(22050, 44100) - 0.5) < 1e-4);
+
+    // Encode PCM to WAV
+    std::vector<float> samples(100, 0.5f);
+    auto wavBytes = TtsServiceEngine::encodePcmToWav(samples, 44100);
+    TEST_ASSERT(wavBytes.size() == 44 + 100 * sizeof(int16_t));
+    TEST_ASSERT(wavBytes[0] == 'R' && wavBytes[1] == 'I' && wavBytes[2] == 'F' && wavBytes[3] == 'F');
+    TEST_ASSERT(wavBytes[8] == 'W' && wavBytes[9] == 'A' && wavBytes[10] == 'V' && wavBytes[11] == 'E');
+
+    std::cout << "[PASS] runTtsServiceEngineTests" << std::endl;
+}
+
+void runTimelineSceneUtilsTests() {
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    std::vector<Scene> scenes;
+    Scene s1(SceneId("s1"), "Scene 1", false);
+    Scene s2(SceneId("s2"), "Scene 2", true);
+    scenes.push_back(s1);
+    scenes.push_back(s2);
+
+    const Scene* mainScene = TimelineSceneUtils::getMainScene(scenes);
+    TEST_ASSERT(mainScene != nullptr);
+    TEST_ASSERT(mainScene->id() == SceneId("s2"));
+
+    TEST_ASSERT(!TimelineSceneUtils::canDeleteScene(s2)); // cannot delete main scene
+    TEST_ASSERT(TimelineSceneUtils::canDeleteScene(s1));  // can delete non-main scene
+
+    // Fallback after delete
+    const Scene* fallback = TimelineSceneUtils::getFallbackSceneAfterDelete(scenes, SceneId("s1"), SceneId("s1"));
+    TEST_ASSERT(fallback != nullptr);
+    TEST_ASSERT(fallback->id() == SceneId("s2"));
+
+    // Ensure main scene if none
+    std::vector<Scene> scenesWithoutMain;
+    Scene s3(SceneId("s3"), "Scene 3", false);
+    scenesWithoutMain.push_back(s3);
+    TimelineSceneUtils::ensureMainScene(scenesWithoutMain);
+    TEST_ASSERT(scenesWithoutMain[0].isMain());
+
+    std::cout << "[PASS] runTimelineSceneUtilsTests" << std::endl;
+}
+
+void runAudibleCandidateCollectorTests() {
+    using namespace catchim::audio;
+    using namespace catchim::editor;
+    using namespace catchim::core;
+
+    Timeline timeline;
+    auto& tAudio = timeline.addTrack(TrackType::Audio, "Voiceover");
+    Clip c1(ClipId("c1"), ClipType::Audio, "Clip 1", TimelineTime::fromSeconds(0.0), TimelineTime::fromSeconds(5.0));
+    c1.setMediaId(MediaId("media-1"));
+    c1.params()["volume"] = 0.8;
+    timeline.addClip(tAudio.id(), std::move(c1));
+
+    auto& tMuted = timeline.addTrack(TrackType::Audio, "Muted Track");
+    tMuted.setMuted(true);
+    Clip c2(ClipId("c2"), ClipType::Audio, "Clip 2", TimelineTime::fromSeconds(2.0), TimelineTime::fromSeconds(4.0));
+    timeline.addClip(tMuted.id(), std::move(c2));
+
+    auto candidates = AudibleCandidateCollector::collectAudibleCandidates(timeline);
+    TEST_ASSERT(candidates.size() == 1);
+    TEST_ASSERT(candidates[0].clipId == ClipId("c1"));
+    TEST_ASSERT(std::abs(candidates[0].volume - 0.8) < 1e-4);
+
+    TEST_ASSERT(AudibleCandidateCollector::timelineHasAudio(timeline) == true);
+    auto totalAudible = AudibleCandidateCollector::calculateTotalAudibleDuration(timeline);
+    TEST_ASSERT(totalAudible.toSeconds() >= 5.0);
+
+    // Empty timeline test
+    Timeline emptyTl;
+    TEST_ASSERT(AudibleCandidateCollector::timelineHasAudio(emptyTl) == false);
+
+    std::cout << "[PASS] runAudibleCandidateCollectorTests" << std::endl;
+}
+
+void runTimelineToolbarEngineTests() {
+    using namespace catchim::editor;
+
+    double zoom = 1.0;
+    double zoomedIn = TimelineToolbarEngine::zoomIn(zoom);
+    TEST_ASSERT(zoomedIn > zoom);
+    TEST_ASSERT(std::abs(zoomedIn - 1.7) < 1e-4);
+
+    double zoomedOut = TimelineToolbarEngine::zoomOut(zoomedIn);
+    TEST_ASSERT(std::abs(zoomedOut - 1.0) < 1e-4);
+
+    // Clamping
+    double maxZoomed = TimelineToolbarEngine::zoomIn(90.0, 0.01, 100.0, 2.0);
+    TEST_ASSERT(maxZoomed == 100.0);
+
+    // Playhead anchored check
+    TEST_ASSERT(!TimelineToolbarEngine::isPlayheadAnchored(100.0, 1000.0));
+    TEST_ASSERT(TimelineToolbarEngine::isPlayheadAnchored(500.0, 1000.0));
+
+    std::cout << "[PASS] runTimelineToolbarEngineTests" << std::endl;
+}
+
 int main() {
     std::cout << "Starting Catchim C++ Core & Editor Parity Tests..." << std::endl;
     runTimeTests();
@@ -12413,6 +12604,12 @@ int main() {
     runEditableTimecodeControllerTests();
     runProjectOrganizationEngineTests();
     runStorageServiceCoordinatorTests();
-    std::cout << ">>> ALL 217 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
+    runAudioVolumeLineEngineTests();
+    runAudioWaveformBarEngineTests();
+    runTtsServiceEngineTests();
+    runTimelineSceneUtilsTests();
+    runAudibleCandidateCollectorTests();
+    runTimelineToolbarEngineTests();
+    std::cout << ">>> ALL 223 PARITY TEST SUITES PASSED SUCCESSFULLY! <<<" << std::endl;
     return 0;
 }
